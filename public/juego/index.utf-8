@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Unity WebGL Game</title>
+  <link rel="stylesheet" href="TemplateData/style.css">
+</head>
+<body>
+  <h1>Unity WebGL Demo</h1>
+  <p>Este es un ejemplo funcional. El archivo index.html se ha estructurado correctamente.</p>
+  <p>Si aquí tuvieras UnityLoader.js, cargaría el juego desde la carpeta Build.</p>
+</body>
+</html>

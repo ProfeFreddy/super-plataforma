@@ -1,0 +1,645 @@
+// server.js — servidor unificado (raíz del proyecto)
+// Combina lo mejor de tus dos versiones, sin perder endpoints.
+// Sirve SPA (si hay build), gestiona Flow (local o CloudFn),
+// expone proxies (mineduc/wiki), shape->GLB, health, y añade /api/billing/create-checkout-session.
+
+const express = require("express");
+const cors = require("cors");
+const axios = require("axios");
+require("dotenv").config();
+const { spawn } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
+
+const app = express();
+app.use(express.json());
+app.set("trust proxy", true);
+
+// ==== DEBUG DE ARRANQUE (para confirmar qué archivo corre) ====
+console.log("[cwd]", process.cwd(), "[file]", __filename);
+
+// ==== HEALTHCHECKS, ARRIBA PARA EVITAR CUALQUIER INTERFERENCIA ====
+app.get("/health", (_req, res) => res.status(200).send("ok"));
+app.get("/api/health", (_req, res) => res.status(200).send("ok"));
+app.get("/zzz", (_req, res) => res.status(200).send("pong")); // ruta de prueba
+
+
+// ──────────────────────────────────────────────────────────────
+// CORS (evita doble middleware): si CORS_ORIGIN existe, úsalo; si no, CORS abierto
+// ──────────────────────────────────────────────────────────────
+if (process.env.CORS_ORIGIN) {
+  const allowed = process.env.CORS_ORIGIN.split(",").map((s) => s.trim());
+  app.use(
+    cors({
+      origin: allowed.length === 1 && allowed[0] === "*"
+        ? true
+        : allowed,
+      credentials: true,
+    })
+  );
+} else {
+  app.use(cors());
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Paths de Python / generador 3D (conservados y unificados)
+   Ahora configurables por ENV, con tus defaults.
+   ────────────────────────────────────────────────────────────── */
+const DEFAULT_PY_DIR = path.join("C:", "Users", "ADMIN-15", "tools", "generador-3d");
+const PY_DIR = process.env.PY_DIR || DEFAULT_PY_DIR;
+const PYTHON = process.env.PYTHON_BIN || path.join(PY_DIR, ".venv", "Scripts", "python.exe");
+const SHAPE_SCRIPT = process.env.SHAPE_SCRIPT || path.join(PY_DIR, "shape_prompt2glb.py");
+
+if (!fs.existsSync(PYTHON)) console.warn("[WARN] No se encontró Python en:", PYTHON);
+if (!fs.existsSync(SHAPE_SCRIPT)) console.warn("[WARN] No se encontró el script:", SHAPE_SCRIPT);
+
+const OUT_DIR = path.resolve(__dirname, "public", "glb");
+fs.mkdirSync(OUT_DIR, { recursive: true });
+app.use("/files", express.static(OUT_DIR)); // Conserva /files
+
+app.get("/ping", (_req, res) => res.json({ ok: true })); // Conservado
+
+/* ──────────────────────────────────────────────────────────────
+   Flow: configuración y utilidades (unificadas)
+   ────────────────────────────────────────────────────────────── */
+const FLOW_URL = process.env.FLOW_URL || "https://sandbox.flow.cl/api";
+const FLOW_API_KEY = process.env.FLOW_API_KEY || "";
+const FLOW_SECRET_RAW = process.env.FLOW_SECRET || process.env.FLOW_SECRET_KEY || "";
+
+/** Normaliza secret: hex/base64/utf8 -> Buffer */
+function normalizeSecret(secret) {
+  const s = String(secret || "").trim();
+  if (!s) return Buffer.from("", "utf8");
+  if (/^[0-9a-fA-F]+$/.test(s) && s.length % 2 === 0) {
+    try { return Buffer.from(s, "hex"); } catch {}
+  }
+  if (/^[A-Za-z0-9+/=]+$/.test(s) && s.length % 4 === 0) {
+    try {
+      const b = Buffer.from(s, "base64");
+      if (b && b.length > 0) return b;
+    } catch {}
+  }
+  return Buffer.from(s, "utf8");
+}
+const FLOW_SECRET = normalizeSecret(FLOW_SECRET_RAW);
+
+/** Construye las URLs de retorno/confirmación (respeta reverse proxy) */
+function buildFlowUrls(req) {
+  const xfProto = req.headers["x-forwarded-proto"];
+  const protocol = (xfProto && String(xfProto).split(",")[0]) || req.protocol || "http";
+  const host = req.get("host") || `localhost:${process.env.PORT || 8080}`;
+  const base = `${protocol}://${host}`;
+  const urlReturn = process.env.FLOW_RETURN_URL || "http://localhost:5173/pago/retorno";
+  const urlConfirmation = process.env.FLOW_CONFIRM_URL || `${base}/api/flow/confirm`;
+  return { urlReturn, urlConfirmation };
+}
+
+/** Canonicalización (raw o encoded) */
+function canonicalQuery(params, doEncode = false) {
+  return Object.keys(params)
+    .sort()
+    .map((k) => {
+      let key = String(k);
+      let val = String(params[k] == null ? "" : params[k]);
+      if (key.normalize) key = key.normalize("NFC");
+      if (val.normalize) val = val.normalize("NFC");
+      return doEncode
+        ? `${encodeURIComponent(key)}=${encodeURIComponent(val)}`
+        : `${key}=${val}`;
+    })
+    .join("&");
+}
+
+/** Firma ambas variantes y retorna hex/base64 */
+function signBoth(canonicalStr, secretBuffer) {
+  const buf = secretBuffer || Buffer.from("", "utf8");
+  const sigHex = crypto.createHmac("sha256", buf).update(canonicalStr).digest("hex");
+  const sigB64 = crypto.createHmac("sha256", buf).update(canonicalStr).digest("base64");
+  return { sigHex, sigB64 };
+}
+
+/** Intento local con combinaciones extensas (superset) */
+async function createPaymentLocal({ plan, monto, email, req }) {
+  if (!FLOW_API_KEY || !FLOW_SECRET || FLOW_SECRET.length === 0) {
+    throw new Error("Faltan FLOW_API_KEY/FLOW_SECRET");
+  }
+
+  const { urlReturn, urlConfirmation } = buildFlowUrls(req);
+  const p = {
+    apiKey: FLOW_API_KEY,
+    amount: Number(monto),
+    commerceOrder: `PP-${Date.now()}`,
+    email: email || "",
+    subject: `Plan ${plan}`,
+    urlConfirmation,
+    urlReturn,
+    reference: `PP-${Date.now()}`, // alias, Flow a veces lo usa
+  };
+
+  const canonicalRaw = canonicalQuery(p, false);
+  const canonicalEncoded = canonicalQuery(p, true);
+
+  // Firmas para ambas
+  const sigRaw = signBoth(canonicalRaw, FLOW_SECRET);
+  const sigEnc = signBoth(canonicalEncoded, FLOW_SECRET);
+
+  const endpoints = [
+    `${FLOW_URL.replace(/\/$/, "")}/payment/create`,
+    `${FLOW_URL.replace(/\/$/, "")}/pagos`,
+  ];
+
+  const combos = [
+    { variant: "encoded", canonical: canonicalEncoded, sigHex: sigEnc.sigHex, sigB64: sigEnc.sigB64 },
+    { variant: "raw",     canonical: canonicalRaw,     sigHex: sigRaw.sigHex, sigB64: sigRaw.sigB64 },
+  ];
+
+  const paramNames = ["s", "signature"];
+  const contentTypes = ["application/x-www-form-urlencoded", "application/json"];
+
+  const results = [];
+
+  for (const endpoint of endpoints) {
+    for (const combo of combos) {
+      for (const pname of paramNames) {
+        for (const sigType of ["hex", "b64"]) {
+          for (const ct of contentTypes) {
+            try {
+              const sigValue = sigType === "hex" ? combo.sigHex : combo.sigB64;
+              const bodyObj = { ...p, [pname]: sigValue };
+
+              // Por compatibilidad, duplica 'signature' si pname != signature
+              if (pname !== "signature") bodyObj.signature = sigValue;
+
+              let resp;
+              if (ct === "application/json") {
+                resp = await axios.post(endpoint, bodyObj, {
+                  headers: { "Content-Type": "application/json" },
+                  validateStatus: () => true,
+                  timeout: 15000,
+                });
+              } else {
+                // form-urlencoded; algunos esperan 'mode=json'
+                const formObj = { ...bodyObj, mode: "json" };
+                const bodyStr = new URLSearchParams(formObj).toString();
+                resp = await axios.post(endpoint, bodyStr, {
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  validateStatus: () => true,
+                  timeout: 15000,
+                });
+              }
+
+              const data = resp.data;
+              results.push({
+                endpoint, variant: combo.variant, pname, sigType, ct, status: resp.status,
+                preview: typeof data === "string" ? data.slice(0, 200) : JSON.stringify(data).slice(0, 200),
+              });
+
+              if (resp.status >= 200 && resp.status < 300 && data && (data.token || data.url)) {
+                const token = data.token || null;
+                let payUrl = data?.url || data?.paymentUrl || data?.paymentURL;
+                if (!payUrl && token) {
+                  const isSandbox = /sandbox/i.test(FLOW_URL);
+                  const host = isSandbox ? "https://sandbox.flow.cl" : "https://www.flow.cl";
+                  payUrl = `${host}/app/web/pay.php?token=${encodeURIComponent(token)}`;
+                }
+                if (token || payUrl) {
+                  return {
+                    token,
+                    payUrl,
+                    usedAttempt: { endpoint, variant: combo.variant, pname, sigType, ct },
+                  };
+                }
+              }
+              // sigue probando…
+            } catch (e) {
+              results.push({
+                endpoint, variant: combo.variant, pname, sigType, ct, error: String(e?.message || e),
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  console.error("[FLOW] intentos agotados:", JSON.stringify(results, null, 2));
+  throw new Error("FLOW_ERROR: no valid signature or missing params after attempts");
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Endpoints Flow (unificados)
+   ────────────────────────────────────────────────────────────── */
+
+// Init pago (CloudFn -> fallback local o directo local si FORCE=1)
+app.post("/api/flow/init", async (req, res) => {
+  try {
+    const { plan, monto, email } = req.body || {};
+    if (!plan || !monto) return res.status(400).json({ error: "Faltan campos: plan y monto" });
+
+    const forceLocal = String(process.env.FLOW_FORCE_LOCAL || "").trim() === "1";
+    const canLocal = Boolean(FLOW_API_KEY && FLOW_SECRET);
+
+    if (forceLocal) {
+      if (!canLocal) return res.status(500).json({ error: "FLOW_FORCE_LOCAL=1 pero faltan claves FLOW_*" });
+      const out = await createPaymentLocal({ plan, monto, email, req });
+      return res.json(out);
+    }
+
+    // Cloud Function por defecto
+    const FLOW_FN_URL =
+      process.env.FLOW_FN_URL ||
+      "https://southamerica-east1-pragma-2c5d1.cloudfunctions.net/crearPagoFlowHttp";
+
+    const r = await axios.post(
+      FLOW_FN_URL,
+      { plan, precio: Number(monto), email: email || "" },
+      { headers: { "Content-Type": "application/json" }, validateStatus: () => true }
+    );
+
+    const data = r.data || {};
+    const looksInvalidSignature =
+      /invalid signature/i.test(JSON.stringify(data)) ||
+      (/FLOW_ERROR/i.test(String(data?.message || "")) && /signature/i.test(JSON.stringify(data)));
+
+    if ((r.status < 200 || r.status >= 300) || looksInvalidSignature) {
+      console.warn("[/api/flow/init] CloudFn error/firmas:", r.status, data);
+      if (canLocal) {
+        const out = await createPaymentLocal({ plan, monto, email, req });
+        return res.json(out);
+      }
+      return res.status(502).json({ error: "FlowFn error", status: r.status, detail: data });
+    }
+
+    // Normaliza salida
+    let token = data?.token;
+    let payUrl = data?.payUrl || data?.url || data?.paymentUrl || data?.paymentURL;
+    if (!token && payUrl) {
+      try {
+        const u = new URL(String(payUrl));
+        token = u.searchParams.get("token");
+      } catch {}
+    }
+    if (!token && !payUrl) return res.status(500).json({ error: "Respuesta sin token ni payUrl", raw: data });
+
+    if (!payUrl && token) {
+      const isSandbox = /sandbox/i.test(String(payUrl || "")) || true;
+      const host = isSandbox ? "https://sandbox.flow.cl" : "https://www.flow.cl";
+      payUrl = `${host}/app/web/pay.php?token=${encodeURIComponent(token)}`;
+    }
+
+    return res.json({ token, payUrl, source: "cloudfn" });
+  } catch (err) {
+    console.error("[/api/flow/init] error:", err?.message || err);
+    return res.status(500).json({ error: "server_error", detail: String(err?.message || err) });
+  }
+});
+
+// Confirmación (conservado)
+app.use("/api/flow/confirm", express.urlencoded({ extended: false }));
+app.post("/api/flow/confirm", (req, res) => {
+  console.log("[/api/flow/confirm] body:", req.body);
+  res.status(200).send("OK");
+});
+
+// Preview firma (útil depurar) — conservado
+app.get("/api/flow/sign-preview", (req, res) => {
+  if (!FLOW_API_KEY || !FLOW_SECRET_RAW) {
+    return res.status(400).json({ error: "Faltan FLOW_API_KEY/FLOW_SECRET" });
+  }
+  const { urlReturn, urlConfirmation } = buildFlowUrls(req);
+  const p = {
+    apiKey: FLOW_API_KEY,
+    amount: "9990",
+    commerceOrder: "PP-TEST-123",
+    email: "test@correo.com",
+    subject: "Plan Básico",
+    urlConfirmation,
+    urlReturn,
+  };
+  const canonical = canonicalQuery(p, false);
+  const sig = crypto.createHmac("sha256", FLOW_SECRET).update(canonical).digest("hex");
+  res.json({ toSign: canonical, s: sig, params: p, flowUrl: `${FLOW_URL}/payment/create` });
+});
+
+// Debug extenso (conservado y unificado)
+app.post("/api/flow/debug", async (req, res) => {
+  try {
+    const {
+      amount = 100,
+      currency = "CLP",
+      reference,
+      email,
+      subject,
+    } = req.body || {};
+
+    const ref = reference || `REF-${Date.now()}`;
+    const { urlReturn, urlConfirmation } = buildFlowUrls(req);
+    const params = {
+      apiKey: FLOW_API_KEY,
+      amount: Number(amount),
+      currency,
+      reference: String(ref),
+      commerceOrder: String(ref),
+      subject: subject || `Pago ${ref}`,
+      email: email || "",
+      urlReturn,
+      urlConfirmation,
+    };
+
+    const canonicalRaw = canonicalQuery(params, false);
+    const canonicalEncoded = canonicalQuery(params, true);
+    const sRaw = signBoth(canonicalRaw, FLOW_SECRET);
+    const sEnc = signBoth(canonicalEncoded, FLOW_SECRET);
+
+    const endpoints = [
+      `${(process.env.FLOW_API_URL || FLOW_URL).replace(/\/$/, "")}/pagos`,
+      `${(process.env.FLOW_API_URL || FLOW_URL).replace(/\/$/, "")}/payment/create`,
+    ];
+
+    const order = [
+      { canonical: canonicalRaw, signature: sRaw.sigB64, type: "b64", variant: "raw" },
+      { canonical: canonicalRaw, signature: sRaw.sigHex, type: "hex", variant: "raw" },
+      { canonical: canonicalEncoded, signature: sEnc.sigB64, type: "b64", variant: "encoded" },
+      { canonical: canonicalEncoded, signature: sEnc.sigHex, type: "hex", variant: "encoded" },
+    ];
+
+    let flowResp = null;
+    const tried = [];
+
+    for (const endpoint of endpoints) {
+      for (const attempt of order) {
+        try {
+          const bodyToFlow = { ...params, signature: attempt.signature };
+          tried.push({ endpoint, signatureType: attempt.type, variant: attempt.variant });
+          const r = await axios.post(endpoint, bodyToFlow, {
+            headers: { "Content-Type": "application/json" },
+            validateStatus: () => true,
+            timeout: 15000,
+          });
+          flowResp = r;
+          flowResp._used = {
+            canonical: attempt.canonical,
+            signatureType: attempt.type,
+            variant: attempt.variant,
+            endpoint,
+          };
+          break;
+        } catch (e) {
+          console.warn("[/api/flow/debug] intento fallo:", e?.message || e);
+        }
+      }
+      if (flowResp) break;
+    }
+
+    if (!flowResp) return res.status(502).json({ ok: false, error: "no_response", tried });
+
+    return res.status(flowResp.status).json({
+      ok: flowResp.status >= 200 && flowResp.status < 300,
+      status: flowResp.status,
+      tried,
+      canonicalRaw,
+      canonicalEncoded,
+      signaturePrefixes: {
+        raw_hex_prefix: sRaw.sigHex.slice(0, 8),
+        raw_b64_prefix: sRaw.sigB64.slice(0, 8),
+        enc_hex_prefix: sEnc.sigHex.slice(0, 8),
+        enc_b64_prefix: sEnc.sigB64.slice(0, 8),
+      },
+      used: flowResp._used,
+      flowData: flowResp.data,
+    });
+  } catch (err) {
+    console.error("[/api/flow/debug] error:", err?.message || err);
+    return res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+/* ──────────────────────────────────────────────────────────────
+   Endpoint NUEVO para front (/api/billing/create-checkout-session)
+   -> reusa /api/flow/init con un map de planes a montos
+   ────────────────────────────────────────────────────────────── */
+const PLAN_PRICES = {
+  PRO_MENSUAL: Number(process.env.PRICE_PRO_MENSUAL || 9990),
+  PRO_ANUAL: Number(process.env.PRICE_PRO_ANUAL || 9990 * 10),
+};
+
+app.post("/api/billing/create-checkout-session", async (req, res) => {
+  try {
+    const { plan = "PRO_MENSUAL", email } = req.body || {};
+    const monto = PLAN_PRICES[plan];
+    if (!monto) return res.status(400).json({ error: "Plan no reconocido", plan });
+
+    // Construye base absoluta si SELF_BASE no está
+    const xfProto = req.headers["x-forwarded-proto"];
+    const protocol = (xfProto && String(xfProto).split(",")[0]) || req.protocol || "http";
+    const host = req.get("host") || `localhost:${process.env.PORT || 8080}`;
+    const selfBase = (process.env.SELF_BASE && process.env.SELF_BASE.replace(/\/$/, "")) || `${protocol}://${host}`;
+
+    // Reusar la lógica de /api/flow/init
+    const out = await (async () => {
+      const forceLocal = String(process.env.FLOW_FORCE_LOCAL || "").trim() === "1";
+      const canLocal = Boolean(FLOW_API_KEY && FLOW_SECRET);
+      if (forceLocal && canLocal) {
+        return createPaymentLocal({ plan, monto, email, req });
+      }
+
+      // Llama al propio endpoint con URL absoluta
+      const r = await axios
+        .post(`${selfBase}/api/flow/init`, { plan, monto, email }, { validateStatus: () => true })
+        .catch(() => ({ status: 0, data: null }));
+
+      if (r && r.status >= 200 && r.status < 300 && r.data) return r.data;
+
+      // fallback local si CloudFn falla y hay claves
+      if (canLocal) return createPaymentLocal({ plan, monto, email, req });
+
+      throw new Error("No se pudo crear checkout.");
+    })();
+
+    if (!out?.payUrl && !out?.token) {
+      return res.status(500).json({ error: "Respuesta inesperada", out });
+    }
+    return res.json({ url: out.payUrl, token: out.token, provider: "flow" });
+  } catch (e) {
+    console.error("[/api/billing/create-checkout-session] error:", e?.message || e);
+    return res.status(500).json({ error: "server_error", detail: String(e?.message || e) });
+  }
+});
+
+/* ──────────────────────────────────────────────────────────────
+   Proxies/utilitarios (conservados del segundo server)
+   ────────────────────────────────────────────────────────────── */
+
+// Nota: en tu frontend usas `${API_BASE}/mineduc` y `${API_BASE}/shape/generate`,
+// así que montamos en /api/... y además dejamos alias sin /api para compat.
+app.get("/api/mineduc", async (req, res) => {
+  try {
+    const { asignatura = "matematica", nivel = "media", unidad = "" } = req.query;
+    const url =
+      `https://www.curriculumnacional.cl/api/v1/oa/buscar` +
+      `?asignatura=${encodeURIComponent(asignatura)}` +
+      `&nivel=${encodeURIComponent(nivel)}` +
+      `&unidad=${encodeURIComponent(unidad)}`;
+
+    console.log(`[proxy /api/mineduc] -> ${url}`);
+
+    const r = await axios.get(url, {
+      headers: { "User-Agent": "pragma-app", Accept: "application/json" },
+      maxRedirects: 5,
+      validateStatus: () => true,
+    });
+
+    if (r.status >= 400) {
+      return res.status(r.status).json({
+        error: true,
+        status: r.status,
+        message: `Mineduc respondió ${r.status} (endpoint probablemente inválido)`,
+        url,
+        body: typeof r.data === "string" ? r.data.slice(0, 500) : r.data,
+      });
+    }
+
+    return res.json(r.data);
+  } catch (e) {
+    console.error("[proxy /api/mineduc] error:", e?.message);
+    return res.status(500).json({ error: true, message: e?.message || "Proxy error" });
+  }
+});
+
+app.get("/api/mineduc/mock", (req, res) => {
+  const unidad = (req.query.unidad || "").toLowerCase();
+  const base = [
+    {
+      id: "OA-MAT-1",
+      descripcion:
+        "Resolver problemas que involucren operaciones con fracciones y sus representaciones equivalentes.",
+      nivel: "1° medio",
+      asignatura: "Matemática",
+      fuente: "mock",
+    },
+    {
+      id: "OA-MAT-2",
+      descripcion:
+        "Aplicar propiedades de los números racionales en contextos cotidianos.",
+      nivel: "1° medio",
+      asignatura: "Matemática",
+      fuente: "mock",
+    },
+  ];
+  const resultados =
+    unidad && unidad.length > 2
+      ? base.filter((x) => x.descripcion.toLowerCase().includes(unidad))
+      : base;
+
+  res.json({ unidadSolicitada: unidad, resultados });
+});
+
+app.get("/api/wiki", async (req, res) => {
+  try {
+    const q = req.query.q || "";
+    const url = `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+      q
+    )}&format=json&origin=*`;
+    const r = await axios.get(url, { maxRedirects: 5 });
+    res.json(r.data);
+  } catch (e) {
+    console.error("[proxy /api/wiki] error:", e?.message);
+    res.status(500).json({ error: true, message: e?.message || "Proxy error" });
+  }
+});
+
+/* ──────────────────────────────────────────────────────────────
+   Shape -> GLB (con alias /api/shape/generate y /shape/generate)
+   ────────────────────────────────────────────────────────────── */
+function handleShapeGenerate(req, res) {
+  const { prompt = "cubo", base = 1, altura = 1, thickness = 0.06, outName } = req.body || {};
+  const safe = (s) => String(s).replace(/[^a-zA-Z0-9._-]/g, "_");
+  const fname = safe(outName || `shape_${Date.now()}.glb`);
+  const outPath = path.join(OUT_DIR, fname);
+
+  const args = [
+    SHAPE_SCRIPT,
+    "--prompt", String(prompt),
+    "--base", String(base),
+    "--altura", String(altura),
+    "--thickness", String(thickness),
+    "--out", outPath,
+  ];
+
+  console.log("[shape/generate] Ejecutando:", PYTHON, args.map(a => `"${a}"`).join(" "));
+
+  const proc = spawn(PYTHON, args, {
+    cwd: PY_DIR,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  let log = "", err = "";
+  proc.stdout.on("data", (d) => (log += d.toString()));
+  proc.stderr.on("data", (d) => (err += d.toString()));
+
+  proc.on("error", (e) => {
+    console.error("[shape/generate] spawn error:", e?.message);
+    res.status(500).json({ ok: false, error: e?.message || "spawn error" });
+  });
+
+  proc.on("close", (code) => {
+    console.log("[shape/generate] exit code:", code);
+    if (code === 0 && fs.existsSync(outPath)) {
+      const xfProto = req.headers["x-forwarded-proto"];
+      const protocol = (xfProto && String(xfProto).split(",")[0]) || req.protocol || "http";
+      const host = req.get("host") || `localhost:${process.env.PORT || 8080}`;
+      return res.json({
+        ok: true,
+        url: `${protocol}://${host}/files/${fname}`,
+        log
+      });
+    }
+    res.status(500).json({ ok: false, error: err || `exit code ${code}`, log });
+  });
+}
+app.post("/api/shape/generate", handleShapeGenerate);
+app.post("/shape/generate", handleShapeGenerate); // alias sin /api (compat)
+
+/* ──────────────────────────────────────────────────────────────
+   Health (ambos)
+   ────────────────────────────────────────────────────────────── */
+app.get("/health", (_req, res) => res.status(200).send("ok"));
+app.get("/api/health", (_req, res) => res.status(200).send("ok"));
+
+/* ──────────────────────────────────────────────────────────────
+   SERVE CLIENT BUILD (del server raíz original)
+   Ajusta CLIENT_BUILD si tu build vive en otra carpeta.
+   ────────────────────────────────────────────────────────────── */
+const CLIENT_BUILD = path.join(__dirname, "frontend", "build");
+if (fs.existsSync(CLIENT_BUILD)) {
+  console.log("[server] sirviendo frontend estático desde:", CLIENT_BUILD);
+  app.use(express.static(CLIENT_BUILD));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(CLIENT_BUILD, "index.html"));
+  });
+} else {
+  console.log("[server] build no encontrado en", CLIENT_BUILD, "(si quieres servir por 8080 ejecuta `npm run build` en el frontend)");
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Inicio del servidor
+   ────────────────────────────────────────────────────────────── */
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[proxy] activo en http://localhost:${PORT}`);
+});
+
+
+
+
+
+
+
+
+
+
+
+
+

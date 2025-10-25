@@ -1,0 +1,29 @@
+// src/lib/api.js
+import axios from "axios";
+
+/**
+ * Base para endpoints relativos. Si tienes VITE_PROXY_BASE, úsala.
+ * Si no, dejamos "" y Vite hará proxy según tu vite.config.js.
+ */
+const BASE = import.meta.env.VITE_API_BASE || "/api";
+// Un único cliente axios.
+// Nota: para URLs absolutas (https://...), axios ignora baseURL — perfecto.
+export const api = axios.create({
+  baseURL: BASE,      // ej: "", "/api" o "http://localhost:8080"
+  timeout: 30000,
+});
+
+// Opcional: pequeño log en desarrollo
+if (import.meta.env?.DEV) {
+  api.interceptors.request.use((cfg) => {
+    console.debug("[api]", cfg.method?.toUpperCase(), cfg.baseURL + (cfg.url || ""));
+    return cfg;
+  });
+}
+
+
+
+
+
+// opcional, por si en algún archivo usas `import api from ...`
+export default api;

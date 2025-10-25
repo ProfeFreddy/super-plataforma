@@ -1,0 +1,12 @@
+// src/lib/planCaps.js (frontend) Ãƒâ€Ãƒâ€¡ÃƒÂ¶ ya tienes algo similar
+export const PLAN_CAPS = {
+  FREE:    { maxStudentsPerClass: 10,  exports:{pdf:true,xlsx:false}, tools:{aiBasic:true} },
+  BASICO:  { maxStudentsPerClass: 25,  exports:{pdf:true,xlsx:false}, tools:{aiBasic:true} },
+  PRO:     { maxStudentsPerClass: 40,  exports:{pdf:true,xlsx:true }, tools:{aiBasic:true} },
+  PREMIUM: { maxStudentsPerClass: 9999,exports:{pdf:true,xlsx:true }, tools:{aiBasic:true} },
+};
+// === AÃ¢â€Å“Ã¢â€“â€™adidos para compatibilidad y helpers ===
+export default PLAN_CAPS; // permite: import PLAN_CAPS from "../lib/planCaps"
+
+export const getCaps = (plan = "FREE") =>
+  PLAN_CAPS[(plan || "").toUpperCase()] || PLAN_CAPS.FREE;

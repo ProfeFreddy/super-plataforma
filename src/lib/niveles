@@ -1,0 +1,9 @@
+// src/lib/niveles.js
+export function nivelDesdeCurso(curso = "") {
+  // "1° básico", "2° medio", etc. Deja algo utilizable.
+  const s = String(curso).toLowerCase();
+  if (/básic|basic/.test(s)) return "básica";
+  if (/medi/.test(s)) return "media";
+  return "";
+}
+export default { nivelDesdeCurso };

@@ -1,0 +1,1 @@
+const s={FREE:{maxStudentsPerClass:10,exports:{pdf:!0,xlsx:!1},tools:{aiBasic:!0}},BASICO:{maxStudentsPerClass:25,exports:{pdf:!0,xlsx:!1},tools:{aiBasic:!0}},PRO:{maxStudentsPerClass:40,exports:{pdf:!0,xlsx:!0},tools:{aiBasic:!0}},PREMIUM:{maxStudentsPerClass:9999,exports:{pdf:!0,xlsx:!0},tools:{aiBasic:!0}}};export{s as P};

@@ -1,0 +1,182 @@
+import React from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+} from "firebase/auth";
+import { auth } from "../firebase";
+
+export default function Registro() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  const qs = new URLSearchParams(loc.search);
+
+  const [nombre, setNombre] = React.useState("");
+  const [email, setEmail] = React.useState(qs.get("email") || "");
+  const [pass, setPass] = React.useState("");
+  const [pass2, setPass2] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  const goAfterRegister = () => {
+    const next = qs.get("next");
+    nav(next || "/inicio", { replace: true });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (!email.trim() || !pass) {
+      setError("Completa correo y contraseña.");
+      return;
+    }
+    if (pass !== pass2) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        pass
+      );
+
+      if (nombre.trim()) {
+        try {
+          await updateProfile(cred.user, { displayName: nombre.trim() });
+        } catch {}
+      }
+      try {
+        await sendEmailVerification(cred.user);
+      } catch {}
+
+      goAfterRegister();
+    } catch (err) {
+      setError(err?.message || "No se pudo crear la cuenta.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.wrap}>
+      <div style={styles.card}>
+        <h1 style={styles.h1}>📝 Crear Cuenta</h1>
+
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 10 }}>
+          <label style={styles.label}>Nombre y Apellido (opcional)</label>
+          <input
+            type="text"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ej: Ana Pérez"
+            style={styles.input}
+          />
+
+          <label style={styles.label}>Correo electrónico</label>
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="ejemplo@correo.com"
+            style={styles.input}
+          />
+
+          <label style={styles.label}>Contraseña</label>
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={pass}
+            onChange={(e) => setPass(e.target.value)}
+            placeholder="Mínimo 6 caracteres"
+            style={styles.input}
+          />
+
+          <label style={styles.label}>Repite la contraseña</label>
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={pass2}
+            onChange={(e) => setPass2(e.target.value)}
+            placeholder="Confirma tu contraseña"
+            style={styles.input}
+          />
+
+          {error && <div style={styles.error}>{error}</div>}
+
+          <button type="submit" disabled={loading} style={styles.btnPrimary}>
+            {loading ? "Creando…" : "Crear cuenta"}
+          </button>
+        </form>
+
+        <div style={styles.muted}>
+          ¿Ya tienes una cuenta?{" "}
+          <Link
+            to={`/login${email ? `?email=${encodeURIComponent(email)}` : ""}`}
+            style={styles.link}
+          >
+            Inicia sesión
+          </Link>
+        </div>
+
+        <div style={{ marginTop: 8 }}>
+          <Link to="/" style={styles.link}>
+            ⬅ Volver al inicio
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  wrap: {
+    minHeight: "100dvh",
+    display: "grid",
+    placeItems: "center",
+    background:
+      "radial-gradient(1200px 600px at 20% -10%, #7dd3fc22, transparent), radial-gradient(1000px 500px at 110% 10%, #a7f3d022, transparent), #f8fafc",
+    padding: 16,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 520,
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    padding: 24,
+    boxShadow: "0 10px 30px rgba(2,6,23,.08)",
+  },
+  h1: { margin: 0, marginBottom: 10, fontSize: 22 },
+  label: { fontSize: 13, color: "#334155" },
+  input: {
+    padding: "10px 12px",
+    border: "1px solid #cbd5e1",
+    borderRadius: 8,
+    outline: "none",
+  },
+  btnPrimary: {
+    marginTop: 6,
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "none",
+    background: "#10b981",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  muted: { marginTop: 12, fontSize: 13, color: "#475569" },
+  link: { color: "#0ea5e9", textDecoration: "none" },
+  error: {
+    background: "#fef2f2",
+    color: "#b91c1c",
+    border: "1px solid #fecaca",
+    padding: "8px 10px",
+    borderRadius: 8,
+    fontSize: 13,
+  },
+};

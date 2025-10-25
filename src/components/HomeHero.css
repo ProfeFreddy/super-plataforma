@@ -1,0 +1,104 @@
+/* contenedor general */
+.home-hero{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:60vh;
+  padding:3rem 1.25rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  color: #0f172a;
+}
+
+/* inner grid */
+.hero-inner{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:1rem;
+  text-align:center;
+}
+
+/* logo */
+.logo-wrap{
+  width:160px;
+  height:160px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  will-change: transform, opacity;
+}
+.logo-img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+}
+
+/* slogan principal */
+.slogan{
+  margin: 0.5rem 0 0;
+  font-size:1.5rem;
+  font-weight:600;
+  letter-spacing: -0.02em;
+  color: #0b1a3a;
+  transition: transform 300ms ease, opacity 300ms ease;
+}
+
+/* tagline final */
+.tagline{
+  margin-top:0.65rem;
+  font-size:1.05rem;
+  color:#0b2540;
+  opacity:0;
+  transform: translateY(8px);
+  transition: opacity 400ms ease, transform 400ms ease;
+}
+
+/* visible */
+.tagline-visible{
+  opacity:1;
+  transform: translateY(0);
+}
+
+/* ANIMACIONES: el logo hace "ir y venir + agrandar/encoger" en loop */
+@keyframes logoPulseSway {
+  0%   { transform: translateY(0px) scale(1);  opacity:1; }
+  25%  { transform: translateY(-8px) scale(1.12); opacity:0.95; }
+  50%  { transform: translateY(0px) scale(1);  opacity:1; }
+  75%  { transform: translateY(8px)  scale(0.92); opacity:0.95; }
+  100% { transform: translateY(0px) scale(1);  opacity:1; }
+}
+
+/* aplicamos la animación cuando animating = true */
+.logo-anim{
+  animation: logoPulseSway 1.1s ease-in-out infinite;
+  transform-origin:center;
+}
+
+/* cuando termina la animación queda en reposo con una pequeña transición */
+.logo-rest{
+  animation: none;
+  transition: transform 350ms ease, opacity 350ms ease;
+  transform: none;
+  opacity:1;
+}
+
+/* slogan ligero durante animación (pequeña entrada) */
+.slogan-anim{
+  opacity:0.98;
+  transform: translateY(0);
+  transition: opacity 250ms ease, transform 250ms ease;
+}
+
+/* al terminar la animación el slogan se estabiliza y se hace más visible */
+.slogan-rest{
+  opacity:1;
+  transform: translateY(0);
+}
+
+/* responsive: reducimos tamaño del logo en pantallas chicas */
+@media (max-width:600px){
+  .logo-wrap{ width:120px; height:120px; }
+  .slogan{ font-size:1.25rem; }
+  .tagline{ font-size:0.98rem; }
+}

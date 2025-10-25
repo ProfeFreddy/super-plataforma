@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/mineduc/debug", "destination": "/api/mineduc/debug" },
+    { "source": "/mineduc",       "destination": "/api/mineduc" },
+    { "source": "/shape/:path*",  "destination": "/api/shape/:path*" },
+    { "source": "/(.*)",          "destination": "/" }
+  ]
+}

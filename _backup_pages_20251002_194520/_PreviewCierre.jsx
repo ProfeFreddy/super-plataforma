@@ -1,0 +1,433 @@
+import React, { useEffect, useMemo, useState } from "react";
+
+/**
+ * CIERRE DE CLASE
+ * - No requiere librerÃ­as. El QR se genera con https://api.qrserver.com
+ * - Si luego quieres â€œenchufarloâ€ a tu backend/Firebase, reemplaza los mocks
+ *   y levanta los datos reales donde corresponde.
+ */
+
+const COLORS = {
+  brand: "#0ea5b7",
+  card: "#ffffff",
+  text: "#0f172a",
+  textMuted: "#64748b",
+  band: "#c7eef3",
+  pill: "#eff8ff",
+  border: "#e5e7eb",
+  good: "#10b981",
+};
+
+const page = {
+  maxWidth: 1160,
+  margin: "0 auto",
+  padding: "24px 16px 64px",
+};
+
+const row = {
+  display: "grid",
+  gap: 16,
+};
+
+const card = {
+  background: COLORS.card,
+  border: `1px solid ${COLORS.border}`,
+  borderRadius: 16,
+  padding: 20,
+  boxShadow: "0 1px 2px rgba(0,0,0,.04)",
+};
+
+const pill = {
+  background: COLORS.pill,
+  border: `1px solid ${COLORS.border}`,
+  color: COLORS.text,
+  padding: "8px 12px",
+  borderRadius: 12,
+  fontSize: 14,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const btn = {
+  primary: {
+    background: COLORS.brand,
+    color: "#fff",
+    border: "none",
+    padding: "10px 14px",
+    borderRadius: 10,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  ghost: {
+    background: "#fff",
+    color: COLORS.text,
+    border: `1px solid ${COLORS.border}`,
+    padding: "10px 14px",
+    borderRadius: 10,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+};
+
+function Band({ children }) {
+  return (
+    <div
+      style={{
+        background: COLORS.band,
+        color: COLORS.text,
+        borderRadius: 16,
+        padding: "16px 20px",
+        fontWeight: 700,
+        marginBottom: 16,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ icon, children, right }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 12,
+      }}
+    >
+      {icon ? <span style={{ fontSize: 18 }}>{icon}</span> : null}
+      <h3 style={{ margin: 0 }}>{children}</h3>
+      <div style={{ marginLeft: "auto" }}>{right}</div>
+    </div>
+  );
+}
+
+function Countdown({ seconds = 600 }) {
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => {
+    const id = setInterval(() => setLeft((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const mm = String(Math.floor(left / 60)).padStart(2, "0");
+  const ss = String(left % 60).padStart(2, "0");
+  return (
+    <div style={{ fontSize: 28, fontWeight: 800 }}>
+      {mm}:{ss}
+    </div>
+  );
+}
+
+function ProgressRow({ name, value = 0 }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 40px", gap: 10, alignItems: "center" }}>
+      <div style={{ color: COLORS.text, fontWeight: 600, opacity: 0.9 }}>{name}</div>
+      <div style={{ height: 20, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }}>
+        <div
+          style={{
+            height: "100%",
+            width: `${Math.max(0, Math.min(100, value))}%`,
+            background: COLORS.brand,
+          }}
+        />
+      </div>
+      <div style={{ textAlign: "right", color: COLORS.textMuted, fontVariantNumeric: "tabular-nums" }}>{Math.round(value)}</div>
+    </div>
+  );
+}
+
+export default function CierreClase({
+  // Mocks / props (puedes traerlos de tu store/DB)
+  planificada = false,
+  unidad = "U1: NÃºmeros y operaciones",
+  objetivo = "Reconocer y aplicar propiedades de los nÃºmeros reales.",
+  curso = "sin curso",
+  asignatura = "Lenguaje",
+  profesor = "Profesor/a",
+  proActivo = false, // si es false, se muestra el upsell de PRO
+  sessionCode = "3WL8UX",
+  participantes = [
+    { nombre: "tomi", avance: 12 },
+    { nombre: "antia", avance: 6 },
+    { nombre: "maria", avance: 5 },
+  ],
+}) {
+  const ahora = useMemo(() => new Date(), []);
+  const hora = ahora.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  const linkParticipa = useMemo(() => {
+    // En producciÃ³n usa tu dominio real
+    const base = typeof window !== "undefined" ? window.location.origin : "https://www.pragmaprofe.com";
+    const url = `${base}/participa?session=${encodeURIComponent(sessionCode)}`;
+    return url;
+  }, [sessionCode]);
+
+  const qrSrc = useMemo(() => {
+    const data = linkParticipa;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(data)}`;
+  }, [linkParticipa]);
+
+  // Mini panel del profesor (local, luego lo puedes llevar a backend)
+  const [pregunta, setPregunta] = useState("");
+  const [opcs, setOpciones] = useState(["", "", "", ""]);
+  const [correcta, setCorrecta] = useState(0);
+  const [rondaActiva, setRondaActiva] = useState(false);
+
+  function publicarRonda() {
+    // Valida al menos texto de la pregunta
+    if (!pregunta.trim()) {
+      alert("Escribe la pregunta antes de publicar.");
+      return;
+    }
+    setRondaActiva(true);
+  }
+  function cerrarRonda() {
+    setRondaActiva(false);
+  }
+  function resetCarrera() {
+    // aquÃ­ puedes notificar a tu backend
+    alert("Carrera reseteada (demo).");
+  }
+
+  return (
+    <div style={page}>
+      {/* Banda superior */}
+      <Band>{planificada ? "Clase planificada" : "Sin clase planificada"}</Band>
+
+      {/* Cabecera: Cierre / Unidad / Profesor */}
+      <div
+        style={{
+          ...row,
+          gridTemplateColumns: "1fr 1.5fr 1fr",
+          marginBottom: 16,
+        }}
+      >
+        <div style={card}>
+          <div style={{ color: COLORS.textMuted, fontSize: 14, marginBottom: 6 }}>Cierre</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <span style={{ fontSize: 18 }}>ðŸ•’</span>
+            <div style={{ fontWeight: 700 }}>{hora}</div>
+          </div>
+          <Countdown seconds={590} />
+        </div>
+
+        <div style={card}>
+          <div style={{ color: COLORS.textMuted, fontSize: 14, marginBottom: 6 }}>Unidad</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{unidad}</div>
+          <div style={{ color: COLORS.textMuted, fontSize: 14, marginBottom: 10 }}>
+            <span style={{ fontWeight: 700 }}>Objetivo: </span>
+            {objetivo}
+          </div>
+          <div style={{ color: COLORS.textMuted, fontSize: 14 }}>
+            <span style={{ fontWeight: 700 }}>Curso:</span> {curso} &nbsp; | &nbsp;
+            <span style={{ fontWeight: 700 }}>Asignatura:</span> {asignatura}
+          </div>
+        </div>
+
+        <div style={card}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <div style={pill}>ðŸ‘</div>
+            <div style={pill}>ðŸ™Œ</div>
+          </div>
+          <div style={{ color: COLORS.textMuted, fontSize: 14, marginBottom: 6 }}>{profesor}</div>
+          <div style={{ color: COLORS.textMuted, fontSize: 14 }}>({asignatura})</div>
+        </div>
+      </div>
+
+      {/* Nube de palabras final */}
+      <div style={{ ...card, marginBottom: 16 }}>
+        <SectionTitle icon="â˜ï¸">Nube de palabras final</SectionTitle>
+        {proActivo ? (
+          <div style={{ color: COLORS.textMuted }}>AquÃ­ irÃ­a el widget de la nube (PRO).</div>
+        ) : (
+          <div
+            style={{
+              border: `1px dashed ${COLORS.border}`,
+              borderRadius: 12,
+              padding: 24,
+              textAlign: "center",
+              color: COLORS.textMuted,
+            }}
+          >
+            Activa participaciÃ³n en vivo con QR y visualizaciÃ³n instantÃ¡nea. Disponible
+            <br />
+            desde el plan <strong>PRO</strong>.
+            <div style={{ marginTop: 16 }}>
+              <button style={btn.primary}>Subir a PRO</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Ãšnete a la carrera (QR) */}
+      <div style={{ ...card, marginBottom: 16 }}>
+        <SectionTitle icon="ðŸŽ¯">Ãšnete a la carrera</SectionTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 24, alignItems: "center" }}>
+          <img
+            src={qrSrc}
+            width={240}
+            height={240}
+            alt="QR para unirse"
+            style={{ borderRadius: 12, border: `1px solid ${COLORS.border}` }}
+          />
+          <div>
+            <div style={{ color: COLORS.textMuted, marginBottom: 6 }}>SesiÃ³n:</div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>{sessionCode}</div>
+            <div style={{ color: COLORS.textMuted, marginBottom: 6 }}>Abre /participa o sigue el link directo:</div>
+            <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace" }}>
+              {linkParticipa}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Centro de Juegos */}
+      <div style={{ ...card, marginBottom: 16 }}>
+        <SectionTitle icon="ðŸŽ®">Centro de Juegos</SectionTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          <div style={{ ...miniTileStyle() }}>
+            <div style={tileTitle}>Carrera PRAGMA (en esta pÃ¡gina)</div>
+            <div style={tileText}>Juego nativo de la plataforma. Publica rondas y muestra ranking.</div>
+            <a href="/carrera" style={linkBtn}>ðŸ Ir a Carrera</a>
+          </div>
+
+          <div style={{ ...miniTileStyle() }}>
+            <div style={tileTitle}>
+              Blooket <small style={{ color: COLORS.textMuted }}>Â· Premium</small>
+            </div>
+            <div style={tileText}>Lanza sets y comparte PIN con tu clase. Requiere tu cuenta.</div>
+            <a href="https://www.blooket.com/" target="_blank" rel="noreferrer" style={linkBtn}>ðŸŒ Abrir</a>
+          </div>
+
+          <div style={{ ...miniTileStyle() }}>
+            <div style={tileTitle}>
+              Deck.Toys <small style={{ color: COLORS.textMuted }}>Â· Premium</small>
+            </div>
+            <div style={tileText}>Rutas y tableros interactivos. Requiere tu cuenta.</div>
+            <a href="https://deck.toys/" target="_blank" rel="noreferrer" style={linkBtn}>ðŸŒ Abrir</a>
+          </div>
+
+          <div style={{ ...miniTileStyle() }}>
+            <div style={tileTitle}>
+              Classcraft <small style={{ color: COLORS.textMuted }}>Â· Premium</small>
+            </div>
+            <div style={tileText}>GamificaciÃ³n del curso a largo plazo. Requiere tu cuenta.</div>
+            <a href="https://www.classcraft.com/" target="_blank" rel="noreferrer" style={linkBtn}>ðŸŒ Abrir</a>
+          </div>
+        </div>
+      </div>
+
+      {/* Mini panel del profesor + Carrera en vivo */}
+      <div style={{ ...row, gridTemplateColumns: "1fr 1fr" }}>
+        {/* Mini panel */}
+        <div style={card}>
+          <SectionTitle icon="ðŸŽ›ï¸">Mini panel del profesor</SectionTitle>
+
+          <div style={{ color: COLORS.textMuted, fontSize: 13, marginBottom: 10 }}>
+            Publica una pregunta (texto + 0â€“4 opciones). Si agregas opciones, selecciona cuÃ¡l es la correcta.
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 6, fontWeight: 600 }}>Pregunta</div>
+            <input
+              type="text"
+              value={pregunta}
+              onChange={(e) => setPregunta(e.target.value)}
+              placeholder="Escribe la preguntaâ€¦"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ marginBottom: 6, fontWeight: 600 }}>Opciones (opcional)</div>
+            {opcs.map((v, i) => (
+              <label key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <input
+                  type="radio"
+                  name="correcta"
+                  checked={correcta === i}
+                  onChange={() => setCorrecta(i)}
+                />
+                <input
+                  type="text"
+                  value={v}
+                  onChange={(e) =>
+                    setOpciones((prev) => {
+                      const next = prev.slice();
+                      next[i] = e.target.value;
+                      return next;
+                    })
+                  }
+                  placeholder={`OpciÃ³n ${i + 1}`}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+              </label>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button style={btn.primary} onClick={publicarRonda}>ðŸš€ Publicar ronda</button>
+            <button style={btn.ghost} onClick={cerrarRonda}>ðŸ›‘ Cerrar ronda</button>
+            <div style={{ marginLeft: "auto", color: COLORS.textMuted, fontSize: 13 }}>
+              Ronda {rondaActiva ? <strong style={{ color: COLORS.good }}>ACTIVA</strong> : "INACTIVA"}
+            </div>
+          </div>
+        </div>
+
+        {/* Carrera en vivo */}
+        <div style={card}>
+          <SectionTitle icon="ðŸ" right={<button style={btn.ghost} onClick={resetCarrera}>â†º Reset carrera</button>}>
+            Carrera en vivo
+          </SectionTitle>
+
+          <div style={{ color: COLORS.textMuted, fontSize: 13, marginBottom: 10 }}>
+            Avance = acierto (5 pts) + bonus por rapidez (hasta +8). ParticipaciÃ³n abierta: pequeÃ±o avance.
+          </div>
+
+          <div style={{ display: "grid", gap: 10 }}>
+            {participantes.map((p) => (
+              <ProgressRow key={p.nombre} name={p.nombre} value={p.avance} />
+            ))}
+          </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+            <a href="/" style={{ ...btn.ghost, textDecoration: "none", display: "inline-block" }}>âŸµ Volver al Inicio</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- helpers visuales (mini tiles / inputs) ---------- */
+
+const inputStyle = {
+  width: "100%",
+  border: `1px solid ${COLORS.border}`,
+  borderRadius: 10,
+  padding: "10px 12px",
+  fontSize: 14,
+};
+
+const tileTitle = { fontWeight: 800, marginBottom: 8 };
+const tileText = { color: COLORS.textMuted, fontSize: 13, marginBottom: 12 };
+const linkBtn = {
+  display: "inline-block",
+  textDecoration: "none",
+  background: "#f8fafc",
+  border: `1px solid ${COLORS.border}`,
+  borderRadius: 10,
+  padding: "8px 12px",
+  color: COLORS.text,
+  fontWeight: 600,
+};
+
+function miniTileStyle() {
+  return {
+    background: "#fff",
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: 12,
+    padding: 16,
+  };
+}

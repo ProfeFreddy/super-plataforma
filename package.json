@@ -1,0 +1,55 @@
+{
+  "name": "super-plataforma",
+  "private": true,
+  "type": "commonjs",
+  "version": "1.0.0",
+  "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server/server.js",
+    "start": "node server/server.js",
+    "dev:proxy": "nodemon server.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dev:api": "vercel dev -l 3001",
+    "dev:vite": "vite --port 5174 --strictPort",
+    "copy-pdf-worker": "node -e \"const fs=require('fs');const p='node_modules/pdfjs-dist/build/pdf.worker.min.js'; if(fs.existsSync(p)){fs.mkdirSync('public/assets',{recursive:true}); fs.copyFileSync(p,'public/assets/pdf.worker.min.js'); console.log('pdf.worker copied');} else console.warn('pdf.worker not found');\"",
+    "build:with-worker": "npm run copy-pdf-worker && vite build",
+    "postinstall": "npm run copy-pdf-worker"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.12.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "firebase": "^12.3.0",
+    "framer-motion": "^12.23.24",
+    "node-fetch": "^3.3.2",
+    "pdfjs-dist": "^3.11.174",
+    "react": "18.3.1",
+    "react-d3-cloud": "1.0.6",
+    "react-dom": "18.3.1",
+    "react-pageflip": "^2.0.3",
+    "react-pdf": "^7.7.3",
+    "react-qr-code": "^2.0.18",
+    "react-router-dom": "^7.9.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "netlify-cli": "^23.9.1",
+    "nodemon": "^3.1.10",
+    "npm-run-all": "^4.1.5",
+    "vite": "^5.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ProfeFreddy/super-plataforma.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ProfeFreddy/super-plataforma/issues"
+  },
+  "homepage": "https://github.com/ProfeFreddy/super-plataforma#readme"
+}

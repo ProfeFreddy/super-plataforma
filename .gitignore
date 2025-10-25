@@ -1,0 +1,141 @@
+############################################################################### 
+# 1. Secretos / credenciales privadas (NUNCA subir)
+###############################################################################
+
+# Archivos .env en cualquier parte
+.env
+*.env
+server/.env
+**/.env
+**/*.env
+
+# Cuentas de servicio / llaves privadas
+secrets/
+reset-auth/
+tools-seed/keys/
+
+service-account.json
+serviceAccountKey.json
+firebase-service-account.json
+firebase-service-account*.json
+*.json.secret
+*.private.json
+*.key.json
+
+# Archivos de credenciales de Firebase / Google Cloud
+firebase-service-account.json
+firebase-service-account*.json
+serviceAccountKey.json
+service-account.json
+google-service-account*.json
+
+###############################################################################
+# 2. Archivos de build, bundles generados y cosas que se pueden volver a crear
+###############################################################################
+
+# Vite / React build final del frontend
+server/frontend/build/
+frontend/build/
+build/
+dist/
+server/dist/
+dist-ssr/
+*.tar.gz
+
+# Generated assets / exportaciones temporales
+*.cache
+.cache/
+.tmp/
+temp/
+tmp/
+
+###############################################################################
+# 3. Dependencias instaladas (npm / node_modules)
+###############################################################################
+
+node_modules/
+*/node_modules/
+**/node_modules/
+
+###############################################################################
+# 4. Logs, reports, debug output
+###############################################################################
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+*.log
+*.log.*
+firestore-debug.log
+firebase-debug.log
+debug.log
+debug-output.log
+
+###############################################################################
+# 5. Sistema operativo / editor / tooling
+###############################################################################
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# VSCode / IDE configs locales
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# JetBrains (WebStorm / IntelliJ)
+.idea/
+
+# TypeScript caches
+*.tsbuildinfo
+
+# Coverage (tests)
+coverage/
+.nyc_output/
+
+###############################################################################
+# 6. Otros backups y dumps locales tuyos
+###############################################################################
+
+*.bak
+*.backup
+*.orig
+*.swp
+*.swo
+*.zip
+*.7z
+*.rar
+
+# Carpetas que parecen dumps o seeds locales
+site-dump/
+backup*/
+.vscode/*
+backup-src-before-utf8.zip
+firestore-debug.log
+firebase-debug.log
+
+###############################################################################
+# 7. Rutas específicas con llaves que GitHub está bloqueando
+#    (estas fueron detectadas como credenciales en tus commits)
+###############################################################################
+
+import-curriculo/serviceAccount.json
+tools/curriculo-import/serviceAccount.json
+scripts/serviceAccountKey.json
+keys/sa.json
+
+import-curriculo/
+tools/curriculo-import/
+scripts/*.json
+keys/
