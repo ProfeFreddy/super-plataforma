@@ -1,11 +1,10 @@
 // src/pages/Home.jsx
-import React, { useEffect, useState, useMemo } from "react";
-import { Link, useNavigate, useLocation, Navigate } from "react-router-dom";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getClaseVigente } from "../services/PlanificadorService";
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
-
 import { api } from "../lib/api";
 import AuthModal from "../components/AuthModal";
 
@@ -28,10 +27,6 @@ const COLORS = {
 const qs = new URLSearchParams(location.search || "");
 const bypass =
   window.location.hostname === "localhost" || qs.get("bypass") === "1";
-
-// if (!bypass && caps?.paid && plan === "FREE") {
-//   return <Navigate to="/pago" replace />;
-// }
 
 const page = {
   minHeight: "100vh",
@@ -94,7 +89,7 @@ const grid = (min = 260) => ({
   gap: 12,
 });
 
-/* ───────────────── Header con hamburguesa ──────────────── */
+/* ───────────────── Header + hamburguesa ──────────────── */
 const headerWrap = {
   position: "sticky",
   top: 0,
@@ -160,7 +155,7 @@ const menuFooter = {
   gap: 8,
 };
 
-/* ───────────────── Splash y Hero ────────────── */
+/* ───────────────── Splash ────────────── */
 function Splash({ seconds = 5, onDone = () => {} }) {
   const [logoSrc, setLogoSrc] = useState(null);
   const candidates = ["/logo512.png", "/logo192.png", "/logo.svg"];
@@ -280,7 +275,6 @@ function Splash({ seconds = 5, onDone = () => {} }) {
           )}
         </motion.div>
 
-        {/* Eslogan BAJO el logo (fuera de la caja) */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -302,6 +296,7 @@ function Splash({ seconds = 5, onDone = () => {} }) {
   );
 }
 
+/* ───────────────── HeroIntro ────────────── */
 function HeroIntro() {
   const [animComplete, setAnimComplete] = useState(false);
   const [logoSrc, setLogoSrc] = useState(null);
@@ -424,7 +419,6 @@ function HeroIntro() {
             marginLeft: 14,
           }}
         >
-          {/* ACTUALIZADO: slogan consistente */}
           <motion.h3
             style={{
               margin: 0,
@@ -449,6 +443,8 @@ function HeroIntro() {
     </AnimatePresence>
   );
 }
+
+/* ───────────────── HintButton ────────────── */
 function HintButton({
   as = "button",
   style = {},
@@ -497,7 +493,6 @@ function HintButton({
     borderTop: "6px solid #0f172a",
   };
 
-  // decidimos si renderizar como <button> o como <Link>
   const commonProps = {
     style,
     onClick,
@@ -508,7 +503,11 @@ function HintButton({
 
   const InnerEl =
     as === "link" ? (
-      <Link to={to} style={{ ...style, textDecoration: "none" }} {...commonProps}>
+      <Link
+        to={to}
+        style={{ ...style, textDecoration: "none" }}
+        {...commonProps}
+      >
         {children}
       </Link>
     ) : (
@@ -520,7 +519,6 @@ function HintButton({
   return (
     <div style={baseWrap}>
       {InnerEl}
-
       <AnimatePresence>
         {show && (
           <motion.div
@@ -539,23 +537,24 @@ function HintButton({
   );
 }
 
-/* ───────────────── Export principal ──────────────── */
+/* ───────────────── MAIN COMPONENT ────────────── */
 export default function Home() {
   const nav = useNavigate();
   const location = useLocation();
+
+  // 👇 estas dos líneas son IMPORTANTES y deben ir DENTRO del componente
+  const pathnameLower = (location.pathname || "").toLowerCase();
+  const hideBurgerInHome = pathnameLower === "/home";
 
   const [claseVigente, setClaseVigente] = useState(null);
   const [loadingClase, setLoadingClase] = useState(true);
 
   const [splashDone, setSplashDone] = useState(false);
 
+  // usuario Firebase
   const [user, setUser] = useState(() => auth?.currentUser || null);
-  useEffect(() => {
-    console.log("[Home] mounted ✓"); // Verificación en consola
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u || null));
-    return () => unsub();
-  }, []);
 
+  // modal auth / loaders
   const [authOpen, setAuthOpen] = useState(false);
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loadingSub, setLoadingSub] = useState(false);
@@ -564,9 +563,103 @@ export default function Home() {
   // menú hamburguesa
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // tooltip / ayuda de hover en botones CTA
+  // tooltip / ayuda
   const [hoverHelp, setHoverHelp] = useState("");
 
+  // 🔐 Para evitar spam de redirecciones
+  const hasRedirectedRef = useRef(false);
+
+  async function hardLocalLogout() {
+    try {
+      await signOut(auth);
+      console.log("[hardLocalLogout] signOut(auth) OK");
+    } catch (err) {
+      console.warn("[hardLocalLogout] signOut error:", err);
+    }
+
+    try {
+      indexedDB.deleteDatabase("firebaseLocalStorageDb");
+      indexedDB.deleteDatabase("firebaseAuthLocalStorageDb");
+      console.log("[hardLocalLogout] borré indexedDB firebase*");
+    } catch (err) {
+      console.warn("[hardLocalLogout] indexedDB cleanup error:", err);
+    }
+
+    try {
+      localStorage.setItem("forceGuest", "1");
+    } catch (err) {}
+
+    try {
+      sessionStorage.clear();
+    } catch (err) {}
+
+    setUser(null);
+  }
+
+  useEffect(() => {
+    console.log("[Home] mounted ✓");
+    const unsub = onAuthStateChanged(auth, (u) => {
+      console.log(
+        "[AuthStateChanged] usuario detectado:",
+        u ? u.email || u.uid : "NO AUTH"
+      );
+      setUser(u || null);
+    });
+    return () => unsub();
+  }, []);
+
+  // NO forzar logout automático si forceGuest
+  useEffect(() => {
+    let forcedGuest = false;
+    try {
+      forcedGuest = localStorage.getItem("forceGuest") === "1";
+    } catch (e) {}
+    if (forcedGuest) {
+      console.log(
+        "[Home] forceGuest=1 detectado, PERO ya NO forzamos hardLocalLogout automático."
+      );
+    }
+  }, [user]);
+
+  // Redirección automática a /InicioClase solo si eres profe real
+  useEffect(() => {
+    try {
+      if (hasRedirectedRef.current) return;
+      if (!user || user.isAnonymous) return;
+
+      if (pathnameLower !== "/home") return;
+
+      const fromState = location?.state?.from || "";
+      const isAuthOrPagoFlow =
+        fromState === "suscripcion" ||
+        fromState === "auto-redirect-login" ||
+        fromState === "menu-login-alreadyAuth";
+
+      if (isAuthOrPagoFlow) return;
+
+      const params = new URLSearchParams(location.search || "");
+      const forced = params.get("force");
+
+      let forcedGuest = false;
+      try {
+        forcedGuest = localStorage.getItem("forceGuest") === "1";
+      } catch (err) {
+        forcedGuest = false;
+      }
+      if (forced === "1" || forcedGuest) return;
+
+      hasRedirectedRef.current = true;
+
+      nav("/InicioClase", {
+        replace: true,
+        state: { from: "auto-redirect" },
+      });
+    } catch (err) {
+      console.warn("[Home] auto-redirect ultra-blind error:", err);
+    }
+  }, [user, location, nav, pathnameLower]);
+
+  // scroll suave
   useEffect(() => {
     const prev = document.documentElement.style.scrollBehavior;
     document.documentElement.style.scrollBehavior = "smooth";
@@ -581,6 +674,7 @@ export default function Home() {
     setMenuOpen(false);
   };
 
+  // obtener clase vigente
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -602,28 +696,94 @@ export default function Home() {
   const claseText = useMemo(() => {
     if (!claseVigente) return null;
     const parts = [];
-    if (claseVigente.unidad)
+    if (claseVigente.unidad) {
       parts.push(
         `Unidad: ${claseVigente.unidad}${
           claseVigente.evaluacion ? " · (Evaluación)" : ""
         }`
       );
-    if (claseVigente.objetivo)
+    }
+    if (claseVigente.objetivo) {
       parts.push(`Objetivo: ${claseVigente.objetivo}`);
+    }
     if (claseVigente.habilidades) {
       const hab = Array.isArray(claseVigente.habilidades)
         ? claseVigente.habilidades.join(", ")
         : claseVigente.habilidades;
       if (hab) parts.push(`Habilidades: ${hab}`);
     }
+    function HeaderMenu() {
+  const navigate = useNavigate();
+
+  const [loggedIn, setLoggedIn] = useState(false); // hay usuario firebase cargado
+  const [isAnon, setIsAnon] = useState(true);      // por defecto asumimos anónimo
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u) {
+        // no hay user (tal vez todavía no terminó de crear anon)
+        setLoggedIn(false);
+        setIsAnon(true);
+        return;
+      }
+      setLoggedIn(true);
+      setIsAnon(!!u.isAnonymous);
+    });
+    return () => unsub();
+  }, []);
+
+  // cerrar sesión solo aplica si NO eres anónimo
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      // opcional: limpiar algunas cosas de profe
+      localStorage.removeItem("uid");
+      // mandar de vuelta al landing
+      navigate("/home", { replace: true });
+    } catch (e) {
+      console.error("signOut error", e);
+    }
+  };
+
+  return (
+    <div className="tu-menu-ejemplo">
+      {/* ...links comunes tipo Producto / Cómo funciona / etc... */}
+
+      {loggedIn && !isAnon ? (
+        <>
+          <button
+            onClick={() => navigate("/perfil")}
+            className="btn"
+          >
+            Mi perfil
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="btn btn-secundario"
+          >
+            Cerrar sesión
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            onClick={() => navigate("/login")}
+            className="btn btn-primario"
+          >
+            Iniciar sesión
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
     const cursoBits = [];
     if (claseVigente.nivel)
-      cursoBits.push(
-        claseVigente.nivel.replace(/basico/gi, "básico")
-      );
+      cursoBits.push(claseVigente.nivel.replace(/basico/gi, "básico"));
     if (claseVigente.seccion) cursoBits.push(claseVigente.seccion);
-    if (cursoBits.length)
-      parts.push(`Curso: ${cursoBits.join(" ")}`);
+    if (cursoBits.length) parts.push(`Curso: ${cursoBits.join(" ")}`);
     if (claseVigente.asignatura)
       parts.push(`Asignatura: ${claseVigente.asignatura}`);
     return parts.join(" • ");
@@ -643,25 +803,42 @@ export default function Home() {
       if (e) e.preventDefault();
     } catch {}
     setMsg("");
+
+    const inCommercialFlow =
+      pathnameLower.startsWith("/pago") ||
+      pathnameLower.startsWith("/planes") ||
+      pathnameLower.startsWith("/login");
+
+    if (user && !user.isAnonymous) {
+      if (!inCommercialFlow) {
+        nav("/InicioClase", {
+          replace: true,
+          state: { from: "menu-login-alreadyAuth" },
+        });
+      }
+      return;
+    }
+
     setAuthOpen(true);
+
     setTimeout(() => {
       try {
-        nav("/login?force=1");
+        nav("/login?force=1", {
+          state: { from: "auto-redirect-login" },
+        });
       } catch {
         window.location.assign("/login?force=1");
       }
     }, 120);
   });
 
-  // ====== Ir a InicioClase desde Home ======
   const goInicioClaseNow = (payload = {}) => {
-    nav("/inicio", {
+    nav("/InicioClase", {
       replace: true,
       state: { from: "home", autostart: true, ...payload },
     });
   };
 
-  // ====== Autostart si vuelves de Horario ======
   useEffect(() => {
     try {
       const st = location?.state || {};
@@ -679,26 +856,22 @@ export default function Home() {
         goInicioClaseNow(payload);
       }
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location?.key]);
+  }, [location?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Checkout → solo navegar a /pago ahora
   const goSuscribir = guard(setLoadingSub)(async (e) => {
     try {
       if (e) e.preventDefault();
     } catch {}
-    nav("/pago");
+    nav("/pago", { state: { from: "suscripcion" } });
   });
 
   async function crearPago(plan) {
     const u = auth.currentUser;
     if (!u || u.isAnonymous) {
       setAuthOpen(true);
-      setMsg(
-        "Primero inicia sesión para asociar tu suscripción."
-      );
+      setMsg("Primero inicia sesión para asociar tu suscripción.");
       try {
-        nav("/login?next=/pago");
+        nav("/login?next=/pago", { state: { from: "auto-redirect-login" } });
       } catch {
         window.location.assign("/login?next=/pago");
       }
@@ -724,9 +897,7 @@ export default function Home() {
       return data.url;
     } catch (err) {
       console.warn("[Home] crearPago error:", err);
-      setMsg(
-        err?.message || "No se pudo iniciar el pago."
-      );
+      setMsg(err?.message || "No se pudo iniciar el pago.");
       return null;
     }
   }
@@ -738,45 +909,126 @@ export default function Home() {
   });
 
   const doSignOut = async () => {
+    console.log("[doSignOut] >>> click cerrar sesión");
+    await hardLocalLogout();
     try {
-      await signOut(auth);
-    } catch {}
-    try {
-      indexedDB.deleteDatabase("firebaseLocalStorageDb");
-    } catch {}
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {}
-    try {
-      window.location.assign("/home");
-    } catch {}
+      window.location.replace("/#/home?force=1");
+      console.log("[doSignOut] replace -> /#/home?force=1");
+    } catch (err) {
+      console.warn("[doSignOut] redirect error:", err);
+    }
   };
 
-  const suscribirHref =
-    user && !user.isAnonymous
-      ? "/pago"
-      : "/login?next=/pago";
+  // 👇 footer del menú hamburguesa
+  const renderMenuFooter = () => {
+    // si estoy en /home => FORZAR versión pública SIEMPRE
+    if (hideBurgerInHome) {
+      return (
+        <Link
+          to="/login?force=1"
+          onClick={(e) => {
+            e.preventDefault();
+            setMenuOpen(false);
+            try {
+              localStorage.removeItem("forceGuest");
+              console.log("[Iniciar sesión link] forceGuest removed");
+            } catch {}
+            goLogin(e);
+          }}
+          style={{
+            ...btnGhost,
+            textAlign: "center",
+            opacity: loadingLogin ? 0.7 : 1,
+          }}
+        >
+          {loadingLogin ? "Abriendo…" : "Iniciar sesión"}
+        </Link>
+      );
+    }
+
+    // lógica normal para pantallas internas:
+    let forcedGuest = false;
+    try {
+      forcedGuest = localStorage.getItem("forceGuest") === "1";
+    } catch (err) {
+      forcedGuest = false;
+    }
+
+    const uid = user?.uid || null;
+    const email = user?.email || "";
+    const isAnon = !!user?.isAnonymous;
+    const loggedInReal = !!uid && !!email && !isAnon;
+
+    const isTeacherContext = [
+      "/inicio",
+      "/inicioclase",
+      "/desarrollo",
+      "/cierre",
+      "/planificaciones",
+      "/perfil",
+      "/horario",
+    ].some((p) => pathnameLower.startsWith(p));
+
+    const canShowProfileAndLogout =
+      loggedInReal && !forcedGuest && isTeacherContext;
+
+    if (canShowProfileAndLogout) {
+      return (
+        <>
+          <Link
+            to="/perfil"
+            onClick={() => setMenuOpen(false)}
+            style={{ ...btnGhost, textAlign: "center" }}
+          >
+            Mi perfil
+          </Link>
+
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              doSignOut();
+            }}
+            style={{ ...btnGhost }}
+          >
+            Cerrar sesión
+          </button>
+        </>
+      );
+    }
+
+    return (
+      <Link
+        to="/login?force=1"
+        onClick={(e) => {
+          e.preventDefault();
+          setMenuOpen(false);
+          try {
+            localStorage.removeItem("forceGuest");
+            console.log("[Iniciar sesión link] forceGuest removed");
+          } catch {}
+          goLogin(e);
+        }}
+        style={{
+          ...btnGhost,
+          textAlign: "center",
+          opacity: loadingLogin ? 0.7 : 1,
+        }}
+      >
+        {loadingLogin ? "Abriendo…" : "Iniciar sesión"}
+      </Link>
+    );
+  };
 
   return (
     <div style={page}>
       {!splashDone && (
-        <Splash
-          seconds={5}
-          onDone={() => setSplashDone(true)}
-        />
+        <Splash seconds={5} onDone={() => setSplashDone(true)} />
       )}
 
       {/* Header */}
       <div style={headerWrap}>
-        <div
-          style={{ ...headerInner, position: "relative" }}
-        >
-          <Link
-            to="/home"
-            style={brand}
-            aria-label="PragmaProfe Home"
-          >
+        <div style={{ ...headerInner, position: "relative" }}>
+          <Link to="/home" style={brand} aria-label="PragmaProfe Home">
             <img
               src="/logo512.png"
               alt="PragmaProfe"
@@ -810,143 +1062,108 @@ export default function Home() {
             <span>PragmaProfe</span>
           </Link>
 
-          {/* Botón hamburguesa */}
-          <button
-            aria-label="Abrir menú"
-            style={burgerBtn}
-            onClick={() => setMenuOpen((s) => !s)}
-          >
-            <div style={{ display: "grid", gap: 4 }}>
-              <span style={burgerBar} />
-              <span style={burgerBar} />
-              <span style={burgerBar} />
-            </div>
-          </button>
-
-          {/* Panel de menú */}
-          <AnimatePresence>
-            {menuOpen && (
-              <motion.div
-                key="menu"
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                style={menuPanel}
+          {/* Menú hamburguesa (oculto en /home si así lo pedimos) */}
+          {!hideBurgerInHome && (
+            <>
+              <button
+                aria-label="Abrir menú"
+                style={burgerBtn}
+                onClick={() => setMenuOpen((s) => !s)}
               >
-                <button
-                  style={{
-                    ...menuItem,
-                    textAlign: "left",
-                    background: "none",
-                    border: "none",
-                    width: "100%",
-                  }}
-                  onClick={() => goAnchor("producto")}
-                >
-                  Producto
-                </button>
-                <button
-                  style={{
-                    ...menuItem,
-                    textAlign: "left",
-                    background: "none",
-                    border: "none",
-                    width: "100%",
-                  }}
-                  onClick={() => goAnchor("como-funciona")}
-                >
-                  Cómo funciona
-                </button>
-                <button
-                  style={{
-                    ...menuItem,
-                    textAlign: "left",
-                    background: "none",
-                    border: "none",
-                    width: "100%",
-                  }}
-                  onClick={() => goAnchor("docentes")}
-                >
-                  Para docentes
-                </button>
-                <button
-                  style={{
-                    ...menuItem,
-                    textAlign: "left",
-                    background: "none",
-                    border: "none",
-                    width: "100%",
-                  }}
-                  onClick={() => goAnchor("faq")}
-                >
-                  FAQ
-                </button>
-                <button
-                  style={{
-                    ...menuItem,
-                    textAlign: "left",
-                    background: "none",
-                    border: "none",
-                    width: "100%",
-                  }}
-                  onClick={() => goAnchor("soporte")}
-                >
-                  Soporte
-                </button>
-
-                <div style={menuFooter}>
-                  {user ? (
-                    <>
-                      <Link
-                        to="/perfil"
-                        onClick={() => setMenuOpen(false)}
-                        style={{
-                          ...btnGhost,
-                          textAlign: "center",
-                        }}
-                      >
-                        Mi perfil
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          doSignOut();
-                        }}
-                        style={{ ...btnGhost }}
-                      >
-                        Cerrar sesión
-                      </button>
-                    </>
-                  ) : (
-                    <Link
-                      to="/login?force=1"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setMenuOpen(false);
-                        goLogin(e);
-                      }}
-                      style={{
-                        ...btnGhost,
-                        textAlign: "center",
-                        opacity: loadingLogin ? 0.7 : 1,
-                      }}
-                    >
-                      {loadingLogin
-                        ? "Abriendo…"
-                        : "Iniciar sesión"}
-                    </Link>
-                  )}
+                <div style={{ display: "grid", gap: 4 }}>
+                  <span style={burgerBar} />
+                  <span style={burgerBar} />
+                  <span style={burgerBar} />
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </button>
+
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    key="menu"
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    style={menuPanel}
+                  >
+                    <button
+                      style={{
+                        ...menuItem,
+                        textAlign: "left",
+                        background: "none",
+                        border: "none",
+                        width: "100%",
+                      }}
+                      onClick={() => goAnchor("producto")}
+                    >
+                      Producto
+                    </button>
+
+                    <button
+                      style={{
+                        ...menuItem,
+                        textAlign: "left",
+                        background: "none",
+                        border: "none",
+                        width: "100%",
+                      }}
+                      onClick={() => goAnchor("como-funciona")}
+                    >
+                      Cómo funciona
+                    </button>
+
+                    <button
+                      style={{
+                        ...menuItem,
+                        textAlign: "left",
+                        background: "none",
+                        border: "none",
+                        width: "100%",
+                      }}
+                      onClick={() => goAnchor("docentes")}
+                    >
+                      Para docentes
+                    </button>
+
+                    <button
+                      style={{
+                        ...menuItem,
+                        textAlign: "left",
+                        background: "none",
+                        border: "none",
+                        width: "100%",
+                      }}
+                      onClick={() => goAnchor("faq")}
+                    >
+                      FAQ
+                    </button>
+
+                    <button
+                      style={{
+                        ...menuItem,
+                        textAlign: "left",
+                        background: "none",
+                        border: "none",
+                        width: "100%",
+                      }}
+                      onClick={() => goAnchor("soporte")}
+                    >
+                      Soporte
+                    </button>
+
+                    <div style={menuFooter}>{renderMenuFooter()}</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </>
+          )}
         </div>
       </div>
 
       <div style={container}>
         <HeroIntro />
 
-        {/* Eslogan visible bajo el Hero */}
+        {/* Eslogan bajo Hero */}
         <div style={{ textAlign: "center", marginTop: 8 }}>
           <div
             style={{
@@ -1002,12 +1219,10 @@ export default function Home() {
                 }}
               />
             </div>
-            <div
-              style={{ padding: 8, background: "#fff" }}
-            >
+            <div style={{ padding: 8, background: "#fff" }}>
               <small style={{ ...pMuted }}>
-                Vídeo explicativo (1:08) — qué es
-                PragmaProfe y cómo acelera tu clase.
+                Vídeo explicativo (1:08) — qué es PragmaProfe y cómo acelera tu
+                clase.
               </small>
             </div>
           </div>
@@ -1021,82 +1236,72 @@ export default function Home() {
               justifyContent: "center",
             }}
           >
-            <h1
-              style={{
-                margin: 0,
-                color: COLORS.textDark,
-              }}
-            >
-              Planifica, dinamiza y evalúa tu
-              clase en minutos.
+            <h1 style={{ margin: 0, color: COLORS.textDark }}>
+              Planifica, dinamiza y evalúa tu clase en minutos.
             </h1>
-            <p
-              style={{
-                ...pMuted,
-                fontSize: 16,
-              }}
-            >
-              PragmaProfe alinea objetivos al
-              currículo, activa a tus estudiantes
-              con QR, nubes de palabras y
-              carreras, y cierra con evidencias…
-              sin complicarte.
+
+            <p style={{ ...pMuted, fontSize: 16 }}>
+              PragmaProfe alinea objetivos al currículo, activa a tus
+              estudiantes con QR, nubes de palabras y carreras, y cierra con
+              evidencias… sin complicarte.
             </p>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-  {/* Probar gratis */}
-  <HintButton
-    as="button"
-    style={btnPrimary}
-    hint={
-      "Usa todas las funciones Pro durante 7 días. Sin tarjeta. Al final tú decides si sigues o no."
-    }
-    onClick={() => nav("/registro")}
-  >
-    🎁 Probar gratis 7 días
-  </HintButton>
+              {/* Probar gratis */}
+              <HintButton
+                as="button"
+                style={btnPrimary}
+                hint={
+                  "Usa todas las funciones Pro durante 7 días. Sin tarjeta. Al final tú decides si sigues o no."
+                }
+                onClick={() => nav("/registro")}
+              >
+                🎁 Probar gratis 7 días
+              </HintButton>
 
-  {/* Suscribirse */}
-  <HintButton
-    as="button"
-    style={{
-      ...btnGhost,
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      opacity: loadingSub ? 0.7 : 1,
-      pointerEvents: loadingSub ? "none" : "auto",
-    }}
-    hint={
-      "Te llevamos a la pantalla de pago seguro. Si aún no inicias sesión te la pedimos primero."
-    }
-    onClick={(e) => {
-      try { e.preventDefault(); } catch {}
-      nav("/pago");
-    }}
-    disabled={loadingSub}
-  >
-    💳 Suscribirse
-  </HintButton>
+              {/* Suscribirse */}
+              <HintButton
+                as="button"
+                style={{
+                  ...btnGhost,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: loadingSub ? 0.7 : 1,
+                  pointerEvents: loadingSub ? "none" : "auto",
+                }}
+                hint={
+                  "Te llevamos a la pantalla de pago seguro. Si aún no inicias sesión te la pedimos primero."
+                }
+                onClick={(e) => {
+                  try {
+                    e.preventDefault();
+                  } catch {}
+                  nav("/pago", { state: { from: "suscripcion" } });
+                }}
+                disabled={loadingSub}
+              >
+                💳 Suscribirse
+              </HintButton>
 
-  {/* Ver planes */}
-  <HintButton
-    as="button"
-    style={btnGhost}
-    hint={
-      "Mira qué incluye cada plan (Free, Básico, Pro): objetivos sugeridos, seguimiento, QR asistencia, etc."
-    }
-    onClick={(e) => {
-      try { e.preventDefault(); } catch {}
-      nav("/planes");
-    }}
-  >
-    Ver planes
-  </HintButton>
-</div>
+              {/* Ver planes */}
+              <HintButton
+                as="button"
+                style={btnGhost}
+                hint={
+                  "Mira qué incluye cada plan (Free, Básico, Pro): objetivos sugeridos, seguimiento, QR asistencia, etc."
+                }
+                onClick={(e) => {
+                  try {
+                    e.preventDefault();
+                  } catch {}
+                  nav("/planes");
+                }}
+              >
+                Ver planes
+              </HintButton>
+            </div>
 
-
-            {/* Tooltip / ayuda bajo los botones */}
             {hoverHelp && (
               <div
                 style={{
@@ -1127,24 +1332,14 @@ export default function Home() {
             ) : null}
 
             {/* Currículo actual */}
-            <div
-              style={{ ...section, marginTop: 12 }}
-            >
-              <h3 style={h3}>
-                📚 Currículo de la clase
-                actual
-              </h3>
+            <div style={{ ...section, marginTop: 12 }}>
+              <h3 style={h3}>📚 Currículo de la clase actual</h3>
               {loadingClase ? (
-                <div style={pMuted}>
-                  Detectando clase vigente…
-                </div>
+                <div style={pMuted}>Detectando clase vigente…</div>
               ) : claseText ? (
                 <div>{claseText}</div>
               ) : (
-                <div style={pMuted}>
-                  No se detectó clase vigente
-                  ahora.
-                </div>
+                <div style={pMuted}>No se detectó clase vigente ahora.</div>
               )}
             </div>
 
@@ -1157,23 +1352,11 @@ export default function Home() {
                   background: "#f8fafc",
                 }}
               >
-                <h3
-                  style={{
-                    ...h3,
-                    marginBottom: 4,
-                  }}
-                >
-                  ✅ Horario guardado
-                </h3>
-                <p
-                  style={{
-                    ...pMuted,
-                    marginBottom: 8,
-                  }}
-                >
-                  ¿Deseas iniciar la clase
-                  ahora mismo?
+                <h3 style={{ ...h3, marginBottom: 4 }}>✅ Horario guardado</h3>
+                <p style={{ ...pMuted, marginBottom: 8 }}>
+                  ¿Deseas iniciar la clase ahora mismo?
                 </p>
+
                 <div
                   style={{
                     display: "flex",
@@ -1185,21 +1368,18 @@ export default function Home() {
                     type="button"
                     onClick={() =>
                       goInicioClaseNow({
-                        slot: location
-                          .state?.slot,
-                        label: location
-                          .state?.label,
+                        slot: location.state?.slot,
+                        label: location.state?.label,
                       })
                     }
                     style={btnPrimary}
                   >
                     Ir a Inicio de Clase
                   </button>
+
                   <button
                     type="button"
-                    onClick={() =>
-                      nav("/planificaciones")
-                    }
+                    onClick={() => nav("/planificaciones")}
                     style={btnGhost}
                   >
                     Ver planificaciones
@@ -1234,10 +1414,7 @@ export default function Home() {
         </div>
 
         {/* Cómo funciona */}
-        <div
-          id="como-funciona"
-          style={{ ...section }}
-        >
+        <div id="como-funciona" style={{ ...section }}>
           <h2 style={h2}>Cómo funciona</h2>
           <div style={grid()}>
             <StepCard
@@ -1264,14 +1441,8 @@ export default function Home() {
         </div>
 
         {/* Pensado para tu contexto */}
-        <div
-          id="docentes"
-          style={{ ...section }}
-        >
-          <h2 style={h2}>
-            Pensado para tu
-            contexto
-          </h2>
+        <div id="docentes" style={{ ...section }}>
+          <h2 style={h2}>Pensado para tu contexto</h2>
           <div style={grid()}>
             <FeatureCard
               title="Educación Básica"
@@ -1286,6 +1457,7 @@ export default function Home() {
               text="Práctica ágil y métricas de avance."
             />
           </div>
+
           <div style={{ marginTop: 8 }}>
             <Link
               to="/participa"
@@ -1294,8 +1466,7 @@ export default function Home() {
                 textDecoration: "none",
               }}
             >
-              ¿Eres estudiante? Mira
-              cómo participar →
+              ¿Eres estudiante? Mira cómo participar →
             </Link>
           </div>
         </div>
@@ -1316,13 +1487,8 @@ export default function Home() {
         </div>
 
         {/* Preguntas frecuentes */}
-        <div
-          id="faq"
-          style={{ ...section }}
-        >
-          <h2 style={h2}>
-            Preguntas frecuentes
-          </h2>
+        <div id="faq" style={{ ...section }}>
+          <h2 style={h2}>Preguntas frecuentes</h2>
           <div style={grid()}>
             <FAQ
               q="¿Mis estudiantes necesitan cuenta?"
@@ -1344,16 +1510,12 @@ export default function Home() {
         </div>
 
         {/* Contacto / Soporte */}
-        <div
-          id="soporte"
-          style={{ ...section }}
-        >
+        <div id="soporte" style={{ ...section }}>
           <h2 style={h3}>Contacto</h2>
           <p style={pMuted}>
-            ¿Tienes dudas o quieres
-            implementar PragmaProfe en tu
-            escuela?
+            ¿Tienes dudas o quieres implementar PragmaProfe en tu escuela?
           </p>
+
           <div
             style={{
               display: "flex",
@@ -1375,7 +1537,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Footer legal */}
         <div
           style={{
             textAlign: "center",
@@ -1418,7 +1580,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Banner fijo de verificación */}
+      {/* Banner fijo (puede quedarse vacío) */}
       <div
         style={{
           position: "fixed",
@@ -1429,15 +1591,12 @@ export default function Home() {
           color: "#fff",
           padding: "8px 12px",
           borderRadius: 10,
-          boxShadow:
-            "0 8px 24px rgba(0,0,0,.35)",
+          boxShadow: "0 8px 24px rgba(0,0,0,.35)",
           fontWeight: 800,
           fontSize: 16,
         }}
         data-test="slogan-banner"
-      >
-        {/* Podríamos poner mini-slogan aquí si quieres que SIEMPRE esté visible */}
-      </div>
+      ></div>
 
       {/* Modal de autenticación */}
       <AuthModal
@@ -1445,16 +1604,14 @@ export default function Home() {
         onClose={() => setAuthOpen(false)}
         onSuccess={() => {
           setAuthOpen(false);
-          setMsg(
-            "Sesión iniciada. Ahora puedes suscribirte."
-          );
+          setMsg("Sesión iniciada. Ahora puedes suscribirte.");
         }}
       />
     </div>
   );
 }
 
-/* Subcomponentes */
+/* ───────────────── Subcomponentes simples ────────────── */
 function FeatureCard({ title, text }) {
   return (
     <div style={{ ...card, padding: 14 }}>
@@ -1471,6 +1628,7 @@ function FeatureCard({ title, text }) {
     </div>
   );
 }
+
 function StepCard({ step, title, text }) {
   return (
     <div style={{ ...card, padding: 14 }}>
@@ -1495,6 +1653,7 @@ function StepCard({ step, title, text }) {
     </div>
   );
 }
+
 function FAQ({ q, a }) {
   return (
     <div style={{ ...card, padding: 14 }}>
@@ -1511,6 +1670,22 @@ function FAQ({ q, a }) {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

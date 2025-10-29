@@ -7,7 +7,7 @@ import {
 } from "firebase/auth";
 import { auth } from "../firebase";
 
-/* Mapear errores de Firebase a mensajes */
+/* Traducción de errores reales de Firebase */
 function msgFromFirebaseCode(code) {
   switch (code) {
     case "auth/email-already-in-use":
@@ -29,25 +29,26 @@ function msgFromFirebaseCode(code) {
   }
 }
 
-/* Helper email simple */
+/* Validación de email */
 const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
 
-/* Timeout defensivo para promesas que podrían quedar colgadas si Firebase no responde */
-const withTimeout = (promise, ms = 15000) =>
-  Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(
-        () =>
-          reject(
-            new Error(
-              "Tiempo de espera agotado al registrar. Revisa tu conexión o la configuración de Firebase (apiKey/proyecto)."
-            )
-          ),
-        ms
-      )
-    ),
-  ]);
+/*
+  Timer suave: marcamos si se demoró mucho, pero NO hacemos reject automático.
+  Esto evita que el usuario vea un error rojo inventado aunque Firebase sí creó la cuenta.
+*/
+function withGentleTimeout(promise, ms = 15000, slowRef = null) {
+  let timer;
+  if (slowRef) {
+    slowRef.current = false;
+    timer = setTimeout(() => {
+      slowRef.current = true; // solo lo marcamos, no rechazamos
+    }, ms);
+  }
+
+  return promise.finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 export default function Registro() {
   const nav = useNavigate();
@@ -61,22 +62,31 @@ export default function Registro() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
 
-  // Diagnóstico visible (opcional)
+  // Para saber si se tardó más de lo normal
+  const slowRef = React.useRef(false);
+
+  // Debug útil en consola (no se ve en UI)
   React.useEffect(() => {
     try {
       const opts = auth?.app?.options || {};
       console.log(
-        "[Registro][FB] projectId:", opts.projectId,
-        "| authDomain:", opts.authDomain,
-        "| apiKey defined:", Boolean(opts.apiKey)
+        "[Registro][FB] projectId:",
+        opts.projectId,
+        "| authDomain:",
+        opts.authDomain,
+        "| apiKey defined:",
+        Boolean(opts.apiKey)
       );
     } catch {}
   }, []);
 
+  // A dónde vamos después de registrar
   const goAfterRegister = () => {
     const next = qs.get("next");
-    const dest = next || "/horario"; // ⬅️ tu destino por defecto
+    const dest = next || "/horario"; // tu destino por defecto
     nav(dest, { replace: true });
+
+    // fallback por si HashRouter no navega como esperamos
     try {
       setTimeout(() => {
         if (!location.pathname.startsWith(dest)) {
@@ -88,7 +98,7 @@ export default function Registro() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; // evita doble envío
+    if (loading) return;
     setError("");
 
     const mail = String(email || "").trim().toLowerCase();
@@ -96,6 +106,7 @@ export default function Registro() {
     const pwd2 = String(pass2 || "");
     const display = String(nombre || "").trim();
 
+    // Validaciones de formulario
     if (!mail || !pwd) {
       setError("Completa correo y contraseña.");
       return;
@@ -113,12 +124,12 @@ export default function Registro() {
       return;
     }
 
-    // Validación extra: apiKey presente
+    // Validación rápida de config
     try {
       const opts = auth?.app?.options || {};
       if (!opts.apiKey) {
         setError(
-          "La configuración de Firebase no tiene apiKey. Edita src/firebase.js con el proyecto correcto."
+          "Falta la apiKey de Firebase en la configuración local. Ajusta src/firebase.js."
         );
         return;
       }
@@ -127,32 +138,67 @@ export default function Registro() {
     try {
       setLoading(true);
 
-      // ⬇️ timeout defensivo
-      const cred = await withTimeout(
-        createUserWithEmailAndPassword(auth, mail, pwd),
-        15000
+      // Creamos usuario en Firebase Auth.
+      // OJO: si esto funciona, Firebase YA creó la cuenta aunque la UI se quede pegada.
+      let cred;
+      await withGentleTimeout(
+        (async () => {
+          cred = await createUserWithEmailAndPassword(auth, mail, pwd);
+        })(),
+        15000,
+        slowRef
       );
 
+      // Si por alguna razón cred no existe, significa que se cayó en mitad de la creación.
+      // Eso es súper raro, pero evitemos crashear.
+      if (!cred || !cred.user) {
+        console.warn("[Registro] cred.user ausente después de crear cuenta");
+        setError(
+          slowRef.current
+            ? "La conexión está muy lenta. Intenta nuevamente."
+            : "No se pudo terminar el registro. Intenta nuevamente."
+        );
+        return;
+      }
+
+      // Actualizar displayName (no bloquea)
       if (display) {
         try {
           await updateProfile(cred.user, { displayName: display });
-        } catch {
-          /* no bloquea */
+        } catch (errProfile) {
+          console.warn("[Registro] updateProfile falló:", errProfile);
         }
       }
+
+      // Enviar verificación al correo (tampoco bloquea)
       try {
         await sendEmailVerification(cred.user);
-      } catch {
-        /* no bloquea */
+      } catch (errVerif) {
+        console.warn("[Registro] sendEmailVerification falló:", errVerif);
       }
 
+      // ✨ ÉXITO REAL ✨
+      // limpiamos cualquier error viejo por si estaba pintado en rojo
+      setError("");
+
+      // y navegamos al siguiente paso
       goAfterRegister();
     } catch (err) {
+      console.warn("[Registro] catch err:", err);
+
+      // Mapeamos errores de Firebase conocidos
       const nice = msgFromFirebaseCode(err?.code);
+
+      // Si no es un código auth/* pero trae un mensaje genérico tipo timeout viejo,
+      // damos algo menos técnico:
+      const fallbackMsg = slowRef.current
+        ? "Está tardando más de lo normal. Revisa tu conexión e inténtalo otra vez."
+        : "No se pudo crear la cuenta. Inténtalo nuevamente.";
+
       setError(
         err?.message?.includes?.("Firebase:") || err?.code?.startsWith?.("auth/")
           ? nice
-          : err?.message || nice
+          : fallbackMsg
       );
     } finally {
       setLoading(false);
@@ -283,6 +329,10 @@ const styles = {
     fontSize: 13,
   },
 };
+
+
+
+
 
 
 

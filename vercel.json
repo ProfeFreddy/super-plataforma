@@ -3,9 +3,12 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/mineduc/debug", "destination": "/api/mineduc/debug" },
-    { "source": "/mineduc", "destination": "/api/mineduc" }
+    { "source": "/mineduc", "destination": "/api/mineduc" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
+
+
 
 
 

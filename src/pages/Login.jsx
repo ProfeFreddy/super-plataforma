@@ -1,4 +1,4 @@
-import React from "react"; 
+import React from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import {
   signInWithEmailAndPassword,
@@ -32,8 +32,10 @@ function msgFromFirebaseCode(code) {
   }
 }
 
-/* ===== Diagnóstico de conectividad (mejorado) =====
-   Devuelve un objeto con el estado de cada endpoint crítico.
+/* ===== Diagnóstico de conectividad =====
+   IMPORTANTE: estos fetch a /.well-known/... devuelven 404 siempre.
+   Eso NO significa que Firebase esté caído.
+   Mostramos pills informativas, pero NO bloqueamos el login.
 */
 async function probeConnectivityDetailed() {
   const out = {
@@ -41,8 +43,9 @@ async function probeConnectivityDetailed() {
     gstatic: false,
     identitytoolkit: false,
     securetoken: false,
-    details: {},
+    ok: true, // asumimos OK, para NO bloquear el login
   };
+
   const tryFetch = async (url) => {
     try {
       await fetch(url, { mode: "no-cors", cache: "no-store" });
@@ -51,18 +54,23 @@ async function probeConnectivityDetailed() {
       return false;
     }
   };
+
   out.gstatic = await tryFetch("https://www.gstatic.com/generate_204");
+
+  // Estas 2 URLs suelen devolver 404, no es error real.
   out.identitytoolkit = await tryFetch(
     "https://identitytoolkit.googleapis.com/.well-known/openid-configuration"
   );
   out.securetoken = await tryFetch(
     "https://securetoken.googleapis.com/.well-known/openid-configuration"
   );
-  out.ok = out.online && out.gstatic && out.identitytoolkit && out.securetoken;
+
   return out;
 }
 
-/* ===== Verifica plan activo para decidir a dónde va tras login ===== */
+/* ===== Verifica plan activo para decidir a dónde va tras login =====
+   (Sigue aquí por si más adelante lo volvemos a usar. No lo borramos.)
+*/
 async function hasActivePlan(uid) {
   try {
     if (!uid) return false;
@@ -74,7 +82,8 @@ async function hasActivePlan(uid) {
     const endDate =
       endTs?.toDate?.() || (endTs instanceof Date ? endTs : null);
     const isActive = !!endDate && endDate > new Date();
-    const isFreeLike = plan === "FREE" || plan === "TRIAL" || plan === "BASICO_TRIAL";
+    const isFreeLike =
+      plan === "FREE" || plan === "TRIAL" || plan === "BASICO_TRIAL";
     return isActive && !isFreeLike;
   } catch {
     return false;
@@ -92,7 +101,7 @@ export default function Login() {
   const [error, setError] = React.useState("");
   const [canCreate, setCanCreate] = React.useState(false);
 
-  /* Nuevo: estado del diagnóstico */
+  /* Estado del diagnóstico visual */
   const [diag, setDiag] = React.useState(null);
   const [runningDiag, setRunningDiag] = React.useState(false);
 
@@ -101,7 +110,9 @@ export default function Login() {
     clearLoadingGuard();
     loadingGuardRef.current = setTimeout(() => {
       setLoading(false);
-      setError("Está tardando más de lo normal. Revisa si hay VPN/AdBlock o vuelve a intentarlo.");
+      setError(
+        "Está tardando más de lo normal. Revisa si hay VPN/AdBlock o vuelve a intentarlo."
+      );
     }, 15000);
   };
   const clearLoadingGuard = () => {
@@ -119,28 +130,59 @@ export default function Login() {
     return r;
   };
 
-  const goAfterLogin = React.useCallback(async () => {
+  /* ========== goAfterLogin AJUSTADO ==========
+     Antes: calculaba plan y a veces mandaba a /pago, y hacía window.location.assign.
+     Ahora:
+       1. Si en la URL venía ?next=..., vamos ahí.
+       2. Sino SIEMPRE vamos a "/inicioclase".
+     Muy importante: usamos SOLO `nav(...)` (HashRouter friendly).
+     Nada de window.location.assign que rompe el hash o te mete al loop /pago→/home.
+  */
+  const goAfterLogin = React.useCallback(() => {
     const next = qs.get("next");
-    if (next) {
-      nav(next, { replace: true });
-      setTimeout(() => { try { window.location.assign(next); } catch {} }, 120);
-      return;
-    }
-    const active = await hasActivePlan(auth.currentUser?.uid);
-    const dest = active ? "/inicioclase" : "/pago";
-    nav(dest, { replace: true });
-    setTimeout(() => { try { window.location.assign(dest); } catch {} }, 120);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nav, loc.key]);
+    const dest = next || "/inicioclase";
 
-  /* Al montar: si ya está autenticado, redirige y además corre diagnóstico para mostrar si hay bloqueos */
+    console.log("[Login] goAfterLogin dest=", dest);
+
+    // Navegación con React Router (HashRouter la convierte en #/inicioclase)
+    nav(dest, { replace: true });
+  }, [nav, qs]);
+
+  /* ========== Efecto al montar ==========
+     - Hacemos diagnóstico visual (no bloquea).
+     - Escuchamos auth:
+         si YA estás logeado y NO has pedido stay=1,
+         te mandamos directo a clase (goAfterLogin()).
+     Esto evita que /login se muestre 1 segundo y luego rebote al flujo roto.
+     Pero también te da un "escape hatch": si vas a /login?stay=1,
+     puedes quedarte viendo la pantalla de login sin que te saque.
+  */
   React.useEffect(() => {
-    runDiag(); // no bloqueante, solo informativo
-    const stop = onAuthStateChanged(auth, (u) => { if (u) goAfterLogin(); });
-    return () => { stop(); clearLoadingGuard(); };
+    runDiag();
+
+    const stayFlag = qs.get("stay");
+    const stop = onAuthStateChanged(auth, (u) => {
+      if (stayFlag === "1") {
+        console.log("[Login] stay=1 → no auto-redirect aunque haya sesión");
+        return;
+      }
+      if (u && !u.isAnonymous) {
+        console.log("[Login] onAuthStateChanged usuario detectado:", u.uid);
+        goAfterLogin();
+      }
+    });
+
+    return () => {
+      stop();
+      clearLoadingGuard();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ========== submit login ==========
+     Igual que antes pero al final llamamos goAfterLogin()
+     (que ahora manda SIEMPRE a /inicioclase, sin /pago ni window.location.assign).
+  */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -152,33 +194,37 @@ export default function Login() {
       return;
     }
 
-    const test = diag || (await runDiag());
-    if (!test?.ok) {
-      setError(
-        "No pudimos contactar a los servicios de autenticación. Desactiva VPN/AdBlock, permite los dominios y vuelve a intentar."
-      );
-      return;
+    if (!diag) {
+      await runDiag(); // sólo para mostrar pills si faltaban
     }
 
     try {
       setLoading(true);
       startLoadingGuard();
       await signInWithEmailAndPassword(auth, mail, pass);
+
       clearLoadingGuard();
       setLoading(false);
-      await goAfterLogin();
+
+      // después de login vamos DIRECTO a clase
+      goAfterLogin();
     } catch (err) {
       if (err?.code === "auth/user-not-found") {
         try {
           const methods = await fetchSignInMethodsForEmail(auth, mail);
           if (!methods || methods.length === 0) {
             setCanCreate(true);
-            setError("No encontramos una cuenta con ese correo. Puedes crearla ahora.");
+            setError(
+              "No encontramos una cuenta con ese correo. Puedes crearla ahora."
+            );
           } else {
             setError("Tu cuenta existe, pero la contraseña no coincide.");
           }
         } catch (e2) {
-          setError(msgFromFirebaseCode(e2?.code) || "No pudimos verificar el correo.");
+          setError(
+            msgFromFirebaseCode(e2?.code) ||
+              "No pudimos verificar el correo."
+          );
         }
       } else if (
         err?.code === "auth/invalid-credential" ||
@@ -189,7 +235,9 @@ export default function Login() {
       ) {
         setError(msgFromFirebaseCode(err?.code));
       } else if (err?.code === "auth/network-request-failed") {
-        setError("No se pudo contactar a Firebase (posible VPN/AdBlock/firewall). Intenta nuevamente.");
+        setError(
+          "No se pudo contactar a Firebase (posible VPN/AdBlock/firewall). Intenta nuevamente."
+        );
       } else {
         setError(err?.message || "No se pudo iniciar sesión.");
       }
@@ -207,18 +255,40 @@ export default function Login() {
   };
 
   const Pill = ({ ok, label, onOpen }) => (
-    <div style={{
-      display:"flex",alignItems:"center",gap:8,
-      padding:"6px 10px",borderRadius:999,
-      background: ok ? "#ecfdf5" : "#fff1f2",
-      border:`1px solid ${ok ? "#34d399" : "#fda4af"}`,
-      color: ok ? "#065f46" : "#7f1d1d",
-      fontSize:12, fontWeight:600
-    }}>
-      <span style={{width:8,height:8,borderRadius:999,background: ok ? "#10b981" : "#ef4444"}}/>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 10px",
+        borderRadius: 999,
+        background: ok ? "#ecfdf5" : "#fff1f2",
+        border: `1px solid ${ok ? "#34d399" : "#fda4af"}`,
+        color: ok ? "#065f46" : "#7f1d1d",
+        fontSize: 12,
+        fontWeight: 600,
+      }}
+    >
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 999,
+          background: ok ? "#10b981" : "#ef4444",
+        }}
+      />
       {label}
       {onOpen && (
-        <button onClick={onOpen} style={{marginLeft:6,border:"none",background:"transparent",color:"#0ea5e9",cursor:"pointer"}}>
+        <button
+          onClick={onOpen}
+          style={{
+            marginLeft: 6,
+            border: "none",
+            background: "transparent",
+            color: "#0ea5e9",
+            cursor: "pointer",
+          }}
+        >
           probar
         </button>
       )}
@@ -230,30 +300,80 @@ export default function Login() {
       <div style={styles.card}>
         <h1 style={styles.h1}>🔐 Iniciar Sesión</h1>
 
-        {/* Panel de diagnóstico */}
+        {/* Panel de diagnóstico (visual, no bloqueante) */}
         {diag && (
-          <div style={{marginBottom:12, padding:10, border:"1px dashed #cbd5e1", borderRadius:8, background:"#f8fafc"}}>
-            <div style={{fontSize:13, color:"#334155", marginBottom:6, fontWeight:700}}>
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 10,
+              border: "1px dashed #cbd5e1",
+              borderRadius: 8,
+              background: "#f8fafc",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                color: "#334155",
+                marginBottom: 6,
+                fontWeight: 700,
+              }}
+            >
               Diagnóstico rápido
             </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <Pill ok={!!diag.online} label="Internet" />
-              <Pill ok={!!diag.gstatic} label="gstatic (red básica)" onOpen={() => window.open("https://www.gstatic.com/generate_204","_blank")}/>
-              <Pill ok={!!diag.identitytoolkit} label="identitytoolkit (Auth)" onOpen={() => window.open("https://identitytoolkit.googleapis.com/.well-known/openid-configuration","_blank")}/>
-              <Pill ok={!!diag.securetoken} label="securetoken (tokens)" onOpen={() => window.open("https://securetoken.googleapis.com/.well-known/openid-configuration","_blank")}/>
+              <Pill
+                ok={!!diag.gstatic}
+                label="gstatic (red básica)"
+                onOpen={() =>
+                  window.open("https://www.gstatic.com/generate_204", "_blank")
+                }
+              />
+              <Pill
+                ok={!!diag.identitytoolkit}
+                label="identitytoolkit (Auth)"
+                onOpen={() =>
+                  window.open(
+                    "https://identitytoolkit.googleapis.com/.well-known/openid-configuration",
+                    "_blank"
+                  )
+                }
+              />
+              <Pill
+                ok={!!diag.securetoken}
+                label="securetoken (tokens)"
+                onOpen={() =>
+                  window.open(
+                    "https://securetoken.googleapis.com/.well-known/openid-configuration",
+                    "_blank"
+                  )
+                }
+              />
             </div>
             {!diag.ok && (
-              <div style={{marginTop:8, fontSize:12, color:"#7f1d1d"}}>
-                ⚠️ Algo bloquea el acceso a los servicios de Google. Desactiva VPN/AdBlock o permite estos dominios:
-                <div><code>identitytoolkit.googleapis.com</code></div>
-                <div><code>securetoken.googleapis.com</code></div>
-                <div><code>gstatic.com</code> y <code>googleapis.com</code></div>
+              <div style={{ marginTop: 8, fontSize: 12, color: "#7f1d1d" }}>
+                ⚠️ Algo podría estar bloqueando dominios de Google. Si falla el
+                login, desactiva VPN/AdBlock o permite:
+                <div>
+                  <code>identitytoolkit.googleapis.com</code>
+                </div>
+                <div>
+                  <code>securetoken.googleapis.com</code>
+                </div>
+                <div>
+                  <code>gstatic.com</code> y <code>googleapis.com</code>
+                </div>
               </div>
             )}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate style={{ display: "grid", gap: 10 }}>
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          style={{ display: "grid", gap: 10 }}
+        >
           <label style={styles.label}>Correo electrónico</label>
           <input
             type="email"
@@ -282,21 +402,36 @@ export default function Login() {
             </div>
           )}
 
-          <button type="submit" disabled={loading || runningDiag} style={{ ...styles.btnPrimary, opacity: (loading || runningDiag) ? 0.7 : 1 }}>
+          <button
+            type="submit"
+            disabled={loading || runningDiag}
+            style={{
+              ...styles.btnPrimary,
+              opacity: loading || runningDiag ? 0.7 : 1,
+            }}
+          >
             {loading ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
 
         <div style={styles.muted}>
           ¿No tienes cuenta?{" "}
-          <button onClick={goToRegister} style={styles.linkBtn} disabled={loading}>
+          <button
+            onClick={goToRegister}
+            style={styles.linkBtn}
+            disabled={loading}
+          >
             Regístrate aquí
           </button>
         </div>
 
         {canCreate && (
           <div style={{ marginTop: 8 }}>
-            <button onClick={goToRegister} style={styles.btnGhost} disabled={loading}>
+            <button
+              onClick={goToRegister}
+              style={styles.btnGhost}
+              disabled={loading}
+            >
               Crear cuenta con <b>{email}</b>
             </button>
           </div>
@@ -310,8 +445,10 @@ export default function Login() {
 
         {error && error.toLowerCase().includes("firebase") && (
           <div style={{ ...styles.smallMuted, marginTop: 12 }}>
-            Si persiste: desactiva VPN/AdBlock, prueba modo incógnito u otro navegador.
-            Dominios a permitir: identitytoolkit.googleapis.com, securetoken.googleapis.com, firebaseapp.com, gstatic.com, googleapis.com.
+            Si persiste: desactiva VPN/AdBlock, prueba modo incógnito u otro
+            navegador. Dominios a permitir:
+            identitytoolkit.googleapis.com, securetoken.googleapis.com,
+            firebaseapp.com, gstatic.com, googleapis.com.
           </div>
         )}
       </div>
@@ -390,6 +527,10 @@ const styles = {
     fontSize: 13,
   },
 };
+
+
+
+
 
 
 

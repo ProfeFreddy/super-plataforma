@@ -7,7 +7,8 @@ import { db } from "../firebase";
 import { getClaseVigente, getYearWeek, slotIdFrom } from "../services/PlanificadorService";
 import { PlanContext } from "../context/PlanContext";
 import { PLAN_CAPS } from "../lib/planCaps";
-import { syncSlotsFromHorario } from "../services/slots";
+// ⛔ TEMP: desactivamos para deploy porque Vercel no encuentra este módulo
+// import { syncSlotsFromHorario } from "../services/slots";
 import FichaClaseSticky from "../components/FichaClaseSticky";
 
 import {
@@ -258,7 +259,8 @@ async function readHorarioMatrix(uid) {
 // helpers para calcular el slot actual usando horarioConfig.marcas
 const colDeHoy = () => {
   const qDow = dowFromQuery();
-  const d = qDow != null ? qDow : (FORCE_TEST_TIME ? getNowForSchedule().getDay() : new Date().getDay());
+  const d =
+    qDow != null ? qDow : (FORCE_TEST_TIME ? getNowForSchedule().getDay() : new Date().getDay());
   return d >= 1 && d <= 5 ? d - 1 : 0; // 0..4 = L..V
 };
 const filaDesdeMarcas = (marcas = []) => {
@@ -447,22 +449,23 @@ function CanvasCloud({ data, palette, width, height, fontSize }) {
   // FIX: define un 'authed' local
   const authed = !!(auth.currentUser?.uid || localStorage.getItem("uid"));
 
-  useEffect(() => {
-    if (!authed) return;
-    const uid = auth.currentUser?.uid || localStorage.getItem("uid");
-    if (!uid) return;
-    if (window.__slotsSyncedForUid === uid) return;
-
-    (async () => {
-      try {
-        await syncSlotsFromHorario(uid, { overwrite: false });
-        window.__slotsSyncedForUid = uid;
-        console.log("slots sincronizados desde el horario");
-      } catch (e) {
-        console.warn("syncSlotsFromHorario error:", e);
-      }
-    })();
-  }, [authed]);
+  // ⛔ TEMP: desactivamos esta sync automática para que Vercel pueda build-ear
+  // useEffect(() => {
+  //   if (!authed) return;
+  //   const uid = auth.currentUser?.uid || localStorage.getItem("uid");
+  //   if (!uid) return;
+  //   if (window.__slotsSyncedForUid === uid) return;
+  //
+  //   (async () => {
+  //     try {
+  //       await syncSlotsFromHorario(uid, { overwrite: false });
+  //       window.__slotsSyncedForUid = uid;
+  //       console.log("slots sincronizados desde el horario");
+  //     } catch (e) {
+  //       console.warn("syncSlotsFromHorario error:", e);
+  //     }
+  //   })();
+  // }, [authed]);
 
   useEffect(() => {
     const cvs = ref.current;
@@ -630,6 +633,9 @@ function InicioClase() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // ✅ NUEVO: guardamos si es sesión anónima o real
+  const [isAnon, setIsAnon] = useState(false);
+
   // ✅ NUEVO: banner de pago recibido y limpieza de ?paid=1
   const [paidOk, setPaidOk] = useState(false);
   useEffect(() => {
@@ -704,24 +710,36 @@ function InicioClase() {
     if (s) setCurrentSlotId(s);
   }, []);
 
-  // === Auth al montar ===
+  // === Auth al montar (ARREGLADO) ===
   useEffect(() => {
+    // este ref evita hacer signInAnonymously más de una vez y pisar sesiones reales
+    let didTryAnon = false;
+
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
-        if (ALLOW_ANON) {
-          try {
-            await signInAnonymously(auth);
-          } catch (e) {
-            console.error("Anon sign-in:", e);
-          }
+      if (u) {
+        // tenemos usuario firebase (puede ser real con email o anon)
+        setAuthed(true);
+        setIsAnon(!!u.isAnonymous);
+
+        const stored = localStorage.getItem("uid");
+        if (stored !== u.uid) {
+          localStorage.setItem("uid", u.uid);
         }
         return;
-      } else {
-        setAuthed(true);
-        const stored = localStorage.getItem("uid");
-        if (stored !== u.uid) localStorage.setItem("uid", u.uid);
+      }
+
+      // si llegamos aquí, no hay usuario todavía
+      // sólo intentamos crear anónimo si está permitido Y aún no intentamos
+      if (ALLOW_ANON && !didTryAnon) {
+        didTryAnon = true;
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {
+          console.error("Anon sign-in:", e);
+        }
       }
     });
+
     return () => unsub();
   }, []);
 
@@ -914,12 +932,24 @@ function InicioClase() {
       }
 
       // host override para QR
+      // IMPORTANTE:
+      // Para que el estudiante NO caiga en la vista del profe,
+      // apuntamos directamente a la ruta pública hash "#/sala/:code"
+      // que ya redirige internamente a /participa?... y muestra el formulario alumno.
       const hostOverride = localStorage.getItem("hostOverride"); // ej: http://192.168.0.22:3005
       const base =
         hostOverride && /^https?:\/\/.*/.test(hostOverride)
           ? hostOverride
           : window.location.origin;
-      setParticipaURL(`${base}/participa?code=${code}`);
+
+      // URL alumno final en el QR:
+      //   https://pragmaprofe.com/#/sala/12345
+      // (fallback simple si no hay code)
+      const studentURL = code
+        ? `${base}/#/sala/${code}`
+        : `${base}/#/participa`;
+
+      setParticipaURL(studentURL);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -948,7 +978,13 @@ function InicioClase() {
           hostOverride && /^https?:\/\/.*/.test(hostOverride)
             ? hostOverride
             : window.location.origin;
-        setParticipaURL(`${base}/participa?code=${code}`);
+
+        // MISMO FIX AQUÍ TAMBIÉN:
+        const studentURL = code
+          ? `${base}/#/sala/${code}`
+          : `${base}/#/participa`;
+
+        setParticipaURL(studentURL);
 
         window.__salaInitDone = true;
       } catch (e) {
@@ -1187,6 +1223,10 @@ function InicioClase() {
         "16:15 - 17:00",
         "17:00 - 17:45",
         "17:45 - 18:30",
+        // nocturnos extra
+        "19:15 - 20:00",
+        "20:00 - 20:45",
+        "20:45 - 21:00",
       ];
       const diasCorrectos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 
@@ -1208,11 +1248,9 @@ function InicioClase() {
         [17, 0],
         [17, 45],
         [18, 30],
-        // nocturnos
         [19, 15],
         [20, 0],
         [20, 45],
-        // cierre
         [21, 0],
       ];
       try {
@@ -1768,6 +1806,7 @@ function InicioClase() {
           SAFE_MODE,
           DISABLE_CLOUD,
           authed,
+          isAnon,
           salaCode: salaCode || "(none)",
           cloudMode,
           palabras: (Array.isArray(cloudData) && cloudData.length) || 0,
@@ -2296,6 +2335,10 @@ function InicioClase() {
 }
 
 export { InicioClase };
+
+
+
+
 
 
 

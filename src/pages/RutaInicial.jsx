@@ -1,55 +1,96 @@
 // src/pages/RutaInicial.jsx
-import React, { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-
-// 🔹 Si ya tienes estos helpers, úsalos.
-//     Si no, igual navega a /home como fallback.
-import { getClaseVigente } from "../services/PlanificadorService";
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import Home from "./Home";
+
+/*
+  RutaInicial (ruta "/"):
+  - Usuario SIN sesión real (sin login con correo):
+      -> mostrar <Home /> (landing pública)
+      -> aunque exista sesión anónima de Firebase, NO redirigimos
+         porque es alguien probando / evaluando.
+
+  - Usuario YA autenticado "de verdad" (no anónimo):
+      -> redirigir a /InicioClase automáticamente.
+
+  Esto evita que la página raíz te "secuestren"
+  directo al flujo docente solo porque existe
+  una sesión anónima previa.
+*/
 
 export default function RutaInicial() {
-  const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // 🚫 Seguridad: este componente SOLO decide al entrar a "/"
-    if (location.pathname !== "/") return;
+  const [checkedAuth, setCheckedAuth] = React.useState(false);
+  const [userInfo, setUserInfo] = React.useState({
+    hasUser: false,
+    isAnon: false,
+  });
 
-    let unsub = () => {};
+  React.useEffect(() => {
+    let alive = true;
 
-    const ensureAuthAndRoute = async (user) => {
-      try {
-        // 🔐 Asegura sesión anónima
-        const u = user || (await signInAnonymously(auth)).user;
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!alive) return;
 
-        // ✅ Intenta detectar clase activa (si tienes el servicio)
-        if (typeof getClaseVigente === "function") {
-          const clase = await getClaseVigente(u?.uid);
-          if (clase) {
-            navigate("/InicioClase", { replace: true });
-            return;
-          }
-          // Sin clase activa
-          navigate("/proximas-clases", { replace: true });
-          return;
-        }
-
-        // 🟡 Si no tienes getClaseVigente aún, manda a Home
-        navigate("/home", { replace: true });
-      } catch (e) {
-        // Fallback robusto
-        navigate("/home", { replace: true });
+      if (u) {
+        setUserInfo({
+          hasUser: true,
+          isAnon: !!u.isAnonymous,
+        });
+      } else {
+        setUserInfo({
+          hasUser: false,
+          isAnon: false,
+        });
       }
-    };
-
-    unsub = onAuthStateChanged(auth, (user) => {
-      ensureAuthAndRoute(user);
+      setCheckedAuth(true);
     });
 
-    return () => unsub();
-  }, [location.pathname, navigate]);
+    return () => {
+      alive = false;
+      unsub && unsub();
+    };
+  }, []);
 
-  // Nada visual: es una ruta “puente”
-  return null;
+  // Redirección automática SOLO si:
+  // - hay usuario
+  // - y NO es anónimo
+  React.useEffect(() => {
+    if (!checkedAuth) return;
+    if (userInfo.hasUser && !userInfo.isAnon) {
+      navigate("/InicioClase", { replace: true });
+    }
+  }, [checkedAuth, userInfo, navigate]);
+
+  // Render:
+  // Caso 1: Usuario logeado normal -> tal vez ya estamos navegando.
+  //         Para ese cuadro negro rápido mostramos mensajito suave.
+  if (userInfo.hasUser && !userInfo.isAnon) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif",
+          color: "#0f172a",
+        }}
+      >
+        Entrando a tu clase…
+      </div>
+    );
+  }
+
+  // Caso 2: visitante nuevo O usuario anónimo de prueba gratis
+  // -> mostramos Home, que es la landing/marketing
+  return <Home />;
 }
+
+
+
+
+

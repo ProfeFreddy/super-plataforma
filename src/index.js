@@ -1,3 +1,4 @@
+console.log("⚠️ ESTO ES index.js (CRA) EJECUTÁNDOSE");
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';

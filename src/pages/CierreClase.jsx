@@ -1,9 +1,30 @@
 ﻿// src/pages/CierreClase.jsx
-import React, { useEffect, useState, useMemo, useContext, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useContext,
+  useRef,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { db } from "../firebase";
-import { getDoc, doc } from "firebase/firestore";
+import { db, auth } from "../firebase";
+import {
+  getDoc,
+  doc,
+  collection,
+  onSnapshot,
+  addDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  increment,
+  query,
+  orderBy,
+  where,
+  getDocs,
+  writeBatch,
+} from "firebase/firestore";
 import CronometroGlobal from "../components/CronometroGlobal";
 import NubeDePalabras from "../components/NubeDePalabras";
 import QRCode from "react-qr-code";
@@ -20,29 +41,59 @@ import { PLAN_CAPS } from "../lib/planCaps";
 import { getClaseVigente } from "../services/PlanificadorService";
 
 import {
-  collection,
-  onSnapshot,
-  addDoc,
-  serverTimestamp,
-  setDoc,
-  doc as fsDoc
-} from "firebase/firestore";
-import {
-  updateDoc,
-  increment,
-  query,
-  orderBy,
-  where,
-  getDocs,
-  writeBatch,
-  deleteDoc
-} from "firebase/firestore";
+  onAuthStateChanged,
+  signInAnonymously,
+} from "firebase/auth";
 
-/* auth (igual que en Desarrollo) */
-import { auth } from "../firebase";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+/* ============================================================
+   Hook seguro de auth (reemplaza al viejo useAuthX roto)
+   ============================================================ */
+function useAuthSafe() {
+  const [ready, setReady] = useState(false);
+  const [userObj, setUserObj] = useState(auth.currentUser || null);
 
-/* NUEVO: base del proxy (más robusto, igual que en Desarrollo) */
+  useEffect(() => {
+    let alive = true;
+
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!alive) return;
+      try {
+        if (!u) {
+          // si no hay usuario, creamos un anónimo
+          const cred = await signInAnonymously(auth);
+          if (!alive) return;
+          setUserObj(cred.user || null);
+          localStorage.setItem("uid", cred.user?.uid || "");
+          setReady(true);
+        } else {
+          setUserObj(u);
+          localStorage.setItem("uid", u.uid);
+          setReady(true);
+        }
+      } catch (err) {
+        console.error("[CierreClase] useAuthSafe error:", err);
+        setUserObj(u || null);
+        // fallback: si ya hay uid guardado en localStorage consideramos "ready"
+        if (localStorage.getItem("uid")) {
+          setReady(true);
+        } else {
+          setReady(true); // igual marcamos listo para no colgar la UI
+        }
+      }
+    });
+
+    return () => {
+      alive = false;
+      unsub && unsub();
+    };
+  }, []);
+
+  return { ready, user: userObj };
+}
+
+/* ============================================================
+   Base del proxy para OA MINEDUC (igual que en Desarrollo)
+   ============================================================ */
 const PROXY_BASE =
   (typeof import.meta !== "undefined" &&
     import.meta.env &&
@@ -50,21 +101,21 @@ const PROXY_BASE =
   (typeof process !== "undefined" &&
     process.env &&
     (process.env.REACT_APP_PROXY_URL || process.env.VITE_PROXY_BASE)) ||
-  (typeof window !== "undefined" ? `${window.location.origin}/api` : "http://localhost:8080");
+  (typeof window !== "undefined"
+    ? `${window.location.origin}/api`
+    : "http://localhost:8080");
 
-  // Ejemplo en Inicio/Desarrollo/Cierre:
-const { auth: authFromHook } = useAuthX ? useAuthX() : { auth: null };
-const user = (authFromHook || auth)?.currentUser;
-
-// si además cargas perfil Firestore (profesores/{uid}):
-// const perfil = ... nombre leído desde Firestore
-const nombre = user?.displayName || perfil?.nombre || "Profesor/a";
-
-<h2>Hola, {nombre}</h2>
-
-/* helpers de normalización y mapeo a slugs API MINEDUC (como en Desarrollo) */
+/* ============================================================
+   Helpers de normalización / asignatura / nivel
+   ============================================================ */
 const norm = (s = "") =>
-  s.toString().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
+  s
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim();
+
 const ASIG_SLUGS = {
   matematica: "matematica",
   matematicas: "matematica",
@@ -80,59 +131,82 @@ const ASIG_SLUGS = {
   ciencias: "ciencias",
   tecnologia: "tecnologia",
 };
+
 function asigToSlug(asig = "") {
   const k = norm(asig);
   return ASIG_SLUGS[k] || "matematica";
 }
+
 function nivelToApi(cursoStr = "", prefer = "") {
   const s = norm(cursoStr || prefer);
   if (/basico|b[aí]sico|b[aí]sica|basica/i.test(s)) return "basica";
   return "media";
 }
 
-/* ===== helpers de tiempo y marcas ===== */
+/* ============================================================
+   Helpers de tiempo y marcas (para detectar bloque actual)
+   ============================================================ */
 const FORCE_TEST_TIME = false;
 const TEST_DATETIME_ISO = "2025-08-11T08:10:00";
+
 function getNowForSchedule() {
   return FORCE_TEST_TIME ? new Date(TEST_DATETIME_ISO) : new Date();
 }
+
 function colDeHoy() {
   const d = getNowForSchedule().getDay();
   return d >= 1 && d <= 5 ? d - 1 : 0;
 }
+
 function filaDesdeMarcas(marcas = []) {
   const now = getNowForSchedule();
   const mins = now.getHours() * 60 + now.getMinutes();
-  for (let i = 0; i < (marcas.length - 1); i++) {
-    const start = (marcas[i][0] * 60) + marcas[i][1];
-    const end   = (marcas[i+1][0] * 60) + marcas[i+1][1];
+  for (let i = 0; i < marcas.length - 1; i++) {
+    const start = marcas[i][0] * 60 + marcas[i][1];
+    const end = marcas[i + 1][0] * 60 + marcas[i + 1][1];
     if (mins >= start && mins < end) return i;
   }
   return 0;
 }
+
 function getMarcasFromConfig(cfg = {}) {
-  if (Array.isArray(cfg.marcas) && Array.isArray(cfg.marcas[0])) return cfg.marcas;
-  if (Array.isArray(cfg.marcas) && cfg.marcas.length && typeof cfg.marcas[0] === "object") {
-    return cfg.marcas.map(x => [Number(x.h) || 0, Number(x.m) || 0]);
+  // caso [ [8,0], [8,45], ... ]
+  if (Array.isArray(cfg.marcas) && Array.isArray(cfg.marcas[0]))
+    return cfg.marcas;
+  // caso [ {h:8,m:0}, {h:8,m:45}, ... ]
+  if (
+    Array.isArray(cfg.marcas) &&
+    cfg.marcas.length &&
+    typeof cfg.marcas[0] === "object"
+  ) {
+    return cfg.marcas.map((x) => [Number(x.h) || 0, Number(x.m) || 0]);
   }
+  // marcasStr: ["08:00","08:45",...]
   if (Array.isArray(cfg.marcasStr)) {
-    return cfg.marcasStr.map(s => {
-      const [h,m] = String(s).split(':').map(n => Number(n)||0);
-      return [h,m];
+    return cfg.marcasStr.map((s) => {
+      const [h, m] = String(s)
+        .split(":")
+        .map((n) => Number(n) || 0);
+      return [h, m];
     });
   }
+  // bloquesGenerados fallback
   if (Array.isArray(cfg.bloquesGenerados) && cfg.bloquesGenerados.length) {
-    const startTimes = cfg.bloquesGenerados.map(b => String(b).split(' - ')[0]);
-    const lastEnd = String(cfg.bloquesGenerados.at(-1)).split(' - ')[1];
-    return [...startTimes, lastEnd].map(s => {
-      const [h,m] = s.split(':').map(n => Number(n)||0);
-      return [h,m];
+    const startTimes = cfg.bloquesGenerados.map((b) =>
+      String(b).split(" - ")[0]
+    );
+    const lastEnd = String(cfg.bloquesGenerados.at(-1)).split(" - ")[1];
+    return [...startTimes, lastEnd].map((s) => {
+      const [h, m] = s.split(":").map((n) => Number(n) || 0);
+      return [h, m];
     });
   }
   return [];
 }
 
-/* ===== estilos ===== */
+/* ============================================================
+   Estilos / UI
+   ============================================================ */
 const COLORS = {
   brandA: "#2193b0",
   brandB: "#6dd5ed",
@@ -164,7 +238,8 @@ const card = {
   color: COLORS.textDark,
   borderRadius: 12,
   padding: "1rem",
-  boxShadow: "0 6px 18px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.03)",
+  boxShadow:
+    "0 6px 18px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.03)",
   border: `1px solid ${COLORS.border}`,
   maxWidth: "100%",
   overflow: "hidden",
@@ -172,7 +247,7 @@ const card = {
   minWidth: 0,
 };
 
-/* NUEVO: forzamos capa propia y antialias consistente (anti-parpadeo) */
+/* antialias / capa propia para evitar parpadeos de texto */
 const layerFix = {
   willChange: "transform",
   transform: "translateZ(0)",
@@ -203,18 +278,50 @@ const input = {
 
 const smallMuted = { color: COLORS.textMuted, fontSize: 12 };
 
-// Centro de Juegos
+/* ============================================================
+   Centro de Juegos
+   ============================================================ */
 const GAMES = [
-  { key: "pragma", name: "Carrera PRAGMA (en esta página)", desc: "Juego nativo de la plataforma. Publica rondas y muestra ranking.", type: "internal" },
-  { key: "blooket", name: "Blooket", desc: "Lanza sets y comparte PIN con tu clase. Requiere tu cuenta.", type: "external", url: "https://dashboard.blooket.com/discover", premium: true },
-  { key: "decktoys", name: "Deck.Toys", desc: "Rutas y tableros interactivos. Requiere tu cuenta.", type: "external", url: "https://deck.toys/teacher", premium: true },
-  { key: "classcraft", name: "Classcraft", desc: "Gamificación del curso a largo plazo. Requiere tu cuenta.", type: "external", url: "https://game.classcraft.com", premium: true },
+  {
+    key: "pragma",
+    name: "Carrera PRAGMA (en esta página)",
+    desc: "Juego nativo de la plataforma. Publica rondas y muestra ranking.",
+    type: "internal",
+  },
+  {
+    key: "blooket",
+    name: "Blooket",
+    desc: "Lanza sets y comparte PIN con tu clase. Requiere tu cuenta.",
+    type: "external",
+    url: "https://dashboard.blooket.com/discover",
+    premium: true,
+  },
+  {
+    key: "decktoys",
+    name: "Deck.Toys",
+    desc: "Rutas y tableros interactivos. Requiere tu cuenta.",
+    type: "external",
+    url: "https://deck.toys/teacher",
+    premium: true,
+  },
+  {
+    key: "classcraft",
+    name: "Classcraft",
+    desc: "Gamificación del curso a largo plazo. Requiere tu cuenta.",
+    type: "external",
+    url: "https://game.classcraft.com",
+    premium: true,
+  },
 ];
+
+/* ============================================================
+   utilidades varias
+   ============================================================ */
 
 // llave para el cronómetro del CIERRE
 const CIERRE_TIMER_KEY = "crono:cierre:v2";
 
-// limpiar llaves de cronos
+// limpiar llaves de cronos / countdowns
 function clearAllCountdowns() {
   try {
     const toDelete = [];
@@ -235,72 +342,117 @@ function clearAllCountdowns() {
 
 const isPlaceholder = (v) => /^\(sin/i.test(String(v || ""));
 
-/* ========== Subcomponentes MEMOIZADOS anti-parpadeo ========== */
+/* ============================================================
+   Subcomponentes memoizados anti-parpadeo
+   ============================================================ */
 const HoraActualText = React.memo(function HoraActualText() {
   const [t, setT] = useState(new Date().toLocaleTimeString());
   useEffect(() => {
-    const id = setInterval(() => setT(new Date().toLocaleTimeString()), 1000);
+    const id = setInterval(
+      () => setT(new Date().toLocaleTimeString()),
+      1000
+    );
     return () => clearInterval(id);
   }, []);
   return <span className="tnum clock-w">{t}</span>;
 });
 
-const DatosClaseCard = React.memo(function DatosClaseCard({
-  unidad, objetivo, curso, asignatura
-}) {
-  return (
-    <div style={{ ...card, textAlign: "center", ...layerFix }}>
-      <div style={{ fontWeight: 800, fontSize: "1.2rem", marginBottom: 6 }}>
-        Unidad
+const DatosClaseCard = React.memo(
+  function DatosClaseCard({ unidad, objetivo, curso, asignatura }) {
+    return (
+      <div style={{ ...card, textAlign: "center", ...layerFix }}>
+        <div
+          style={{
+            fontWeight: 800,
+            fontSize: "1.2rem",
+            marginBottom: 6,
+          }}
+        >
+          Unidad
+        </div>
+        <div style={{ marginBottom: 6, ...layerFix }}>
+          <strong>{unidad || "(sin unidad)"}</strong>
+        </div>
+        <div
+          style={{
+            marginTop: 4,
+            color: COLORS.textDark,
+            ...layerFix,
+          }}
+        >
+          <strong>Objetivo:</strong> {objetivo}
+        </div>
+        <div
+          style={{
+            marginTop: 10,
+            color: COLORS.textMuted,
+            ...layerFix,
+          }}
+        >
+          <strong>Curso:</strong> {curso} &nbsp;|&nbsp;{" "}
+          <strong>Asignatura:</strong> {asignatura}
+        </div>
       </div>
-      <div style={{ marginBottom: 6, ...layerFix }}>
-        <strong>{unidad || "(sin unidad)"}</strong>
-      </div>
-      <div style={{ marginTop: 4, color: COLORS.textDark, ...layerFix }}>
-        <strong>Objetivo:</strong> {objetivo}
-      </div>
-      {/* Línea problemática aislada en su propia capa */}
-      <div style={{ marginTop: 10, color: COLORS.textMuted, ...layerFix }}>
-        <strong>Curso:</strong> {curso} &nbsp;|&nbsp; <strong>Asignatura:</strong> {asignatura}
-      </div>
-    </div>
-  );
-}, (prev, next) =>
-  prev.unidad === next.unidad &&
-  prev.objetivo === next.objetivo &&
-  prev.curso === next.curso &&
-  prev.asignatura === next.asignatura
+    );
+  },
+  (prev, next) =>
+    prev.unidad === next.unidad &&
+    prev.objetivo === next.objetivo &&
+    prev.curso === next.curso &&
+    prev.asignatura === next.asignatura
 );
 
-const ProfesorCard = React.memo(function ProfesorCard({
-  nombreProfesor, asignatura
-}) {
-  return (
-    <div style={{ ...card, display: "flex", flexDirection: "column", gap: ".6rem", ...layerFix }}>
-      <div style={{ display: "flex", gap: ".5rem" }}>
-        <button style={btnWhite}>🧑‍🏫</button>
-        <button style={btnWhite}>🎓</button>
+const ProfesorCard = React.memo(
+  function ProfesorCard({ nombreProfesor, asignatura }) {
+    return (
+      <div
+        style={{
+          ...card,
+          display: "flex",
+          flexDirection: "column",
+          gap: ".6rem",
+          ...layerFix,
+        }}
+      >
+        <div style={{ display: "flex", gap: ".5rem" }}>
+          <button style={btnWhite}>🧑‍🏫</button>
+          <button style={btnWhite}>🎓</button>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontWeight: 800, ...layerFix }}>
+            {nombreProfesor}
+          </div>
+          <div style={{ color: COLORS.textMuted, ...layerFix }}>
+            {asignatura}
+          </div>
+        </div>
       </div>
-      <div style={{ textAlign: "right" }}>
-        {/* Ambos textos con capa propia */}
-        <div style={{ fontWeight: 800, ...layerFix }}>{nombreProfesor}</div>
-        <div style={{ color: COLORS.textMuted, ...layerFix }}>{asignatura}</div>
-      </div>
-    </div>
-  );
-}, (prev, next) =>
-  prev.nombreProfesor === next.nombreProfesor &&
-  prev.asignatura === next.asignatura
+    );
+  },
+  (prev, next) =>
+    prev.nombreProfesor === next.nombreProfesor &&
+    prev.asignatura === next.asignatura
 );
 
-/* ========================= COMPONENTE ========================= */
+/* ============================================================
+   COMPONENTE PRINCIPAL
+   ============================================================ */
 export default function CierreClase({ duracion = 10 }) {
   const navigate = useNavigate();
 
+  // contexto de plan (lo mantenemos porque es parte de tu diseño comercial)
   const planCtx = useContext(PlanContext) || {};
-  const { user = null, plan = "FREE", caps = PLAN_CAPS.FREE, loading = false } = planCtx;
+  const {
+    user: userPlanCtx = null,
+    plan = "FREE",
+    caps = PLAN_CAPS.FREE,
+    loading = false,
+  } = planCtx;
 
-  const [horaActual, setHoraActual] = useState(""); // compat
+  // auth seguro (sustituye al viejo useAuthX)
+  const { ready: authReady, user: authUser } = useAuthSafe();
+
+  const [horaActual, setHoraActual] = useState(""); // compat visual
   const [nombreProfesor, setNombreProfesor] = useState("Profesor");
   const [asignatura, setAsignatura] = useState("(sin asignatura)");
   const [curso, setCurso] = useState("(sin curso)");
@@ -308,85 +460,103 @@ export default function CierreClase({ duracion = 10 }) {
   const [oaMinisterio, setOaMinisterio] = useState(null);
   const [objetivo, setObjetivo] = useState("(sin objetivo)");
 
-  useEffect(() => {}, []);
-
   const [claseVigente, setClaseVigente] = useState(null);
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await getClaseVigente(new Date());
-        setClaseVigente(res);
-        if (res?.unidad && !unidad) setUnidad(res.unidad);
-        if (res?.asignatura && asignatura === "(sin asignatura)") setAsignatura(res.asignatura);
-        if (res?.objetivo && objetivo === "(sin objetivo)") setObjetivo(res.objetivo);
-      } catch(e) {
-        console.error("[Cierre] getClaseVigente:", e);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  // Candado visual
+  // Candado visual para la asignatura (evita que vuelva a "(sin asignatura)" después de tener valor bueno)
   const lastGoodAsignaturaRef = useRef(null);
   useEffect(() => {
     if (asignatura && !isPlaceholder(asignatura)) {
       lastGoodAsignaturaRef.current = asignatura;
     }
   }, [asignatura]);
-  const asignaturaStable = lastGoodAsignaturaRef.current || asignatura;
+  const asignaturaStable =
+    lastGoodAsignaturaRef.current || asignatura;
 
-  // Asegurar sesión anónima
-  const [authed, setAuthed] = useState(false);
+  // Cargamos info de clase vigente (planificación semanal / slots)
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    (async () => {
       try {
-        if (!u) {
-          const cred = await signInAnonymously(auth);
-          localStorage.setItem("uid", cred.user.uid);
-          setAuthed(true);
-        } else {
-          localStorage.setItem("uid", u.uid);
-          setAuthed(true);
-        }
+        const res = await getClaseVigente(new Date());
+        setClaseVigente(res);
+        if (res?.unidad && !unidad) setUnidad(res.unidad);
+        if (
+          res?.asignatura &&
+          asignatura === "(sin asignatura)"
+        )
+          setAsignatura(res.asignatura);
+        if (
+          res?.objetivo &&
+          objetivo === "(sin objetivo)"
+        )
+          setObjetivo(res.objetivo);
       } catch (e) {
-        console.error("[Cierre] auth error:", e);
-        if (localStorage.getItem("uid")) setAuthed(true);
+        console.error("[Cierre] getClaseVigente:", e);
       }
-    });
-    return () => unsub();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sesión juego
+  // Bandera simple para "ya tengo sesión lista"
+  const [authed, setAuthed] = useState(false);
+  useEffect(() => {
+    if (!authReady) return;
+    // authReady viene de useAuthSafe, que ya intentó login anon
+    if (authUser || localStorage.getItem("uid")) {
+      setAuthed(true);
+    }
+  }, [authReady, authUser]);
+
+  /* ========================================================
+     Sesión de juego / carrera PRAGMA
+     ======================================================== */
   const [sessionId, setSessionId] = useState("");
+
   const joinURL = useMemo(() => {
     const base = window.location.origin.replace(/\/$/, "");
-    return sessionId ? `${base}/participa?session=${encodeURIComponent(sessionId)}` : `${base}/participa`;
+    return sessionId
+      ? `${base}/participa?session=${encodeURIComponent(
+          sessionId
+        )}`
+      : `${base}/participa`;
   }, [sessionId]);
 
-  // Juego: estado
+  // Datos juego y panel profesor
   const [pregunta, setPregunta] = useState(null);
   const [participantes, setParticipantes] = useState([]);
   const [panelTexto, setPanelTexto] = useState("");
-  const [panelOpciones, setPanelOpciones] = useState(["", "", "", ""]);
+  const [panelOpciones, setPanelOpciones] = useState([
+    "",
+    "",
+    "",
+    "",
+  ]);
   const [panelCorrecta, setPanelCorrecta] = useState(0);
   const [publicando, setPublicando] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [ronda, setRonda] = useState(0);
 
-  // Datos base
+  /* ========================================================
+     Cargar datos base del profe / clase desde Firestore
+     ======================================================== */
   useEffect(() => {
     if (!authed) return;
+
     const obtenerDatos = async () => {
       try {
-        const uid = localStorage.getItem("uid") || auth.currentUser?.uid;
+        const uid =
+          localStorage.getItem("uid") || auth.currentUser?.uid;
         if (!uid) return;
 
+        // usuarios/{uid}
         const uref = doc(db, "usuarios", uid);
         const usnap = await getDoc(uref);
         if (usnap.exists()) {
-          setNombreProfesor(usnap.data()?.nombre || "Profesor");
+          setNombreProfesor(
+            usnap.data()?.nombre || "Profesor"
+          );
         }
 
+        // profesores/{uid} (perfil docente más rico)
         const pref = doc(db, "profesores", uid);
         const psnap = await getDoc(pref);
         if (psnap.exists()) {
@@ -394,53 +564,95 @@ export default function CierreClase({ duracion = 10 }) {
           const unidadInicial = data.unidadInicial || "";
           setUnidad((u) => u || unidadInicial);
 
-          // No degradar a "(sin asignatura)"
-          if (data.asignatura && !isPlaceholder(data.asignatura)) {
-            setAsignatura((a) => (isPlaceholder(a) ? data.asignatura : a));
+          if (
+            data.asignatura &&
+            !isPlaceholder(data.asignatura)
+          ) {
+            setAsignatura((a) =>
+              isPlaceholder(a) ? data.asignatura : a
+            );
           }
 
-          setCurso((c) => (c === "(sin curso)" ? (data.curso || "(sin curso)") : c));
-          if (data.objetivo) setObjetivo(data.objetivo);
-          else if (data.objetivoInicial) setObjetivo(data.objetivoInicial);
+          setCurso((c) =>
+            c === "(sin curso)"
+              ? data.curso || "(sin curso)"
+              : c
+          );
 
-          // OA dinámico por asignatura/nivel + proxy
+          if (data.objetivo) setObjetivo(data.objetivo);
+          else if (data.objetivoInicial)
+            setObjetivo(data.objetivoInicial);
+
+          // OA dinámico desde proxy / fallback directo MINEDUC
           if (unidadInicial && !oaMinisterio) {
             try {
-              const asigSlug = asigToSlug(data.asignatura || asignatura || "Matemática");
-              const nivelApi = nivelToApi(data.curso || curso, claseVigente?.nivel || "");
+              const asigSlug = asigToSlug(
+                data.asignatura ||
+                  asignatura ||
+                  "Matemática"
+              );
+              const nivelApi = nivelToApi(
+                data.curso || curso,
+                claseVigente?.nivel || ""
+              );
               const proxyUrl = `${PROXY_BASE}/mineduc?asignatura=${encodeURIComponent(
                 asigSlug
-              )}&nivel=${encodeURIComponent(nivelApi)}&unidad=${encodeURIComponent(unidadInicial)}`;
+              )}&nivel=${encodeURIComponent(
+                nivelApi
+              )}&unidad=${encodeURIComponent(
+                unidadInicial
+              )}`;
               const rProxy = await axios.get(proxyUrl);
-              const firstProxy = Array.isArray(rProxy.data) ? rProxy.data[0] : null;
+              const firstProxy = Array.isArray(rProxy.data)
+                ? rProxy.data[0]
+                : null;
               if (firstProxy) {
                 setOaMinisterio(firstProxy);
               } else {
-                throw new Error("Proxy sin resultados, intento directo");
+                throw new Error(
+                  "Proxy sin resultados, intento directo"
+                );
               }
             } catch (e) {
               try {
-                const asigSlug = asigToSlug(data.asignatura || asignatura || "Matemática");
-                const nivelApi = nivelToApi(data.curso || curso, claseVigente?.nivel || "");
+                const asigSlug = asigToSlug(
+                  data.asignatura ||
+                    asignatura ||
+                    "Matemática"
+                );
+                const nivelApi = nivelToApi(
+                  data.curso || curso,
+                  claseVigente?.nivel || ""
+                );
                 const directUrl = `https://curriculumnacional.mineduc.cl/api/v1/oa/buscar?asignatura=${encodeURIComponent(
                   asigSlug
-                )}&nivel=${encodeURIComponent(nivelApi)}&unidad=${encodeURIComponent(unidadInicial)}`;
-                const oaResponse = await axios.get(directUrl);
-                setOaMinisterio(Array.isArray(oaResponse.data) ? oaResponse.data[0] : null);
+                )}&nivel=${encodeURIComponent(
+                  nivelApi
+                )}&unidad=${encodeURIComponent(
+                  unidadInicial
+                )}`;
+                const oaResponse = await axios.get(
+                  directUrl
+                );
+                setOaMinisterio(
+                  Array.isArray(oaResponse.data)
+                    ? oaResponse.data[0]
+                    : null
+                );
               } catch (e2) {
-                // Copia original (NO eliminada)
+                // Dejamos comentado tu fallback original por si quieres volver:
                 // try {
                 //   const oaResponse = await axios.get(
                 //     `https://curriculumnacional.mineduc.cl/api/v1/oa/buscar?asignatura=matematica&nivel=media&unidad=${encodeURIComponent(unidadInicial)}`
                 //   );
                 //   setOaMinisterio(Array.isArray(oaResponse.data) ? oaResponse.data[0] : null);
-                // } catch (e) {}
+                // } catch (e3) {}
               }
             }
           }
         }
 
-        // horarioConfig.marcas → clases_detalle/{slot}
+        // --- Intentar mapear bloque actual segun horarioConfig.marcas
         try {
           if (usnap.exists()) {
             const cfg = usnap.data()?.horarioConfig || {};
@@ -449,155 +661,285 @@ export default function CierreClase({ duracion = 10 }) {
               const fila = filaDesdeMarcas(marcas);
               const col = colDeHoy();
               const slotId = `${fila}-${col}`;
-              const dref = doc(db, "clases_detalle", uid, "slots", slotId);
+              const dref = doc(
+                db,
+                "clases_detalle",
+                uid,
+                "slots",
+                slotId
+              );
               const dsnap = await getDoc(dref);
               if (dsnap.exists()) {
                 const det = dsnap.data() || {};
                 if (det.unidad && !unidad) setUnidad(det.unidad);
-                if (det.objetivo && objetivo === "(sin objetivo)") setObjetivo(det.objetivo);
-                if (det.asignatura && asignatura === "(sin asignatura)") setAsignatura(det.asignatura);
-                if (det.curso && curso === "(sin curso)") setCurso(det.curso);
+                if (
+                  det.objetivo &&
+                  objetivo === "(sin objetivo)"
+                )
+                  setObjetivo(det.objetivo);
+                if (
+                  det.asignatura &&
+                  asignatura === "(sin asignatura)"
+                )
+                  setAsignatura(det.asignatura);
+                if (
+                  det.curso &&
+                  curso === "(sin curso)"
+                )
+                  setCurso(det.curso);
               }
             }
           }
         } catch (e) {
-          console.warn("[Cierre] horarioConfig → clases_detalle:", e?.code || e?.message);
+          console.warn(
+            "[Cierre] horarioConfig → clases_detalle:",
+            e?.code || e?.message
+          );
         }
 
-        // slot semilla 0-0
+        // slot semilla "0-0" como fallback universal
         try {
-          const slotRef = doc(db, "clases_detalle", uid, "slots", "0-0");
+          const slotRef = doc(
+            db,
+            "clases_detalle",
+            uid,
+            "slots",
+            "0-0"
+          );
           const slotSnap = await getDoc(slotRef);
           if (slotSnap.exists()) {
             const s = slotSnap.data() || {};
             if (!unidad && s.unidad) setUnidad(s.unidad);
-            if (objetivo === "(sin objetivo)" && s.objetivo) setObjetivo(s.objetivo);
-            if (asignatura === "(sin asignatura)" && s.asignatura) setAsignatura(s.asignatura);
-            if (curso === "(sin curso)" && s.curso) setCurso(s.curso);
+            if (
+              objetivo === "(sin objetivo)" &&
+              s.objetivo
+            )
+              setObjetivo(s.objetivo);
+            if (
+              asignatura === "(sin asignatura)" &&
+              s.asignatura
+            )
+              setAsignatura(s.asignatura);
+            if (curso === "(sin curso)" && s.curso)
+              setCurso(s.curso);
           }
         } catch (e) {}
       } catch (err) {
-        console.error("Error cargando datos de Cierre:", err);
+        console.error(
+          "Error cargando datos de Cierre:",
+          err
+        );
       }
     };
+
     obtenerDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
-  // Fallback extra desde usuarios/{uid}
+  // fallback extra desde usuarios/{uid} para rellenar huecos
   useEffect(() => {
     if (!authed) return;
     (async () => {
       try {
-        const uid = localStorage.getItem("uid") || auth.currentUser?.uid;
+        const uid =
+          localStorage.getItem("uid") || auth.currentUser?.uid;
         if (!uid) return;
+
         const uref = doc(db, "usuarios", uid);
         const usnap = await getDoc(uref);
         if (usnap.exists()) {
           const u = usnap.data() || {};
-          if (!unidad || /^\(sin/i.test(unidad)) setUnidad(u.unidadInicial || u.unidad || "");
-          if (asignatura === "(sin asignatura)" && u.asignatura) setAsignatura(u.asignatura);
-          if (curso === "(sin curso)" && u.curso) setCurso(u.curso);
-          if (objetivo === "(sin objetivo)" && u.objetivo) setObjetivo(u.objetivo);
+          if (!unidad || /^\(sin/i.test(unidad))
+            setUnidad(
+              u.unidadInicial || u.unidad || ""
+            );
+          if (
+            asignatura === "(sin asignatura)" &&
+            u.asignatura
+          )
+            setAsignatura(u.asignatura);
+          if (curso === "(sin curso)" && u.curso)
+            setCurso(u.curso);
+          if (
+            objetivo === "(sin objetivo)" &&
+            u.objetivo
+          )
+            setObjetivo(u.objetivo);
         }
       } catch (e) {
-        console.warn("[Cierre] usuarios fallback:", e?.code || e?.message);
+        console.warn(
+          "[Cierre] usuarios fallback:",
+          e?.code || e?.message
+        );
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
-  // Suscripciones en tiempo real
+  /* ========================================================
+     Subs en tiempo real (profesor, clase actual, etc)
+     ======================================================== */
   useEffect(() => {
     if (!authed) return;
-    const uid = localStorage.getItem("uid") || auth.currentUser?.uid;
+    const uid =
+      localStorage.getItem("uid") || auth.currentUser?.uid;
     if (!uid) return;
 
     const applyClase = (d) => {
       if (!d) return;
 
       if (d.nombre) {
-        setNombreProfesor(prev => d.nombre && d.nombre !== prev ? d.nombre : prev);
+        setNombreProfesor((prev) =>
+          d.nombre && d.nombre !== prev ? d.nombre : prev
+        );
       }
 
-      setUnidad(prev => (d.unidad && d.unidad !== prev ? d.unidad : prev));
-
-      setAsignatura(prev =>
-        d.asignatura && !isPlaceholder(d.asignatura) && d.asignatura !== prev ? d.asignatura : prev
+      setUnidad((prev) =>
+        d.unidad && d.unidad !== prev ? d.unidad : prev
       );
 
-      setCurso(prev =>
-        d.curso && !isPlaceholder(d.curso) && d.curso !== prev ? d.curso : prev
+      setAsignatura((prev) =>
+        d.asignatura &&
+        !isPlaceholder(d.asignatura) &&
+        d.asignatura !== prev
+          ? d.asignatura
+          : prev
       );
 
-      setObjetivo(prev =>
-        d.objetivo && !isPlaceholder(d.objetivo) && d.objetivo !== prev ? d.objetivo : prev
+      setCurso((prev) =>
+        d.curso &&
+        !isPlaceholder(d.curso) &&
+        d.curso !== prev
+          ? d.curso
+          : prev
+      );
+
+      setObjetivo((prev) =>
+        d.objetivo &&
+        !isPlaceholder(d.objetivo) &&
+        d.objetivo !== prev
+          ? d.objetivo
+          : prev
       );
     };
 
     const unsubs = [];
 
     try {
-      const r1 = fsDoc(db, "clases_detalle", uid, "meta", "actual");
-      unsubs.push(onSnapshot(r1, (s) => s.exists() && applyClase(s.data())));
+      const r1 = doc(
+        db,
+        "clases_detalle",
+        uid,
+        "meta",
+        "actual"
+      );
+      unsubs.push(
+        onSnapshot(r1, (s) => s.exists() && applyClase(s.data()))
+      );
     } catch (e) {}
 
     try {
-      const r2 = fsDoc(db, "clases_detalle", uid, "actual", "info");
-      unsubs.push(onSnapshot(r2, (s) => s.exists() && applyClase(s.data())));
+      const r2 = doc(
+        db,
+        "clases_detalle",
+        uid,
+        "actual",
+        "info"
+      );
+      unsubs.push(
+        onSnapshot(r2, (s) => s.exists() && applyClase(s.data()))
+      );
     } catch (e) {}
 
     try {
-      const r3 = fsDoc(db, "clases_detalle", uid, "slots", "0-0");
-      unsubs.push(onSnapshot(r3, (s) => s.exists() && applyClase(s.data())));
+      const r3 = doc(
+        db,
+        "clases_detalle",
+        uid,
+        "slots",
+        "0-0"
+      );
+      unsubs.push(
+        onSnapshot(r3, (s) => s.exists() && applyClase(s.data()))
+      );
     } catch (e) {}
 
     try {
-      const r4 = fsDoc(db, "profesores", uid);
-      unsubs.push(onSnapshot(r4, (s) => {
-        if (!s.exists()) return;
-        applyClase({
-          nombre: s.data()?.nombre,
-          unidad: s.data()?.unidad || s.data()?.unidadInicial,
-          objetivo: s.data()?.objetivo || s.data()?.objetivoInicial,
-          asignatura: s.data()?.asignatura,
-          curso: s.data()?.curso
-        });
-      }));
+      const r4 = doc(db, "profesores", uid);
+      unsubs.push(
+        onSnapshot(r4, (s) => {
+          if (!s.exists()) return;
+          applyClase({
+            nombre: s.data()?.nombre,
+            unidad:
+              s.data()?.unidad ||
+              s.data()?.unidadInicial,
+            objetivo:
+              s.data()?.objetivo ||
+              s.data()?.objetivoInicial,
+            asignatura: s.data()?.asignatura,
+            curso: s.data()?.curso,
+          });
+        })
+      );
     } catch (e) {}
 
-    return () => unsubs.forEach((u) => typeof u === "function" && u());
+    return () =>
+      unsubs.forEach(
+        (u) => typeof u === "function" && u()
+      );
   }, [authed]);
 
-  // Session para carrera
+  // SessionId de la carrera
   useEffect(() => {
     if (!authed) return;
     const ensureSession = async () => {
       try {
-        const sref = doc(db, "carrera", "actual", "meta", "session");
+        const sref = doc(
+          db,
+          "carrera",
+          "actual",
+          "meta",
+          "session"
+        );
         const snap = await getDoc(sref);
         if (snap.exists() && snap.data()?.id) {
           setSessionId(String(snap.data().id));
         } else {
-          const newId = Math.random().toString(36).slice(2, 8).toUpperCase();
+          const newId = Math.random()
+            .toString(36)
+            .slice(2, 8)
+            .toUpperCase();
           await setDoc(
             sref,
-            { id: newId, createdAt: serverTimestamp() },
+            {
+              id: newId,
+              createdAt: serverTimestamp(),
+            },
             { merge: true }
           );
           setSessionId(newId);
         }
       } catch (e) {
-        console.error("No se pudo crear/leer la sesión:", e);
+        console.error(
+          "No se pudo crear/leer la sesión:",
+          e
+        );
       }
     };
     ensureSession();
   }, [authed]);
 
-  // Pregunta activa
+  // Pregunta activa de la ronda
   useEffect(() => {
     if (!authed) return;
-    const ref = doc(db, "carrera", "actual", "meta", "pregunta");
+    const ref = doc(
+      db,
+      "carrera",
+      "actual",
+      "meta",
+      "pregunta"
+    );
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) setPregunta(snap.data());
       else setPregunta(null);
@@ -605,7 +947,7 @@ export default function CierreClase({ duracion = 10 }) {
     return () => unsub();
   }, [authed]);
 
-  // Participantes
+  // Participantes (ranking en vivo)
   useEffect(() => {
     if (!authed) return;
     let qRef;
@@ -622,13 +964,16 @@ export default function CierreClase({ duracion = 10 }) {
       );
     }
     const unsub = onSnapshot(qRef, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const list = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
       setParticipantes(list);
     });
     return () => unsub();
   }, [sessionId, authed]);
 
-  // Respuestas
+  // Scoring de respuestas en tiempo real
   useEffect(() => {
     if (!authed) return;
     if (!pregunta?.activa) return;
@@ -652,14 +997,27 @@ export default function CierreClase({ duracion = 10 }) {
       setProcesando(true);
 
       const toProcess = [];
-      const startMs = pregunta?.startAt?.toMillis ? pregunta.startAt.toMillis() : null;
+      const startMs = pregunta?.startAt?.toMillis
+        ? pregunta.startAt.toMillis()
+        : null;
 
       snap.docChanges().forEach((chg) => {
-        if (chg.type === "added" || chg.type === "modified") {
+        if (
+          chg.type === "added" ||
+          chg.type === "modified"
+        ) {
           const data = chg.doc.data();
-          if (startMs && data.createdAt?.toMillis && data.createdAt.toMillis() < startMs) return;
+          if (
+            startMs &&
+            data.createdAt?.toMillis &&
+            data.createdAt.toMillis() < startMs
+          )
+            return;
           if (data.scored === true) return;
-          toProcess.push({ id: chg.doc.id, data });
+          toProcess.push({
+            id: chg.doc.id,
+            data,
+          });
         }
       });
 
@@ -675,25 +1033,169 @@ export default function CierreClase({ duracion = 10 }) {
 
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pregunta?.activa, pregunta?.startAt, ronda, sessionId, authed]);
+  }, [
+    pregunta?.activa,
+    pregunta?.startAt,
+    ronda,
+    sessionId,
+    authed,
+  ]);
 
+  async function scoreAnswer(respId, respData) {
+    const { pid, answer, latencyMs } = respData;
+    if (!pid) {
+      await updateDoc(
+        doc(
+          db,
+          "carrera",
+          "actual",
+          "respuestas",
+          respId
+        ),
+        { scored: true, points: 0 }
+      );
+      return;
+    }
+
+    // puntaje base
+    let points = 0;
+
+    // caso con alternativas
+    if (
+      Array.isArray(pregunta?.opciones) &&
+      pregunta.opciones.length > 0 &&
+      typeof pregunta?.correcta === "number"
+    ) {
+      const correcta =
+        pregunta.opciones[pregunta.correcta];
+      const esCorrecta =
+        String(answer).trim() ===
+        String(correcta).trim();
+      if (esCorrecta) {
+        const latS =
+          typeof latencyMs === "number"
+            ? latencyMs / 1000
+            : 8;
+        const bonus = Math.max(
+          0,
+          8 - Math.floor(latS)
+        );
+        points = 5 + bonus;
+      } else {
+        points = 0;
+      }
+    } else {
+      // pregunta abierta
+      const latS =
+        typeof latencyMs === "number"
+          ? latencyMs / 1000
+          : 8;
+      const bonus = Math.max(
+        0,
+        5 - Math.floor(latS)
+      );
+      points = 2 + bonus;
+    }
+
+    try {
+      // sumar puntos al participante
+      await updateDoc(
+        doc(
+          db,
+          "carrera",
+          "actual",
+          "participantes",
+          pid
+        ),
+        {
+          puntos: increment(points),
+          progreso: increment(points),
+        }
+      );
+    } catch (e) {
+      // crear si no existía
+      await setDoc(
+        doc(
+          db,
+          "carrera",
+          "actual",
+          "participantes",
+          pid
+        ),
+        {
+          nombre: respData.nombre || "Jugador",
+          avatar: "🟢",
+          progreso: points,
+          puntos: points,
+          joinedAt: serverTimestamp(),
+          session: sessionId || null,
+        },
+        { merge: true }
+      );
+    }
+
+    // marcar respuesta como "scored"
+    await updateDoc(
+      doc(
+        db,
+        "carrera",
+        "actual",
+        "respuestas",
+        respId
+      ),
+      {
+        scored: true,
+        points,
+      }
+    );
+  }
+
+  // Ranking ordenado
+  const ranking = useMemo(() => {
+    return [...participantes].sort(
+      (a, b) => (b.progreso || 0) - (a.progreso || 0)
+    );
+  }, [participantes]);
+
+  // Publicar nueva pregunta/ronda
   const publicarPregunta = async () => {
     if (!panelTexto.trim()) return;
 
-    const opcionesLimpias = panelOpciones.map((x) => x.trim()).filter((x) => x.length > 0);
-    if (opcionesLimpias.length > 0 && (panelCorrecta < 0 || panelCorrecta >= opcionesLimpias.length)) {
-      alert("Selecciona el índice de la respuesta correcta válido.");
+    const opcionesLimpias = panelOpciones
+      .map((x) => x.trim())
+      .filter((x) => x.length > 0);
+
+    if (
+      opcionesLimpias.length > 0 &&
+      (panelCorrecta < 0 ||
+        panelCorrecta >= opcionesLimpias.length)
+    ) {
+      alert(
+        "Selecciona el índice de la respuesta correcta válido."
+      );
       return;
     }
 
     setPublicando(true);
     try {
       await setDoc(
-        doc(db, "carrera", "actual", "meta", "pregunta"),
+        doc(
+          db,
+          "carrera",
+          "actual",
+          "meta",
+          "pregunta"
+        ),
         {
           texto: panelTexto.trim(),
-          opciones: opcionesLimpias.length > 0 ? opcionesLimpias : [],
-          correcta: opcionesLimpias.length > 0 ? panelCorrecta : null,
+          opciones:
+            opcionesLimpias.length > 0
+              ? opcionesLimpias
+              : [],
+          correcta:
+            opcionesLimpias.length > 0
+              ? panelCorrecta
+              : null,
           startAt: serverTimestamp(),
           activa: true,
           session: sessionId || null,
@@ -709,86 +1211,79 @@ export default function CierreClase({ duracion = 10 }) {
     }
   };
 
+  // Cerrar la ronda actual
   const cerrarRonda = async () => {
     try {
-      await updateDoc(doc(db, "carrera", "actual", "meta", "pregunta"), { activa: false });
-    } catch (e) {
-    }
+      await updateDoc(
+        doc(
+          db,
+          "carrera",
+          "actual",
+          "meta",
+          "pregunta"
+        ),
+        { activa: false }
+      );
+    } catch (e) {}
   };
 
-  async function scoreAnswer(respId, respData) {
-    const { pid, answer, latencyMs } = respData;
-    if (!pid) {
-      await updateDoc(doc(db, "carrera", "actual", "respuestas", respId), { scored: true, points: 0 });
-      return;
-    }
-
-    let points = 0;
-    if (Array.isArray(pregunta?.opciones) && pregunta.opciones.length > 0 && typeof pregunta?.correcta === "number") {
-      const correcta = pregunta.opciones[pregunta.correcta];
-      const esCorrecta = String(answer).trim() === String(correcta).trim();
-      if (esCorrecta) {
-        const latS = typeof latencyMs === "number" ? latencyMs / 1000 : 8;
-        const bonus = Math.max(0, 8 - Math.floor(latS));
-        points = 5 + bonus;
-      } else {
-        points = 0;
-      }
-    } else {
-      const latS = typeof latencyMs === "number" ? latencyMs / 1000 : 8;
-      const bonus = Math.max(0, 5 - Math.floor(latS));
-      points = 2 + bonus;
-    }
-
-    try {
-      await updateDoc(doc(db, "carrera", "actual", "participantes", pid), {
-        puntos: increment(points),
-        progreso: increment(points),
-      });
-    } catch (e) {
-      await setDoc(
-        doc(db, "carrera", "actual", "participantes", pid),
-        {
-          nombre: respData.nombre || "Jugador",
-          avatar: "🟢",
-          progreso: points,
-          puntos: points,
-          joinedAt: serverTimestamp(),
-          session: sessionId || null,
-        },
-        { merge: true }
-      );
-    }
-
-    await updateDoc(doc(db, "carrera", "actual", "respuestas", respId), {
-      scored: true,
-      points,
-    });
-  }
-
-  const ranking = useMemo(() => {
-    return [...participantes].sort((a, b) => (b.progreso || 0) - (a.progreso || 0));
-  }, [participantes]);
-
+  // Reset de toda la carrera
   const resetCarrera = async () => {
-    const ok = window.confirm("¿Resetear carrera? Se borrarán participantes y respuestas, y se reiniciará la pregunta.");
+    const ok = window.confirm(
+      "¿Resetear carrera? Se borrarán participantes y respuestas, y se reiniciará la pregunta."
+    );
     if (!ok) return;
 
     try {
-      let pQ = collection(db, "carrera", "actual", "participantes");
-      let pSnap = sessionId ? await getDocs(query(pQ, where("session", "==", sessionId))) : await getDocs(pQ);
+      // borrar participantes activos
+      let pQ = collection(
+        db,
+        "carrera",
+        "actual",
+        "participantes"
+      );
+      let pSnap = sessionId
+        ? await getDocs(
+            query(
+              pQ,
+              where("session", "==", sessionId)
+            )
+          )
+        : await getDocs(pQ);
+
       const batch1 = writeBatch(db);
       pSnap.forEach((d) => batch1.delete(d.ref));
       await batch1.commit();
 
-      let rQ = collection(db, "carrera", "actual", "respuestas");
-      let rSnap = sessionId ? await getDocs(query(rQ, where("session", "==", sessionId))) : await getDocs(rQ);
+      // borrar respuestas activas
+      let rQ = collection(
+        db,
+        "carrera",
+        "actual",
+        "respuestas"
+      );
+      let rSnap = sessionId
+        ? await getDocs(
+            query(
+              rQ,
+              where("session", "==", sessionId)
+            )
+          )
+        : await getDocs(rQ);
+
       const batch2 = writeBatch(db);
       rSnap.forEach((d) => batch2.delete(d.ref));
       await batch2.commit();
 
+      // reiniciar pregunta
       await setDoc(
-        doc(db, "carrera", "actual", "meta", "pregunta"),
+        doc(
+          db,
+          "carrera",
+          "actual",
+          "meta",
+          "pregunta"
+        ),
         {
           texto: "",
           opciones: [],
@@ -800,6 +1295,7 @@ export default function CierreClase({ duracion = 10 }) {
         { merge: true }
       );
 
+      // resetear UI local
       setPanelTexto("");
       setPanelOpciones(["", "", "", ""]);
       setPanelCorrecta(0);
@@ -810,6 +1306,7 @@ export default function CierreClase({ duracion = 10 }) {
     }
   };
 
+  // Abrir juegos externos en nueva pestaña con tracking simple
   const openExternal = (baseUrl) => {
     try {
       const url = new URL(baseUrl);
@@ -818,26 +1315,43 @@ export default function CierreClase({ duracion = 10 }) {
       url.searchParams.set("utm_campaign", "cierre");
       const sala = localStorage.getItem("salaCode") || "";
       if (sala) url.searchParams.set("code", sala);
-      window.open(url.toString(), "_blank", "noopener,noreferrer");
+      window.open(
+        url.toString(),
+        "_blank",
+        "noopener,noreferrer"
+      );
     } catch (e) {
-      window.open(baseUrl, "_blank", "noopener,noreferrer");
+      window.open(
+        baseUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
     }
   };
+
+  // Scroll suave al panel de carrera
   const goToCarrera = () => {
     try {
-      const el = document.getElementById("carreraPanel");
-      if (el?.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      const el =
+        document.getElementById("carreraPanel");
+      if (el?.scrollIntoView)
+        el.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
     } catch (e) {}
   };
 
+  // Cronómetro de cierre
   const cronometroPropsCierre = {
     duracion,
     storageKey: CIERRE_TIMER_KEY,
-    instanceId: "cierre"
+    instanceId: "cierre",
   };
 
-  /* =================== NUEVO: Conexión a Desarrollo =================== */
-  // Guardamos un “bridge” simple para que Desarrollo (si quiere) lo lea.
+  /* ========================================================
+     Puente hacia DesarrolloClase (guardamos info en localStorage)
+     ======================================================== */
   function persistClaseForDesarrollo() {
     try {
       const bridge = {
@@ -848,26 +1362,40 @@ export default function CierreClase({ duracion = 10 }) {
         ts: Date.now(),
         from: "cierre",
       };
-      localStorage.setItem("bridge:desarrolloClase", JSON.stringify(bridge));
+      localStorage.setItem(
+        "bridge:desarrolloClase",
+        JSON.stringify(bridge)
+      );
     } catch (_) {}
   }
+
   function goToDesarrollo() {
     persistClaseForDesarrollo();
     navigate("/desarrollo");
   }
-  /* =================== FIN conexión =================== */
 
-  /* =================== NUEVO: Fin de Cierre -> HOME =================== */
+  /* ========================================================
+     Fin de Cierre → volver a InicioClase
+     (ajustado: /InicioClase sí existe en App.jsx)
+     ======================================================== */
   function handleEndCierre() {
-    try { persistClaseForDesarrollo(); } catch (_) {}
+    try {
+      persistClaseForDesarrollo();
+    } catch (_) {}
     clearAllCountdowns();
-    navigate("/inicio", {
+    navigate("/InicioClase", {
       replace: true,
-      state: { resetTimers: true, from: "cierre", autoReturn: true }
+      state: {
+        resetTimers: true,
+        from: "cierre",
+        autoReturn: true,
+      },
     });
   }
-  /* =================== FIN cambio =================== */
 
+  /* ========================================================
+     Render
+     ======================================================== */
   return (
     <div style={page} className="no-scroll-jump">
       {/* Banner plan/clase vigente */}
@@ -876,38 +1404,85 @@ export default function CierreClase({ duracion = 10 }) {
           style={{
             ...card,
             marginBottom: "1rem",
-            background: claseVigente.fuente === "calendario" ? "rgba(124,58,237,.06)" : "rgba(2,132,199,.06)"
+            background:
+              claseVigente.fuente === "calendario"
+                ? "rgba(124,58,237,.06)"
+                : "rgba(2,132,199,.06)",
           }}
         >
-          <div style={{fontWeight:800}}>
-            {claseVigente.fuente === "calendario" ? "Plan semanal (vigente)" :
-             claseVigente.fuente === "slots" ? "Horario (fallback)" : "Sin clase planificada"}
+          <div style={{ fontWeight: 800 }}>
+            {claseVigente.fuente === "calendario"
+              ? "Plan semanal (vigente)"
+              : claseVigente.fuente === "slots"
+              ? "Horario (fallback)"
+              : "Sin clase planificada"}
           </div>
-          {claseVigente.unidad && <div><b>Unidad:</b> {claseVigente.unidad}{claseVigente.evaluacion ? " · (Evaluación)" : ""}</div>}
-          {claseVigente?.objetivo && <div><b>Objetivo:</b> {claseVigente.objetivo}</div>}
+          {claseVigente.unidad && (
+            <div>
+              <b>Unidad:</b> {claseVigente.unidad}
+              {claseVigente.evaluacion
+                ? " · (Evaluación)"
+                : ""}
+            </div>
+          )}
+          {claseVigente?.objetivo && (
+            <div>
+              <b>Objetivo:</b>{" "}
+              {claseVigente.objetivo}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Fila 1 */}
-      <div style={{ ...row("1rem"), marginBottom: "1rem" }}>
-        <div style={{ ...card, ...layerFix }} className="no-scroll-jump layer-accel">
-          <div style={{ fontWeight: 800, fontSize: "1.1rem", marginBottom: 6 }}>Cierre</div>
-          <div style={{ color: COLORS.textMuted, marginBottom: 8 }}>
+      {/* Fila 1: reloj, datos clase, profe */}
+      <div
+        style={{
+          ...row("1rem"),
+          marginBottom: "1rem",
+        }}
+      >
+        <div
+          style={{
+            ...card,
+            ...layerFix,
+          }}
+          className="no-scroll-jump layer-accel"
+        >
+          <div
+            style={{
+              fontWeight: 800,
+              fontSize: "1.1rem",
+              marginBottom: 6,
+            }}
+          >
+            Cierre
+          </div>
+          <div
+            style={{
+              color: COLORS.textMuted,
+              marginBottom: 8,
+            }}
+          >
             ⏰ <HoraActualText />
           </div>
-          {/* Crono en su propia capa */}
+
+          {/* Cronómetro (cuando termina → handleEndCierre) */}
           <div
             className="tnum clock-w layer-accel"
             style={{
-              fontVariantNumeric: "tabular-nums lining-nums",
-              fontFeatureSettings: "'tnum' 1, 'lnum' 1",
+              fontVariantNumeric:
+                "tabular-nums lining-nums",
+              fontFeatureSettings:
+                "'tnum' 1, 'lnum' 1",
               transform: "translateZ(0)",
               willChange: "transform",
-              backfaceVisibility: "hidden"
+              backfaceVisibility: "hidden",
             }}
           >
-            {/* CAMBIO: al terminar, enviar a Home (/inicio) */}
-            <CronometroGlobal {...cronometroPropsCierre} onEnd={handleEndCierre} />
+            <CronometroGlobal
+              {...cronometroPropsCierre}
+              onEnd={handleEndCierre}
+            />
           </div>
         </div>
 
@@ -925,48 +1500,170 @@ export default function CierreClase({ duracion = 10 }) {
       </div>
 
       {/* Nube de palabras */}
-      <div style={{ ...card, textAlign: "center", marginBottom: "1rem" }}>
-        <h3 style={{ marginTop: 0 }}>🧠 Nube de palabras final</h3>
+      <div
+        style={{
+          ...card,
+          textAlign: "center",
+          marginBottom: "1rem",
+        }}
+      >
+        <h3 style={{ marginTop: 0 }}>
+          🧠 Nube de palabras final
+        </h3>
         <NubeDePalabras modo="cierre" />
       </div>
 
-      {/* QR sesión */}
-      <div style={{ ...card, textAlign: "center", marginBottom: "1rem" }}>
-        <h3 style={{ marginTop: 0 }}>🔗 Únete a la carrera</h3>
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ background: "#fff", padding: 12, borderRadius: 8, border: `1px solid ${COLORS.border}` }}>
+      {/* QR sesión carrera */}
+      <div
+        style={{
+          ...card,
+          textAlign: "center",
+          marginBottom: "1rem",
+        }}
+      >
+        <h3 style={{ marginTop: 0 }}>
+          🔗 Únete a la carrera
+        </h3>
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            justifyContent: "center",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: 12,
+              borderRadius: 8,
+              border: `1px solid ${COLORS.border}`,
+            }}
+          >
             <QRCode value={joinURL} size={160} />
           </div>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 18 }}>Sesión: {sessionId || "—"}</div>
-            <div style={{ color: COLORS.textMuted, fontSize: 14, marginTop: 6 }}>
-              Abre <code>/participa</code> o escanea el QR. Link directo:
+            <div
+              style={{
+                fontWeight: 800,
+                fontSize: 18,
+              }}
+            >
+              Sesión: {sessionId || "—"}
             </div>
-            <code style={{ fontSize: 12, color: COLORS.textMuted }}>{joinURL}</code>
+            <div
+              style={{
+                color: COLORS.textMuted,
+                fontSize: 14,
+                marginTop: 6,
+              }}
+            >
+              Abre <code>/participa</code> o
+              escanea el QR. Link directo:
+            </div>
+            <code
+              style={{
+                fontSize: 12,
+                color: COLORS.textMuted,
+              }}
+            >
+              {joinURL}
+            </code>
           </div>
         </div>
       </div>
 
       {/* Centro de Juegos */}
-      <div style={{ ...card, marginBottom: "1rem" }}>
-        <h3 style={{ marginTop: 0, marginBottom: 8 }}>🎮 Centro de Juegos</h3>
-        <div style={{ color: COLORS.textMuted, fontSize: 13, marginBottom: 8 }}>
-          Los juegos externos se abren en pestaña nueva y requieren tu propia cuenta.
+      <div
+        style={{
+          ...card,
+          marginBottom: "1rem",
+        }}
+      >
+        <h3
+          style={{
+            marginTop: 0,
+            marginBottom: 8,
+          }}
+        >
+          🎮 Centro de Juegos
+        </h3>
+        <div
+          style={{
+            color: COLORS.textMuted,
+            fontSize: 13,
+            marginBottom: 8,
+          }}
+        >
+          Los juegos externos se abren en pestaña
+          nueva y requieren tu propia cuenta.
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 10 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit,minmax(260px,1fr))",
+            gap: 10,
+          }}
+        >
           {GAMES.map((g) => (
-            <div key={g.key} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+            <div
+              key={g.key}
+              style={{
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 10,
+                padding: 12,
+              }}
+            >
               <div style={{ fontWeight: 800 }}>
-                {g.name} {g.premium ? <span style={{ fontSize: 12, color: "#9333ea" }}>· Premium</span> : null}
+                {g.name}{" "}
+                {g.premium ? (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "#9333ea",
+                    }}
+                  >
+                    · Premium
+                  </span>
+                ) : null}
               </div>
-              <div style={{ color: COLORS.textMuted, fontSize: 14, marginTop: 4 }}>{g.desc}</div>
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  color: COLORS.textMuted,
+                  fontSize: 14,
+                  marginTop: 4,
+                }}
+              >
+                {g.desc}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginTop: 10,
+                  flexWrap: "wrap",
+                }}
+              >
                 {g.type === "internal" ? (
-                  <button style={btnWhite} onClick={goToCarrera}>🏁 Ir a Carrera</button>
+                  <button
+                    style={btnWhite}
+                    onClick={goToCarrera}
+                  >
+                    🏁 Ir a Carrera
+                  </button>
                 ) : (
                   <>
-                    <button style={btnWhite} onClick={() => openExternal(g.url)}>🔗 Abrir</button>
+                    <button
+                      style={btnWhite}
+                      onClick={() =>
+                        openExternal(g.url)
+                      }
+                    >
+                      🔗 Abrir
+                    </button>
                   </>
                 )}
               </div>
@@ -975,30 +1672,65 @@ export default function CierreClase({ duracion = 10 }) {
         </div>
       </div>
 
-      {/* Juego: panel + ranking */}
-      <div id="carreraPanel" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+      {/* Panel profesor + Ranking carrera */}
+      <div
+        id="carreraPanel"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "1rem",
+          marginBottom: "1rem",
+        }}
+      >
         <div style={card}>
-          <h3 style={{ marginTop: 0 }}>🎮 Mini panel del profesor</h3>
-          <div style={{ ...smallMuted, marginBottom: 8 }}>
-            Publica una pregunta (texto + 0–4 opciones). Si agregas opciones, selecciona cuál es la correcta.
+          <h3 style={{ marginTop: 0 }}>
+            🎮 Mini panel del profesor
+          </h3>
+          <div
+            style={{
+              ...smallMuted,
+              marginBottom: 8,
+            }}
+          >
+            Publica una pregunta (texto + 0–4
+            opciones). Si agregas opciones,
+            selecciona cuál es la correcta.
           </div>
 
-          <label style={{ fontWeight: 700 }}>Pregunta</label>
+          <label style={{ fontWeight: 700 }}>
+            Pregunta
+          </label>
           <input
             style={{ ...input, marginBottom: 8 }}
             value={panelTexto}
-            onChange={(e) => setPanelTexto(e.target.value)}
+            onChange={(e) =>
+              setPanelTexto(e.target.value)
+            }
             placeholder="Escribe la pregunta…"
           />
 
-          <label style={{ fontWeight: 700 }}>Opciones (opcional)</label>
+          <label style={{ fontWeight: 700 }}>
+            Opciones (opcional)
+          </label>
           {panelOpciones.map((op, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 8, alignItems: "center", marginBottom: 6 }}>
+            <div
+              key={i}
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "auto 1fr",
+                gap: 8,
+                alignItems: "center",
+                marginBottom: 6,
+              }}
+            >
               <input
                 type="radio"
                 name="correcta"
                 checked={panelCorrecta === i}
-                onChange={() => setPanelCorrecta(i)}
+                onChange={() =>
+                  setPanelCorrecta(i)
+                }
                 title="Marcar correcta"
               />
               <input
@@ -1009,12 +1741,20 @@ export default function CierreClase({ duracion = 10 }) {
                   arr[i] = e.target.value;
                   setPanelOpciones(arr);
                 }}
-                placeholder={`Opción ${i + 1}`}
+                placeholder={`Opción ${
+                  i + 1
+                }`}
               />
             </div>
           ))}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginTop: 8,
+            }}
+          >
             <button
               style={btnWhite}
               onClick={publicarPregunta}
@@ -1032,44 +1772,124 @@ export default function CierreClase({ duracion = 10 }) {
             </button>
           </div>
 
-          <div style={{ ...smallMuted, marginTop: 8 }}>
-            {pregunta?.activa ? "Ronda ACTIVA" : "Ronda INACTIVA"} {pregunta?.texto ? `• "${pregunta.texto}"` : ""}
+          <div
+            style={{
+              ...smallMuted,
+              marginTop: 8,
+            }}
+          >
+            {pregunta?.activa
+              ? "Ronda ACTIVA"
+              : "Ronda INACTIVA"}{" "}
+            {pregunta?.texto
+              ? `• "${pregunta.texto}"`
+              : ""}
           </div>
         </div>
 
         <div style={card}>
-          <h3 style={{ marginTop: 0 }}>🏁 Carrera en vivo</h3>
-          <div style={{ ...smallMuted, marginBottom: 8 }}>
-            Avance = acierto (5 pts) + bonus por rapidez (hasta +8). Participación abierta: pequeño avance.
+          <h3 style={{ marginTop: 0 }}>
+            🏁 Carrera en vivo
+          </h3>
+          <div
+            style={{
+              ...smallMuted,
+              marginBottom: 8,
+            }}
+          >
+            Avance = acierto (5 pts) + bonus
+            por rapidez (hasta +8).
+            Participación abierta: pequeño
+            avance.
           </div>
 
           <div style={{ display: "grid", gap: 10 }}>
             {ranking.length === 0 && (
-              <div style={{ color: COLORS.textMuted }}>
-                Aún no hay participantes. Pide a tus estudiantes abrir <code>/participa</code>.
+              <div
+                style={{
+                  color: COLORS.textMuted,
+                }}
+              >
+                Aún no hay participantes.
+                Pide a tus estudiantes abrir{" "}
+                <code>/participa</code>.
               </div>
             )}
+
             {ranking.map((p) => {
-              const prog = Math.min(100, Math.round((p.progreso || 0)));
+              const prog = Math.min(
+                100,
+                Math.round(
+                  p.progreso || 0
+                )
+              );
               return (
-                <div key={p.id} style={{ display: "grid", gridTemplateColumns: "40px 1fr 60px", gap: 8, alignItems: "center" }}>
-                  <div style={{ textAlign: "center", fontSize: 20 }}>{p.avatar || "🟢"}</div>
-                  <div style={{ background: "#eef2f7", borderRadius: 999, overflow: "hidden", border: `1px solid ${COLORS.border}` }}>
+                <div
+                  key={p.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "40px 1fr 60px",
+                    gap: 8,
+                    alignItems:
+                      "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      textAlign:
+                        "center",
+                      fontSize: 20,
+                    }}
+                  >
+                    {p.avatar ||
+                      "🟢"}
+                  </div>
+                  <div
+                    style={{
+                      background:
+                        "#eef2f7",
+                      borderRadius: 999,
+                      overflow:
+                        "hidden",
+                      border: `1px solid ${COLORS.border}`,
+                    }}
+                  >
                     <div
                       style={{
                         width: `${prog}%`,
                         background: `linear-gradient(90deg, ${COLORS.brandA}, ${COLORS.brandB})`,
-                        color: "#fff",
-                        padding: "6px 10px",
-                        whiteSpace: "nowrap",
-                        textOverflow: "ellipsis",
+                        color:
+                          "#fff",
+                        padding:
+                          "6px 10px",
+                        whiteSpace:
+                          "nowrap",
+                        textOverflow:
+                          "ellipsis",
                       }}
                       title={`${p.nombre} (${prog} pts)`}
                     >
-                      <strong style={{ fontSize: 12 }}>{p.nombre || "Jugador"}</strong>
+                      <strong
+                        style={{
+                          fontSize: 12,
+                        }}
+                      >
+                        {p.nombre ||
+                          "Jugador"}
+                      </strong>
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", fontWeight: 800 }}>{p.progreso || 0}</div>
+                  <div
+                    style={{
+                      textAlign:
+                        "right",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {p.progreso ||
+                      0}
+                  </div>
                 </div>
               );
             })}
@@ -1077,8 +1897,16 @@ export default function CierreClase({ duracion = 10 }) {
         </div>
       </div>
 
-      {/* Fila 4 */}
-      <div style={{ textAlign: "center", display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      {/* Acciones finales */}
+      <div
+        style={{
+          textAlign: "center",
+          display: "flex",
+          gap: 8,
+          justifyContent: "center",
+          flexWrap: "wrap",
+        }}
+      >
         <button
           onClick={resetCarrera}
           style={btnWhite}
@@ -1087,7 +1915,7 @@ export default function CierreClase({ duracion = 10 }) {
           🧹 Reset carrera
         </button>
 
-        {/* NUEVO: botón de conexión a Desarrollo */}
+        {/* Ir a Desarrollo */}
         <button
           onClick={goToDesarrollo}
           style={btnWhite}
@@ -1096,10 +1924,17 @@ export default function CierreClase({ duracion = 10 }) {
           ➡️ Ir a Desarrollo
         </button>
 
+        {/* Volver al inicio de clase */}
         <button
           onClick={() => {
             clearAllCountdowns();
-            navigate("/InicioClase", { replace: true, state: { resetTimers: true, from: "cierre" } });
+            navigate("/InicioClase", {
+              replace: true,
+              state: {
+                resetTimers: true,
+                from: "cierre",
+              },
+            });
           }}
           style={btnWhite}
         >
@@ -1109,6 +1944,7 @@ export default function CierreClase({ duracion = 10 }) {
     </div>
   );
 }
+
 
 
 
