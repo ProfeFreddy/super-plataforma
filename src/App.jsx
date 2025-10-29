@@ -9,7 +9,7 @@ import {
   useParams,
 } from "react-router-dom";
 
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth"; // *** CAMBIO: import signInAnonymously
 import { auth } from "./firebase";
 
 // registra el worker de pdf (no exporta nada, pero algunos componentes lo necesitan)
@@ -33,9 +33,9 @@ import RutaInicial from "./pages/RutaInicial";
   React.lazy() espera que el módulo tenga "default".
   Para no tocar tus archivos originales, hacemos este patrón:
 
-  const X = lazy(() =>
-    import("./pages/X").then(mod => ({ default: mod.X }))
-  );
+    const X = lazy(() =>
+      import("./pages/X").then(mod => ({ default: mod.X }))
+    );
 
   Así le damos a React.lazy un default artificial.
 */
@@ -61,7 +61,7 @@ const CierreClase = lazy(() =>
   }))
 );
 
-// Pago / planes
+// Pago / planes de pago
 const Pago = lazy(() =>
   import("./pages/Pago").then((mod) => ({
     default: mod.Pago || mod.default || mod,
@@ -93,6 +93,13 @@ const PlanClaseEditor = lazy(() =>
 const PlanificadorClase = lazy(() =>
   import("./pages/PlanificadorClase.jsx").then((mod) => ({
     default: mod.PlanificadorClase || mod.default || mod,
+  }))
+);
+
+// Planes (pantalla que lista los planes, distinta de Pago)
+const Planes = lazy(() =>
+  import("./pages/Planes").then((mod) => ({
+    default: mod.Planes || mod.default || mod,
   }))
 );
 
@@ -271,40 +278,94 @@ function RequirePlan({ children }) {
 
 /* ─────────────────────────────────────────
    Hook pequeño para saber si ya cargó Firebase Auth
+   *** CAMBIO: ahora también garantizamos usuario anónimo
    ───────────────────────────────────────── */
 function useAuthReady() {
   const [ready, setReady] = React.useState(false);
   const [user, setUser] = React.useState(null);
 
   React.useEffect(() => {
-    let unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u || null);
-      setReady(true);
+    let alive = true;
+
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!alive) return;
+
+      if (!u) {
+        // si no hay user todavía, intentamos sesión anónima
+        try {
+          const cred = await signInAnonymously(auth);
+          if (!alive) return;
+          setUser(cred.user || null);
+          setReady(true);
+        } catch (err) {
+          console.error("No pude crear sesión anónima", err);
+          if (!alive) return;
+          setUser(null);
+          setReady(true);
+        }
+      } else {
+        setUser(u || null);
+        setReady(true);
+      }
     });
 
+    // safety timeout antiguo que tenías
     const t = setTimeout(() => {
+      if (!alive) return;
       setReady(true);
     }, 1500);
 
     return () => {
+      alive = false;
       clearTimeout(t);
       if (unsub) unsub();
     };
   }, []);
 
-  return { ready, user };
+  const isAnon = !!user && !!user.isAnonymous;
+  const isLoggedIn = !!user && !user.isAnonymous;
+
+  return { ready, user, isAnon, isLoggedIn };
 }
 
 /* ─────────────────────────────────────────
    Rutas que requieren login NO anónimo
+   (ej: Perfil, cosas serias)
    ───────────────────────────────────────── */
 function RequireAuth({ children }) {
-  const { ready, user } = useAuthReady();
-  if (!ready)
+  const { ready, isLoggedIn } = useAuthReady();
+  if (!ready) {
     return <div style={{ padding: 16 }}>Cargando sesión…</div>;
+  }
+  return isLoggedIn ? children : <Navigate to="/login" replace />;
+}
 
-  const isAuthed = !!user && !user.isAnonymous;
-  return isAuthed ? children : <Navigate to="/login" replace />;
+/* ─────────────────────────────────────────
+   Ruta que PERMITE también usuario anónimo / trial
+   Esta es la clave para /horario.
+   ───────────────────────────────────────── */
+function AllowAnonWithPlan({ children }) {
+  const { ready, user } = useAuthReady();
+
+  if (!ready) {
+    return (
+      <div style={{ padding: 16, fontFamily: "sans-serif" }}>
+        Cargando tu sesión docente…
+      </div>
+    );
+  }
+
+  if (!user) {
+    // ni siquiera pudimos lograr anónimo -> mándalo al landing
+    return <Navigate to="/home" replace />;
+  }
+
+  // ya tenemos user (anónimo o real), ahora validamos plan/trial:
+  return (
+    <PlanGuard allowDuringTrial={true}>
+      {children}
+    </PlanGuard>
+  );
 }
 
 /* ─────────────────────────────────────────
@@ -312,17 +373,16 @@ function RequireAuth({ children }) {
    evita que abra /login otra vez
    ───────────────────────────────────────── */
 function RedirectIfAuthed({ children }) {
-  const { ready, user } = useAuthReady();
+  const { ready, isLoggedIn } = useAuthReady();
   if (!ready) return null;
-
-  const isAuthed = !!user && !user.isAnonymous;
-  return isAuthed ? <Navigate to="/home" replace /> : children;
+  return isLoggedIn ? <Navigate to="/home" replace /> : children;
 }
 
 /* ─────────────────────────────────────────
-   Layout protegido:
-   - primero exige login (RequireAuth)
-   - luego exige plan (PlanGuard / RequirePlan)
+   Layout protegido SOLO para features full:
+   - requiere login normal (no anónimo)
+   - y plan válido / trial
+   Esto sigue protegiendo /perfil, /planificaciones, etc.
    ───────────────────────────────────────── */
 function GuardedLayout() {
   return (
@@ -358,18 +418,14 @@ function AsistenciaWrapper() {
   const search = new URLSearchParams();
   search.set("m", "asis");
   if (code) search.set("code", code);
-  return (
-    <Navigate to={`/participa?${search.toString()}`} replace />
-  );
+  return <Navigate to={`/participa?${search.toString()}`} replace />;
 }
 
 function SalaWrapper() {
   const { code } = useParams();
   const search = new URLSearchParams();
   if (code) search.set("code", code);
-  return (
-    <Navigate to={`/participa?${search.toString()}`} replace />
-  );
+  return <Navigate to={`/participa?${search.toString()}`} replace />;
 }
 
 /* ─────────────────────────────────────────
@@ -404,10 +460,11 @@ export default function App() {
           />
 
           {/* Inicio de clase:
-             - en dev cualquiera puede entrar
-             - en prod exige plan */}
+              - en dev cualquiera puede entrar
+              - en prod exige plan
+              Normalizado a /InicioClase */}
           <Route
-            path="/inicioclase"
+            path="/InicioClase"
             element={
               import.meta.env.DEV ? (
                 <InicioClase />
@@ -419,8 +476,24 @@ export default function App() {
             }
           />
 
-          {/* Editor directo de horario */}
-          <Route path="/horario/editar" element={<HorarioEditable />} />
+          {/* DEMO DIRECTA SIN GUARDS */}
+          <Route path="/demo" element={<InicioClase />} />
+
+          {/* Editor directo de horario:
+              ANTES: estaba sin ningún guard
+              AHORA: lo pasamos por AllowAnonWithPlan para que
+              - espere Firebase
+              - cree sesión anónima si falta
+              - permita prueba gratis
+          */}
+          <Route
+            path="/horario/editar"
+            element={
+              <AllowAnonWithPlan>
+                <HorarioEditable />
+              </AllowAnonWithPlan>
+            }
+          />
 
           {/* Páginas varias */}
           <Route path="/plan-clase" element={<PlanClaseEditor />} />
@@ -431,12 +504,19 @@ export default function App() {
 
           {/* Pago / Planes públicas */}
           <Route path="/pago" element={<Pago />} />
-          <Route path="/planes" element={<Pago />} />
+          <Route path="/planes" element={<Planes />} />
 
-          {/* Privadas bajo sesión + plan */}
+          {/* Privadas bajo sesión FULL + plan/trial */}
           <Route element={<GuardedLayout />}>
             <Route path="/perfil" element={<Perfil />} />
-            <Route path="/horario" element={<HorarioEditable />} />
+            <Route
+              path="/horario"
+              element={
+                <AllowAnonWithPlan>
+                  <HorarioEditable />
+                </AllowAnonWithPlan>
+              }
+            />
             <Route
               path="/planificaciones"
               element={<Planificaciones />}
@@ -458,6 +538,8 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+
 
 
 
