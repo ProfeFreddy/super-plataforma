@@ -1,4 +1,4 @@
-// functions/index.js
+// functions/index.js 
 // Firebase Functions Gen2 + Express. Flow con firma HMAC y form-url-encoded.
 
 const { onRequest } = require("firebase-functions/v2/https");
@@ -18,11 +18,11 @@ function buildApp() {
   const FLOW_MERCHANT  = process.env.FLOW_MERCHANT || "";     // opcional
 
   // En producción usa el endpoint oficial de Flow
-  const FLOW_API_URL   = (process.env.FLOW_API_URL || "https://www.flow.cl/api").replace(/\/+$/, ""); // <<< cambio (antes sandbox)
+  const FLOW_API_URL   = (process.env.FLOW_API_URL || "https://www.flow.cl/api").replace(/\/+$/, ""); // <<< mantiene tu cambio
 
   // Base pública de este backend para webhooks (no pongas el front aquí)
   // Puedes sobreescribir con PUBLIC_BASE_URL en variables de entorno si cambias región/URL.
-  const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "https://us-central1-pragma-2c5d1.cloudfunctions.net/api").replace(/\/+$/, ""); // <<< cambio (nuevo)
+  const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "https://us-central1-pragma-2c5d1.cloudfunctions.net/api").replace(/\/+$/, ""); // <<< mantiene tu cambio
 
   // ====== Helpers ======
   const sortObject = (obj) =>
@@ -78,6 +78,7 @@ function buildApp() {
   a.use(express.json({ limit: "2mb" }));
 
   a.get("/", (_req, res) => res.json({ ok: true, service: "api", ts: Date.now() }));
+  a.get("/ping", (_req, res) => res.status(200).send("pong")); // <- test rápido
 
   a.get("/health", (_req, res) => {
     if (initError) return res.status(500).json({ ok: false, initError: String(initError) });
@@ -91,7 +92,7 @@ function buildApp() {
       hasSecret: !!FLOW_SECRET,
       apiUrl: FLOW_API_URL,
       hasMerchant: !!FLOW_MERCHANT,
-      publicBase: PUBLIC_BASE_URL, // <<< cambio (nuevo)
+      publicBase: PUBLIC_BASE_URL
     });
   });
 
@@ -113,7 +114,7 @@ function buildApp() {
       const { plan, email, amount, returnUrl } = req.body || {};
 
       // Email lo dejamos opcional (Flow igual acepta vacío)
-      if (!plan || !amount || !returnUrl) { // <<< cambio (ya NO exigimos email)
+      if (!plan || !amount || !returnUrl) { // <<< ya NO exige email
         return res.status(400).json({ ok: false, message: "MISSING_FIELDS" });
       }
       if (!FLOW_API_KEY || !FLOW_SECRET || !FLOW_API_URL) {
@@ -134,7 +135,7 @@ function buildApp() {
         amount: amountInt,
         email: email || "",                                             // opcional
         urlReturn: returnUrl,
-        urlConfirmation: `${PUBLIC_BASE_URL}/flow/webhook`,             // <<< cambio (antes tomaba el returnUrl)
+        urlConfirmation: `${PUBLIC_BASE_URL}/flow/webhook`,
         ...(FLOW_MERCHANT ? { merchantId: FLOW_MERCHANT } : {})
       };
 
@@ -147,7 +148,7 @@ function buildApp() {
         return axios.post(flowEndpoint, payload, {
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           timeout: 20_000,
-          validateStatus: () => true // para poder leer cuerpo en 4xx/5xx
+          validateStatus: () => true
         }).then(r => ({ label, status: r.status, data: r.data }));
       };
 
@@ -167,11 +168,9 @@ function buildApp() {
         const form2 = formEncode({ ...base, s: sigEnc });
         const r2 = await tryPost("encoded", form2);
 
-        // Si el segundo intento resulta OK, usamos ese
         if (r2.status >= 200 && r2.status < 300) {
           r = r2;
         } else {
-          // Conservamos el mejor de los dos para devolver detalle
           r = r2.status >= r.status ? r2 : r;
         }
       }
@@ -243,4 +242,7 @@ try {
 // https://us-central1/pragma-2c5d1.cloudfunctions.net/api/flow/init
 // =========================================================
 
-exports.api = onRequest({ region: "us-central1", timeoutSeconds: 300, memory: "512MiB" }, app);
+// Export dual para compatibilidad con firebase.json (app o api)
+const opts = { region: "us-central1", timeoutSeconds: 300, memory: "512MiB" };
+exports.api = onRequest(opts, app);
+exports.app = onRequest(opts, app); // <-- alias extra por si usas "app" en rewrites

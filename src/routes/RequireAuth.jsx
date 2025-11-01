@@ -1,28 +1,46 @@
-// src/components/RequireAuth.jsx
-import React, { useEffect, useState } from "react";
+// src/routes/RequireAuth.jsx
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 
-export default function RequireAuth({ children }) {
-  const [ready, setReady] = useState(false);
+export default function RequireAuth({ children, allowAnon = false }) {
+  const location = useLocation();
+  const [ready, setReady] = React.useState(false);
+  const [state, setState] = React.useState({ hasUser: false, isAnon: false });
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      try {
-        if (!u) {
-          // NUEVO: no redirigimos al login; habilitamos anónimo
-          await signInAnonymously(auth);
-        }
-      } catch (_e) {
-        // si falla, igual mostramos la app (leerá como no autenticado)
-      } finally {
-        setReady(true);
+  React.useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (!u) {
+        setState({ hasUser: false, isAnon: false });
+      } else {
+        setState({ hasUser: true, isAnon: !!u.isAnonymous });
       }
+      setReady(true);
     });
-    return () => unsub();
+    return () => unsub && unsub();
   }, []);
 
-  if (!ready) return null; // o spinner suave
+  if (!ready) {
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
+        Cargando…
+      </div>
+    );
+  }
+
+  // Sin usuario: bloquea
+  if (!state.hasUser) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Con usuario anónimo: permite solo si allowAnon
+  if (state.isAnon && !allowAnon) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // OK
   return children;
 }
+
 

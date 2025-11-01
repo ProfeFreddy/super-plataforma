@@ -6,16 +6,11 @@
   "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server/server.js",
-    "start": "node server/server.js",
-    "dev:proxy": "nodemon server.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "nodemon server/server.js",
+    "client": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "dev:api": "vercel dev -l 3001",
-    "dev:vite": "vite --port 5174 --strictPort",
-    "copy-pdf-worker": "node -e \"const fs=require('fs');const p='node_modules/pdfjs-dist/build/pdf.worker.min.js'; if(fs.existsSync(p)){fs.mkdirSync('public/assets',{recursive:true}); fs.copyFileSync(p,'public/assets/pdf.worker.min.js'); console.log('pdf.worker copied');} else console.warn('pdf.worker not found');\"",
-    "build:with-worker": "npm run copy-pdf-worker && vite build",
-    "postinstall": "npm run copy-pdf-worker"
+    "start": "node server/server.js"
   },
   "keywords": [],
   "author": "",
@@ -39,6 +34,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
     "netlify-cli": "^23.9.1",
     "nodemon": "^3.1.10",
     "npm-run-all": "^4.1.5",

@@ -208,18 +208,18 @@ function getMarcasFromConfig(cfg = {}) {
    Estilos / UI
    ============================================================ */
 const COLORS = {
-  brandA: "#2193b0",
-  brandB: "#6dd5ed",
+  brandA: "#1b75a6", // un poco más oscuro para más contraste
+  brandB: "#60c3eb",
   white: "#ffffff",
-  textDark: "#1f2937",
-  textMuted: "#475569",
+  textDark: "#0f172a",
+  textMuted: "#334155", // más contraste
   border: "#e5e7eb",
-  btnText: "#2193b0",
+  btnText: "#164e63",
 };
 
 const page = {
   minHeight: "100vh",
-  background: `linear-gradient(to right, ${COLORS.brandA}, ${COLORS.brandB})`,
+  background: `linear-gradient(110deg, ${COLORS.brandA}, ${COLORS.brandB})`,
   padding: "2rem",
   fontFamily: "Segoe UI, sans-serif",
   color: COLORS.white,
@@ -239,7 +239,7 @@ const card = {
   borderRadius: 12,
   padding: "1rem",
   boxShadow:
-    "0 6px 18px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.03)",
+    "0 10px 24px rgba(16,24,40,.12), 0 4px 10px rgba(16,24,40,.06)", // sombra un poco más marcada
   border: `1px solid ${COLORS.border}`,
   maxWidth: "100%",
   overflow: "hidden",
@@ -264,7 +264,7 @@ const btnWhite = {
   padding: ".6rem .9rem",
   fontWeight: 700,
   cursor: "pointer",
-  boxShadow: "0 4px 10px rgba(0,0,0,.15)",
+  boxShadow: "0 6px 14px rgba(0,0,0,.18)",
 };
 
 const input = {
@@ -277,6 +277,41 @@ const input = {
 };
 
 const smallMuted = { color: COLORS.textMuted, fontSize: 12 };
+
+/* ============================================================
+   🎆 PRESET "showtime" para NubeDePalabras
+   - Más contraste y rotaciones agresivas
+   - No rompe si el componente no usa estas props
+   ============================================================ */
+const SHOWTIME_PRESET = {
+  id: "showtime",
+  // Paleta de alto contraste (se puede ignorar si el hijo no la usa)
+  colors: [
+    "#0f172a", // casi negro
+    "#0ea5e9", // celeste vivo
+    "#22c55e", // verde
+    "#ef4444", // rojo
+    "#f59e0b", // ámbar
+    "#a855f7", // violeta
+  ],
+  fontFamily: "Segoe UI, system-ui, sans-serif",
+  fontWeight: [600, 800],
+  fontSizes: [18, 72], // rango más amplio
+  padding: 1,
+  spiral: "rectangular",
+  shuffle: true,
+  // Rotaciones agresivas
+  rotate: {
+    mode: "steep",
+    // ángulos marcados
+    angles: [-90, -60, -30, 0, 30, 60, 90],
+    probabilityTilted: 0.75,
+  },
+  // “contraste extra” para componentes que lo soporten
+  contrastBoost: 1.25,
+  // opción extra para suavizado y nitidez
+  rendering: { fontKerning: "none", pixelRatio: 1.0 },
+};
 
 /* ============================================================
    Centro de Juegos
@@ -640,13 +675,7 @@ export default function CierreClase({ duracion = 10 }) {
                     : null
                 );
               } catch (e2) {
-                // Dejamos comentado tu fallback original por si quieres volver:
-                // try {
-                //   const oaResponse = await axios.get(
-                //     `https://curriculumnacional.mineduc.cl/api/v1/oa/buscar?asignatura=matematica&nivel=media&unidad=${encodeURIComponent(unidadInicial)}`
-                //   );
-                //   setOaMinisterio(Array.isArray(oaResponse.data) ? oaResponse.data[0] : null);
-                // } catch (e3) {}
+                // fallback opcional (dejado comentado)
               }
             }
           }
@@ -1406,8 +1435,8 @@ export default function CierreClase({ duracion = 10 }) {
             marginBottom: "1rem",
             background:
               claseVigente.fuente === "calendario"
-                ? "rgba(124,58,237,.06)"
-                : "rgba(2,132,199,.06)",
+                ? "rgba(124,58,237,.08)"
+                : "rgba(2,132,199,.08)",
           }}
         >
           <div style={{ fontWeight: 800 }}>
@@ -1510,7 +1539,22 @@ export default function CierreClase({ duracion = 10 }) {
         <h3 style={{ marginTop: 0 }}>
           🧠 Nube de palabras final
         </h3>
-        <NubeDePalabras modo="cierre" />
+        {/* 🚀 Enviamos preset “showtime” + banderas de contraste/rotación */}
+        <NubeDePalabras
+          modo="cierre"
+          preset="showtime"
+          cloudPreset={SHOWTIME_PRESET}
+          rotationAggressive
+          contrastBoost={SHOWTIME_PRESET.contrastBoost}
+          angles={SHOWTIME_PRESET.rotate?.angles}
+          colors={SHOWTIME_PRESET.colors}
+          fontFamily={SHOWTIME_PRESET.fontFamily}
+          fontWeight={SHOWTIME_PRESET.fontWeight}
+          fontSizes={SHOWTIME_PRESET.fontSizes}
+          spiral={SHOWTIME_PRESET.spiral}
+          shuffle={SHOWTIME_PRESET.shuffle}
+          padding={SHOWTIME_PRESET.padding}
+        />
       </div>
 
       {/* QR sesión carrera */}
@@ -1944,6 +1988,7 @@ export default function CierreClase({ duracion = 10 }) {
     </div>
   );
 }
+
 
 
 

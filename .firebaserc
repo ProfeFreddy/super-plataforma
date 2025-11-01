@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "pragma-2c5d1"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

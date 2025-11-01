@@ -1,3 +1,4 @@
+// src/pages/Registro.jsx
 import React from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import {
@@ -5,7 +6,8 @@ import {
   updateProfile,
   sendEmailVerification,
 } from "firebase/auth";
-import { auth } from "../firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../firebase";
 
 /* Traducción de errores reales de Firebase */
 function msgFromFirebaseCode(code) {
@@ -29,22 +31,16 @@ function msgFromFirebaseCode(code) {
   }
 }
 
-/* Validación de email */
 const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
 
-/*
-  Timer suave: marcamos si se demoró mucho, pero NO hacemos reject automático.
-  Esto evita que el usuario vea un error rojo inventado aunque Firebase sí creó la cuenta.
-*/
 function withGentleTimeout(promise, ms = 15000, slowRef = null) {
   let timer;
   if (slowRef) {
     slowRef.current = false;
     timer = setTimeout(() => {
-      slowRef.current = true; // solo lo marcamos, no rechazamos
+      slowRef.current = true;
     }, ms);
   }
-
   return promise.finally(() => {
     if (timer) clearTimeout(timer);
   });
@@ -61,145 +57,146 @@ export default function Registro() {
   const [pass2, setPass2] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [success, setSuccess] = React.useState(false);
+  const [isSlow, setIsSlow] = React.useState(false);
 
-  // Para saber si se tardó más de lo normal
   const slowRef = React.useRef(false);
 
-  // Debug útil en consola (no se ve en UI)
   React.useEffect(() => {
-    try {
-      const opts = auth?.app?.options || {};
-      console.log(
-        "[Registro][FB] projectId:",
-        opts.projectId,
-        "| authDomain:",
-        opts.authDomain,
-        "| apiKey defined:",
-        Boolean(opts.apiKey)
-      );
-    } catch {}
+    const id = setInterval(() => setIsSlow(!!slowRef.current), 300);
+    return () => clearInterval(id);
   }, []);
-
-  // A dónde vamos después de registrar
-  const goAfterRegister = () => {
-    const next = qs.get("next");
-    const dest = next || "/horario"; // tu destino por defecto
-    nav(dest, { replace: true });
-
-    // fallback por si HashRouter no navega como esperamos
-    try {
-      setTimeout(() => {
-        if (!location.pathname.startsWith(dest)) {
-          window.location.assign(dest);
-        }
-      }, 150);
-    } catch {}
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
     setError("");
+    setSuccess(false);
 
     const mail = String(email || "").trim().toLowerCase();
     const pwd = String(pass || "");
     const pwd2 = String(pass2 || "");
     const display = String(nombre || "").trim();
 
-    // Validaciones de formulario
-    if (!mail || !pwd) {
-      setError("Completa correo y contraseña.");
-      return;
-    }
-    if (!isEmail(mail)) {
-      setError("El correo no parece válido.");
-      return;
-    }
-    if (pwd.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
-      return;
-    }
-    if (pwd !== pwd2) {
-      setError("Las contraseñas no coinciden.");
-      return;
-    }
-
-    // Validación rápida de config
-    try {
-      const opts = auth?.app?.options || {};
-      if (!opts.apiKey) {
-        setError(
-          "Falta la apiKey de Firebase en la configuración local. Ajusta src/firebase.js."
-        );
-        return;
-      }
-    } catch {}
+    if (!mail || !pwd) return setError("Completa correo y contraseña.");
+    if (!isEmail(mail)) return setError("El correo no parece válido.");
+    if (pwd.length < 6) return setError("La contraseña debe tener al menos 6 caracteres.");
+    if (pwd !== pwd2) return setError("Las contraseñas no coinciden.");
 
     try {
       setLoading(true);
+      console.log("[Registro] Intentando crear usuario…");
 
-      // Creamos usuario en Firebase Auth.
-      // OJO: si esto funciona, Firebase YA creó la cuenta aunque la UI se quede pegada.
-      let cred;
-      await withGentleTimeout(
-        (async () => {
-          cred = await createUserWithEmailAndPassword(auth, mail, pwd);
-        })(),
+      const cred = await withGentleTimeout(
+        createUserWithEmailAndPassword(auth, mail, pwd),
         15000,
         slowRef
       );
 
-      // Si por alguna razón cred no existe, significa que se cayó en mitad de la creación.
-      // Eso es súper raro, pero evitemos crashear.
-      if (!cred || !cred.user) {
-        console.warn("[Registro] cred.user ausente después de crear cuenta");
-        setError(
-          slowRef.current
-            ? "La conexión está muy lenta. Intenta nuevamente."
-            : "No se pudo terminar el registro. Intenta nuevamente."
-        );
+      const user = cred?.user;
+      console.log("[Registro] Usuario creado:", user?.uid || "(sin uid)");
+
+      if (!user) {
+        setError("No se pudo completar el registro. Inténtalo nuevamente.");
         return;
       }
 
-      // Actualizar displayName (no bloquea)
+      // Nombre visible (si se ingresó)
       if (display) {
         try {
-          await updateProfile(cred.user, { displayName: display });
+          await updateProfile(user, { displayName: display });
+          console.log("[Registro] Perfil actualizado con nombre:", display);
         } catch (errProfile) {
           console.warn("[Registro] updateProfile falló:", errProfile);
         }
       }
 
-      // Enviar verificación al correo (tampoco bloquea)
+      // Enviar verificación (no bloquea flujo)
       try {
-        await sendEmailVerification(cred.user);
+        await sendEmailVerification(user);
+        console.log("[Registro] Verificación enviada a:", user.email);
       } catch (errVerif) {
         console.warn("[Registro] sendEmailVerification falló:", errVerif);
       }
 
-      // ✨ ÉXITO REAL ✨
-      // limpiamos cualquier error viejo por si estaba pintado en rojo
-      setError("");
+      // Escribir en Firestore (colección principal)
+      try {
+        await setDoc(
+          doc(db, "usuarios", user.uid),
+          {
+            nombre: display || user.displayName || "",
+            email: mail,
+            rol: "profesor",
+            creadoEn: serverTimestamp(),
+            horario: null, // placeholder
+            horarioConfig: {
+              bloquesGenerados: [],
+              marcas: [],
+            },
+            onboarding: {
+              fase: "registro",
+              ts: serverTimestamp(),
+            },
+          },
+          { merge: true }
+        );
+        console.log("[Registro] Guardado en Firestore: usuarios/", user.uid);
+      } catch (errDB) {
+        console.warn("[Registro] setDoc usuarios falló:", errDB);
+      }
 
-      // y navegamos al siguiente paso
-      goAfterRegister();
+      // Fallback opcional: profesores/{uid}
+      try {
+        await setDoc(
+          doc(db, "profesores", user.uid),
+          {
+            nombre: display || user.displayName || "",
+            email: mail,
+            slogan: "",
+            actualizadoEn: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (e2) {
+        console.warn("[Registro] setDoc profesores falló:", e2);
+      }
+
+      // Flags anti-rebote
+      try {
+        localStorage.setItem("uid", user.uid);
+        localStorage.setItem("nombre", display || user.displayName || "");
+        localStorage.setItem("email", mail);
+        localStorage.setItem("justRegisteredAt", String(Date.now()));
+        localStorage.setItem("skipRutaInicialOnce", "1");
+        localStorage.setItem("forceHorarioOnce", "1");
+      } catch {}
+
+      setSuccess(true);
+      setError("");
+      console.log("[Registro] ✅ Registro completo, redirigiendo a /horario…");
+
+      try {
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, "", cleanUrl);
+      } catch {}
+
+      nav("/horario", { replace: true, state: { from: "registro" } });
+
+      setTimeout(() => {
+        const now =
+          window.location.pathname + window.location.hash + window.location.search;
+        const isInHorario =
+          now.startsWith("/horario") ||
+          now.includes("#/horario") ||
+          now.includes("#%2Fhorario");
+        if (!isInHorario) {
+          window.location.assign("/#/horario");
+        }
+      }, 450);
     } catch (err) {
       console.warn("[Registro] catch err:", err);
-
-      // Mapeamos errores de Firebase conocidos
       const nice = msgFromFirebaseCode(err?.code);
-
-      // Si no es un código auth/* pero trae un mensaje genérico tipo timeout viejo,
-      // damos algo menos técnico:
-      const fallbackMsg = slowRef.current
-        ? "Está tardando más de lo normal. Revisa tu conexión e inténtalo otra vez."
-        : "No se pudo crear la cuenta. Inténtalo nuevamente.";
-
-      setError(
-        err?.message?.includes?.("Firebase:") || err?.code?.startsWith?.("auth/")
-          ? nice
-          : fallbackMsg
-      );
+      setError(nice || "No se pudo crear la cuenta. Inténtalo nuevamente.");
     } finally {
       setLoading(false);
     }
@@ -219,7 +216,6 @@ export default function Registro() {
             placeholder="Ej: Ana Pérez"
             style={styles.input}
             autoComplete="name"
-            name="name"
           />
 
           <label style={styles.label}>Correo electrónico</label>
@@ -230,8 +226,6 @@ export default function Registro() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="ejemplo@correo.com"
             style={styles.input}
-            name="email"
-            inputMode="email"
           />
 
           <label style={styles.label}>Contraseña</label>
@@ -242,7 +236,6 @@ export default function Registro() {
             onChange={(e) => setPass(e.target.value)}
             placeholder="Mínimo 6 caracteres"
             style={styles.input}
-            name="new-password"
           />
 
           <label style={styles.label}>Repite la contraseña</label>
@@ -253,13 +246,15 @@ export default function Registro() {
             onChange={(e) => setPass2(e.target.value)}
             placeholder="Confirma tu contraseña"
             style={styles.input}
-            name="confirm-password"
           />
 
           {error && <div style={styles.error}>{error}</div>}
+          {success && (
+            <div style={styles.success}>✅ Cuenta creada correctamente. Redirigiendo...</div>
+          )}
 
           <button type="submit" disabled={loading} style={styles.btnPrimary}>
-            {loading ? "Creando…" : "Crear cuenta"}
+            {loading ? (isSlow ? "Creando… (puede tardar)" : "Creando…") : "Crear cuenta"}
           </button>
         </form>
 
@@ -328,7 +323,20 @@ const styles = {
     borderRadius: 8,
     fontSize: 13,
   },
+  success: {
+    background: "#ecfdf5",
+    color: "#065f46",
+    border: "1px solid #a7f3d0", // ← fix aquí
+    padding: "8px 10px",
+    borderRadius: 8,
+    fontSize: 13,
+  },
 };
+
+
+
+
+
 
 
 

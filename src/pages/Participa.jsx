@@ -1,7 +1,6 @@
 // src/pages/Participa.jsx
-import React from "react";
-import { useEffect, useMemo, useState } from "react";
-import { db } from "../firebase";
+import React, { useEffect, useMemo, useState } from "react";
+import { db, rtdb, auth } from "../firebase";
 import {
   collection,
   doc,
@@ -12,10 +11,34 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
+// ✅ RTDB
+import {
+  ref as rRef,
+  push as rPush,
+  set as rSet,
+  onValue as rOnValue,
+  serverTimestamp as rServerTimestamp,
+} from "firebase/database";
+import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
-// ───────────────────────────────────────────────
-// Helpers de URL y estado local
-// ───────────────────────────────────────────────
+signInAnonymously(auth).catch(() => {}); // <- evita ser pateado a /login
+
+// Promesa que se resuelve cuando YA hay user (anónimo o normal)
+let _resolveAuthReady;
+export const authReady = new Promise((res) => (_resolveAuthReady = res));
+
+onAuthStateChanged(auth, (u) => {
+  if (u) {
+    _resolveAuthReady?.();
+  } else {
+    // Fuerza sesión anónima en dev/local o mientras pruebas
+    signInAnonymously(auth).finally(() => _resolveAuthReady?.());
+  }
+});
+
+/* ───────────────────────────────────────────────
+   Helpers de URL y estado local
+─────────────────────────────────────────────── */
 function useQuery() {
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search));
   useEffect(() => {
@@ -25,7 +48,6 @@ function useQuery() {
   }, []);
   return q;
 }
-
 function setQueryParams(obj = {}) {
   const url = new URL(window.location.href);
   Object.entries(obj).forEach(([k, v]) => {
@@ -33,6 +55,28 @@ function setQueryParams(obj = {}) {
     else url.searchParams.set(k, String(v));
   });
   window.history.replaceState({}, "", url.toString());
+}
+
+/* ===== Nuevo: Normalizador FUERTE del código de sala ===== */
+function extractSalaFromHash() {
+  // Soporta hash routes tipo "#/sala/26134" o "#/participa?code=26134"
+  const h = String(window.location.hash || "");
+  // #/sala/xxxx  -> captura xxxx
+  const m1 = h.match(/#\/sala\/([^?&#/]+)/i);
+  if (m1 && m1[1]) return m1[1];
+  // #/participa?...&code=xxxx
+  const m2 = h.match(/[?&]code=([^&#]+)/i);
+  if (m2 && m2[1]) return m2[1];
+  return "";
+}
+function sanitizeSalaCode(raw) {
+  // Quita espacios, querys, hashes y segmentos de ruta. Solo permite [A-Za-z0-9_-]
+  return String(raw || "")
+    .split("?")[0]
+    .split("#").pop()
+    .split("/").pop()
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, "");
 }
 
 const COLORS = {
@@ -88,7 +132,7 @@ const btn = {
   boxShadow: "0 2px 6px rgba(0,0,0,.08)",
 };
 
-// ID anónimo por dispositivo (para posibles deduplicaciones futuras)
+// ID anónimo por dispositivo
 function getDeviceId() {
   try {
     const k = "ic_device_id";
@@ -103,15 +147,16 @@ function getDeviceId() {
   }
 }
 
-// ───────────────────────────────────────────────
-// Componente principal
-// ───────────────────────────────────────────────
+/* ───────────────────────────────────────────────
+   Componente principal
+─────────────────────────────────────────────── */
 export default function Participa() {
-  // ✅ Conservamos tu estructura base, ampliándola:
   const q = useQuery();
 
   const mode = (q.get("m") || "").toLowerCase() === "asis" ? "asis" : "cloud";
-  const initialCode = q.get("code") || "";
+  const initialCodeRaw =
+    q.get("code") || q.get("sala") || extractSalaFromHash() || "";
+  const initialCode = sanitizeSalaCode(initialCodeRaw);
   const initialSlot = q.get("slot") || "";
   const initialYW = q.get("yw") || "";
 
@@ -119,7 +164,21 @@ export default function Participa() {
   const [slotId, setSlotId] = useState(initialSlot);
   const [yearWeek, setYearWeek] = useState(initialYW);
 
-  // Pregunta en vivo (para el modo nube)
+  // Si llegó algo sucio vía URL (p. ej. "http://...#/sala/26134"), lo corrige una vez.
+  useEffect(() => {
+    const cleaned = sanitizeSalaCode(salaCode);
+    if (cleaned !== salaCode) setSalaCode(cleaned);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Garantiza sesión anónima para no “pegarse”
+  useEffect(() => {
+    if (!auth.currentUser) {
+      signInAnonymously(auth).catch(() => {});
+    }
+  }, []);
+
+  // Pregunta en vivo (Firestore)
   const [pregunta, setPregunta] = useState("");
   useEffect(() => {
     const ref = doc(db, "preguntaClase", "actual");
@@ -133,11 +192,8 @@ export default function Participa() {
     return () => unsub();
   }, []);
 
-  // Prefills de alumno
-  const storageKey = useMemo(
-    () => `part:${salaCode || "nocode"}`,
-    [salaCode]
-  );
+  // Prefills
+  const storageKey = useMemo(() => `part:${salaCode || "nocode"}`, [salaCode]);
   const [numeroLista, setNumeroLista] = useState(() => {
     try {
       const raw = JSON.parse(localStorage.getItem(storageKey) || "{}");
@@ -154,7 +210,6 @@ export default function Participa() {
       return "";
     }
   });
-
   useEffect(() => {
     try {
       const data = { numeroLista, nombre };
@@ -162,28 +217,28 @@ export default function Participa() {
     } catch {}
   }, [numeroLista, nombre, storageKey]);
 
-  // Estado de envío / feedback
+  // Estado envío / feedback
   const [textWord, setTextWord] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  // Validaciones básicas
-  const canSendWord =
-    salaCode.trim().length > 0 && textWord.trim().length > 0;
-
+  // Validaciones
+  const canSendWord = salaCode.trim().length > 0 && textWord.trim().length > 0;
   const canSendAsis =
     salaCode.trim().length > 0 && Number.isFinite(parseInt(numeroLista, 10));
 
-  // Suscripción opcional a palabras recientes (para feedback del alumno)
+  // Últimos (Firestore principal + fallback RTDB)
   const [ultimos, setUltimos] = useState([]);
   useEffect(() => {
     if (!salaCode) return;
+
+    // 1) Firestore (lo que usa tu InicioClase)
     const colRef = collection(db, "salas", salaCode, "palabras");
     let qRef = colRef;
     try {
       qRef = query(colRef, orderBy("timestamp"));
     } catch {}
-    const unsub = onSnapshot(
+    const unsubFS = onSnapshot(
       qRef,
       (snap) => {
         const arr = snap.docs
@@ -199,10 +254,34 @@ export default function Participa() {
       },
       () => {}
     );
-    return () => unsub();
+
+    // 2) Fallback RTDB (solo si FS no tiene nada aún)
+    const rPath = rRef(rtdb, `salas/${salaCode}/palabras`);
+    const unsubRT = rOnValue(rPath, (snap) => {
+      const val = snap.val() || {};
+      const rows = Object.entries(val).map(([id, v]) => ({
+        id,
+        ...v,
+        ts: typeof v?.ts === "number" ? v.ts : 0,
+      }));
+      if (rows.length && ultimos.length === 0) {
+        setUltimos(
+          rows
+            .filter((x) => (x.texto || "").trim())
+            .sort((a, b) => b.ts - a.ts)
+            .slice(0, 5)
+        );
+      }
+    });
+
+    return () => {
+      unsubFS();
+      unsubRT();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [salaCode]);
 
-  // Persistir cambios de query cuando el usuario edite los campos (para que el QR siguiente sea consistente)
+  // Persistir query (ya sale saneado)
   useEffect(() => {
     setQueryParams({
       code: salaCode || null,
@@ -212,32 +291,66 @@ export default function Participa() {
     });
   }, [salaCode, mode, slotId, yearWeek]);
 
-  // ───────────────────────────────────────────────
-  // Acciones
-  // ───────────────────────────────────────────────
+  /* ───────────────────────────────────────────────
+     Acciones (DOBLE ESCRITURA FS + RTDB)
+  ─────────────────────────────────────────────── */
+  // Anti-spam: 1 envío cada 8s por sala
+  const canSendNow = () => {
+    const k = `lastSend:${salaCode}`;
+    const last = Number(localStorage.getItem(k) || 0);
+    return Date.now() - last > 8000;
+  };
+  const markSend = () => {
+    try {
+      localStorage.setItem(`lastSend:${salaCode}`, String(Date.now()));
+    } catch {}
+  };
+
   const enviarPalabra = async () => {
     if (!canSendWord) return;
+    if (!canSendNow()) {
+      setMsg({ type: "warn", text: "Espera unos segundos antes de enviar otra palabra." });
+      return;
+    }
+
     setLoading(true);
     setMsg(null);
     try {
-      const payload = {
-        texto: String(textWord || "").trim(),
+      const clean = String(textWord || "").trim();
+      const payloadFS = {
+        texto: clean,
         numeroLista: Number.isFinite(+numeroLista) ? +numeroLista : null,
         nombre: (nombre || "").trim() || null,
         deviceId: getDeviceId(),
-        slotId: slotId || null, // no es requerido por Inicio, pero no molesta
-        yw: yearWeek || null,   // idem
+        slotId: slotId || null,
+        yw: yearWeek || null,
         timestamp: serverTimestamp(),
       };
-      const ref = doc(collection(db, "salas", salaCode, "palabras"));
-      await setDoc(ref, payload, { merge: true });
+      // Firestore (compat con InicioClase actual)
+      const refFS = doc(collection(db, "salas", salaCode, "palabras"));
+      await setDoc(refFS, payloadFS, { merge: true });
+
+      // RTDB (baja latencia)
+      const payloadRT = {
+        texto: clean,
+        numeroLista: Number.isFinite(+numeroLista) ? +numeroLista : null,
+        nombre: (nombre || "").trim() || null,
+        deviceId: getDeviceId(),
+        slotId: slotId || null,
+        yw: yearWeek || null,
+        ts: Date.now(),
+        serverTs: rServerTimestamp(),
+      };
+      const refRT = rRef(rtdb, `salas/${salaCode}/palabras`);
+      await rSet(rPush(refRT), payloadRT);
+
       setTextWord("");
+      markSend();
       setMsg({ type: "ok", text: "¡Enviado! Gracias por participar." });
     } catch (e) {
       setMsg({
         type: "err",
-        text:
-          "Ocurrió un error al enviar. Comprueba tu conexión e inténtalo otra vez.",
+        text: "No se pudo enviar. Revisa tu conexión e inténtalo otra vez.",
       });
     } finally {
       setLoading(false);
@@ -255,54 +368,60 @@ export default function Participa() {
     setLoading(true);
     setMsg(null);
     try {
-      const payload = {
+      const payloadCommon = {
         numeroLista: parseInt(numeroLista, 10),
         nombre: (nombre || "").trim() || null,
-        slotId: slotId || null, // InicioClase lo usa si viene
-        yw: yearWeek || null,   // InicioClase lo usa si viene
+        slotId: slotId || null,
+        yw: yearWeek || null,
         source: "web",
         deviceId: getDeviceId(),
-        // 👉 añadimos ambos campos de tiempo para compatibilidad
-        ts: serverTimestamp(),
-        timestamp: serverTimestamp(),
       };
 
-      // ✅ 1) Mantener tu colección original
+      // Firestore (mantengo tus colecciones)
       const refAsis = doc(collection(db, "salas", salaCode, "asistencia"));
-      await setDoc(refAsis, payload, { merge: true });
+      await setDoc(
+        refAsis,
+        { ...payloadCommon, ts: serverTimestamp(), timestamp: serverTimestamp() },
+        { merge: true }
+      );
 
-      // ✅ 2) NUEVO: escribir también en 'presentes' (lo que lee InicioClase)
       const refPres = doc(collection(db, "salas", salaCode, "presentes"));
-      await setDoc(refPres, payload, { merge: true });
+      await setDoc(
+        refPres,
+        { ...payloadCommon, ts: serverTimestamp(), timestamp: serverTimestamp() },
+        { merge: true }
+      );
 
-      setMsg({
-        type: "ok",
-        text: "¡Listo! Tu asistencia ha sido registrada.",
-      });
+      // RTDB (lo que leerá InicioClase si migras)
+      const presRT = rRef(rtdb, `salas/${salaCode}/presentes`);
+      await rSet(
+        rPush(presRT),
+        { ...payloadCommon, ts: Date.now(), serverTs: rServerTimestamp() }
+      );
+
+      setMsg({ type: "ok", text: "¡Listo! Tu asistencia ha sido registrada." });
     } catch (e) {
       setMsg({
         type: "err",
-        text:
-          "No pudimos registrar tu asistencia. Verifica conexión e inténtalo nuevamente.",
+        text: "No pudimos registrar tu asistencia. Inténtalo nuevamente.",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // ───────────────────────────────────────────────
-  // UI
-  // ───────────────────────────────────────────────
+  /* ───────────────────────────────────────────────
+     UI
+  ─────────────────────────────────────────────── */
   return (
     <div style={pageStyle}>
       <div style={{ ...card, marginBottom: 16 }}>
         <h1 style={{ marginTop: 0 }}>Participa</h1>
         <p style={{ marginTop: 4, color: COLORS.muted }}>
-          Vista de participación. (Placeholder temporal para compilar y
-          desplegar)
+          Vista de participación.
         </p>
 
-        {/* Encabezado visible para el estudiante */}
+        {/* Encabezado */}
         <div
           style={{
             marginTop: 10,
@@ -320,7 +439,9 @@ export default function Participa() {
                 style={input}
                 placeholder="Ej: 12345"
                 value={salaCode}
-                onChange={(e) => setSalaCode(e.target.value.replace(/\s+/g, ""))}
+                onChange={(e) =>
+                  setSalaCode(sanitizeSalaCode(e.target.value))
+                }
               />
             </div>
 
@@ -346,7 +467,7 @@ export default function Participa() {
             </div>
           </div>
 
-          {/* Campos solo informativos si vienen del QR en modo asistencia */}
+          {/* Campos informativos si vienen del QR */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div>
               <div style={{ fontSize: 12, color: COLORS.muted }}>Slot (opcional)</div>
@@ -369,7 +490,7 @@ export default function Participa() {
           </div>
         </div>
 
-        {/* Mensajes de estado */}
+        {/* Mensajes */}
         {msg && (
           <div
             style={{
@@ -469,7 +590,7 @@ export default function Participa() {
             </button>
           </div>
 
-          {/* Últimos envíos (feedback) */}
+          {/* Últimos envíos */}
           <div style={{ marginTop: 16 }}>
             <div style={{ fontWeight: 700, marginBottom: 6 }}>Últimos envíos</div>
             {ultimos.length === 0 ? (
@@ -492,7 +613,7 @@ export default function Participa() {
         </div>
       )}
 
-      {/* Pie ligero */}
+      {/* Pie */}
       <div style={{ ...card, marginTop: 16 }}>
         <div style={{ fontSize: 12, color: COLORS.muted }}>
           Código de dispositivo: <code>{getDeviceId().slice(0, 8)}</code>
@@ -501,5 +622,7 @@ export default function Participa() {
     </div>
   );
 }
+
+
 
 

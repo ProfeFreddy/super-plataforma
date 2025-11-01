@@ -1,4 +1,4 @@
-// InicioClase.jsx 
+// InicioClase.jsx
 import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import QRCode from "react-qr-code";
@@ -9,6 +9,7 @@ import { PlanContext } from "../context/PlanContext";
 import { PLAN_CAPS } from "../lib/planCaps";
 import { syncSlotsFromHorario } from "../services/Slots";
 import FichaClaseSticky from "../components/FichaClaseSticky";
+import NubeDePalabras from "../components/NubeDePalabras";
 
 import {
   collection,
@@ -33,13 +34,11 @@ import { getPrimerOA } from "../services/curriculoService";
 // ─────────────────────────────────────────────────────────────
 // PON ESTO CERCA DE TUS UTILIDADES DE CONTADOR
 // ─────────────────────────────────────────────────────────────
-
 function makeCountKey(slotId = "0-0") {
   const uid = auth.currentUser?.uid || localStorage.getItem("uid") || "anon";
   const yw = getYearWeek(); // p.ej. "2025-39"
   return `ic_countdown_end:${uid}:${yw}:${slotId}`;
 }
-
 /* 🔥 NUEVO: clave por segmento OA */
 function makeSegKey(slotId = "0-0", idx = 0) {
   const uid = auth.currentUser?.uid || localStorage.getItem("uid") || "anon";
@@ -61,19 +60,6 @@ const PLAN_DEFAULTS = {
   caps: PLAN_CAPS.FREE,
   loading: false,
 };
-
-// ✅ NUEVO: ir a horario en modo edición
-const irAHorario = () => {
-  navigate("/horario", { state: { edit: true, from: "/InicioClase" } });
-};
-
-<button
-  onClick={irAHorario}
-  style={{ ...btnTiny, width: "100%", justifyContent: "center", display: "inline-flex", marginTop: 6 }}
-  title="Modificar o completar todo tu horario"
->
-  🗓️ Modificar horario
-</button>
 
 // ====== estilos (alineados con Home: #2193b0 – #6dd5ed) ======
 const COLORS = {
@@ -166,7 +152,6 @@ function dowFromQuery() {
   const v = Number(q.get("dow"));
   return v >= 1 && v <= 5 ? v : null;
 }
-
 /* ✅ NUEVO: permitir forzar slot vía query (?slot=fila-col) */
 function slotFromQuery() {
   try {
@@ -255,26 +240,18 @@ const filaDesdeMarcas = (marcas = []) => {
   }
   return 0;
 };
-
 /* 🧩 NUEVO HELPER: acepta varios formatos de horarioConfig */
 function getMarcasFromConfig(cfg = {}) {
-  // a) array de [h,m]
   if (Array.isArray(cfg.marcas) && Array.isArray(cfg.marcas[0])) return cfg.marcas;
-
-  // b) array de maps {h,m}
   if (Array.isArray(cfg.marcas) && cfg.marcas.length && typeof cfg.marcas[0] === "object") {
     return cfg.marcas.map((x) => [Number(x.h) || 0, Number(x.m) || 0]);
   }
-
-  // c) marcasStr: ["08:00", ...]
   if (Array.isArray(cfg.marcasStr)) {
     return cfg.marcasStr.map((s) => {
       const [h, m] = String(s).split(":").map((n) => Number(n) || 0);
       return [h, m];
     });
   }
-
-  // d) bloquesGenerados: ["08:00 - 08:45", ...]
   if (Array.isArray(cfg.bloquesGenerados) && cfg.bloquesGenerados.length) {
     const startTimes = cfg.bloquesGenerados.map((b) => String(b).split(" - ")[0]);
     const lastEnd = String(cfg.bloquesGenerados.at(-1)).split(" - ")[1];
@@ -283,7 +260,6 @@ function getMarcasFromConfig(cfg = {}) {
       return [h, m];
     });
   }
-
   return [];
 }
 
@@ -397,7 +373,8 @@ class GlobalBoundary extends React.Component {
 }
 
 // Componente fallback HTML (palabras coloridas, crecimiento por frecuencia)
-function HtmlCloud({ data, palette, fontSize }) {
+// ⬇️ Acepta onEditHorario para no depender de variables fuera de scope
+function HtmlCloud({ data, palette, fontSize, onEditHorario }) {
   return (
     <div
       style={{
@@ -408,20 +385,20 @@ function HtmlCloud({ data, palette, fontSize }) {
         padding: "6px 2px",
       }}
     >
-        {/* ✅ NUEVO: botón Modificar horario */}
-  <button
-    onClick={irAHorario}
-    style={{
-      ...btnTiny,
-      width: "100%",
-      justifyContent: "center",
-      display: "inline-flex",
-      marginTop: 6,
-    }}
-    title="Modificar o completar todo tu horario"
-  >
-    🗓️ Modificar horario
-  </button>
+      {/* ✅ Botón Modificar horario (con handler pasado por props) */}
+      <button
+        onClick={onEditHorario}
+        style={{
+          ...btnTiny,
+          width: "100%",
+          justifyContent: "center",
+          display: "inline-flex",
+          marginTop: 6,
+        }}
+        title="Modificar o completar todo tu horario"
+      >
+        🗓️ Modificar horario
+      </button>
       {data.map((w, i) => (
         <span
           key={w.key || `${w.text}_${i}`}
@@ -432,6 +409,9 @@ function HtmlCloud({ data, palette, fontSize }) {
             color: palette[i % palette.length],
             whiteSpace: "nowrap",
             userSelect: "none",
+            // ✨ más contraste en fallback HTML
+            textShadow:
+              "0 1px 0 rgba(0,0,0,.15), 0 2px 6px rgba(0,0,0,.12)",
           }}
           title={`${w.text} ×${w.value}`}
         >
@@ -445,7 +425,7 @@ function HtmlCloud({ data, palette, fontSize }) {
 /* ========= NUEVO: CanvasCloud =========
    Dibuja una nube centrada con disposición en espiral (tipo Mentimeter).
    Se usa cuando 'cloudMode' cae a "html" para evitar el fallback en fila. */
-function CanvasCloud({ data, palette, width, height, fontSize }) {
+function CanvasCloud({ data, palette, width, height, fontSize, onEditHorario }) {
   const ref = useRef(null);
 
   // ✅ FIX: define un 'authed' local para que no marque no-undef
@@ -456,7 +436,6 @@ function CanvasCloud({ data, palette, width, height, fontSize }) {
     const uid = auth.currentUser?.uid || localStorage.getItem("uid");
     if (!uid) return;
 
-    // evita repetir la sincronización cada render
     if (window.__slotsSyncedForUid === uid) return;
 
     (async () => {
@@ -484,7 +463,6 @@ function CanvasCloud({ data, palette, width, height, fontSize }) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
-    // ordenar de mayor a menor para colocar primero las más grandes
     const words = [...data].sort((a, b) => fontSize(b) - fontSize(a));
 
     const centerX = width / 2;
@@ -544,16 +522,32 @@ function CanvasCloud({ data, palette, width, height, fontSize }) {
         t += step;
       }
 
+      // ✨ contraste en canvas
       ctx.fillStyle = color;
-      ctx.globalAlpha = 0.95;
+      ctx.shadowColor = "rgba(0,0,0,.25)";
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 1;
+      ctx.globalAlpha = 0.98;
       ctx.fillText(text, px, py);
       ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
 
       if (found) placed.push(rect);
     });
   }, [data, palette, width, height, fontSize]);
 
-  return <canvas ref={ref} style={{ display: "block", width, height }} />;
+  return (
+    <div>
+      <button
+        onClick={onEditHorario}
+        style={{ ...btnTiny, marginBottom: 8 }}
+        title="Modificar o completar todo tu horario"
+      >
+        🗓️ Modificar horario
+      </button>
+      <canvas ref={ref} style={{ display: "block", width, height }} />
+    </div>
+  );
 }
 
 /* 🧪 NUEVO: overlay de debug para confirmar montaje de InicioClase */
@@ -594,14 +588,30 @@ function InicioClase() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const { ready: authReady, user: authUser, isAnon: isAnonLight } = useAuthReadyLight();
+React.useEffect(() => {
+    if (authReady) {
+      setAuthed(!!authUser);
+      setIsAnon(!!isAnonLight);
+      if (authUser?.uid && localStorage.getItem("uid") !== authUser.uid) {
+        localStorage.setItem("uid", authUser.uid);
+      }
+    }
+  }, [authReady, authUser, isAnonLight]);
+
+  // ... (el resto de tus useState/useEffect existentes)
+
   // 🧪 NUEVO: flags por query para pruebas
   const __qs = new URLSearchParams(window.location.search || "");
   const SAFE_MODE = __qs.get("safe") === "1";
   const DISABLE_CLOUD = __qs.get("nocloud") === "1";
   const DEBUG_ON = __qs.get("debug") === "1";
-  try {
-    console.log("[InicioClase] flags", { SAFE_MODE, DISABLE_CLOUD });
-  } catch (e) {}
+
+  // 🎛️ PRESET (incluye "showtime" para más contraste/rotación agresiva)
+  const PRESET =
+    __qs.get("preset") ||
+    localStorage.getItem("ic_preset") ||
+    "default";
 
   /* ✅ Uso correcto del contexto DENTRO del componente, con fallback */
   const {
@@ -610,10 +620,11 @@ function InicioClase() {
     caps = PLAN_DEFAULTS.caps,
     loading = PLAN_DEFAULTS.loading,
   } = useContext(PlanContext) || PLAN_DEFAULTS;
+
   const [currentSlotId, setCurrentSlotId] = useState("0-0");
   const [authed, setAuthed] = useState(false);
   const [nombre, setNombre] = useState("Profesor");
-  const [asignaturaProfe, setAsignaturaProfe] = useState(""); // ✅ fallback asignatura
+  const [asignaturaProfe, setAsignaturaProfe] = useState("");
   const [horaActual, setHoraActual] = useState("");
   const [claseActual, setClaseActual] = useState(null);
   const [planSug, setPlanSug] = useState(null);
@@ -630,7 +641,7 @@ function InicioClase() {
   const [participaURL, setParticipaURL] = useState("");
 
   // 🔄 Para mantener tu bloque opcional más abajo:
-  const [palabras, setPalabras] = useState([]); // dummy para evitar referencias indefinidas
+  const [palabras, setPalabras] = useState([]);
 
   // === NUEVO: modo de render del cloud ===
   const [cloudMode, setCloudMode] = useState("auto");
@@ -645,6 +656,15 @@ function InicioClase() {
 
   // ✅ NUEVO: desactivar login anónimo aquí (sin borrar tu código)
   const ALLOW_ANON = false;
+
+  // ✅ NUEVO: ir a horario en modo edición (ahora SÍ dentro del componente)
+  const irAHorario = () => {
+    try {
+      navigate("/horario", { state: { edit: true, from: "/InicioClase" } });
+    } catch {
+      window.location.assign("/horario");
+    }
+  };
 
   // ✅ tomar slot forzado o recordado apenas monta
   useEffect(() => {
@@ -663,14 +683,13 @@ function InicioClase() {
             console.error("Anon sign-in:", e);
           }
         } else {
-          // 🔒 SIN invitado: redirige a login y vuelve acá luego
           try {
             navigate("/login?next=/inicio", { replace: true });
           } catch {
             window.location.assign("/login?next=/inicio");
           }
         }
-        return; // RequireAuth del router no debería dejar entrar aquí sin login
+        return;
       } else {
         setAuthed(true);
         const stored = localStorage.getItem("uid");
@@ -691,21 +710,21 @@ function InicioClase() {
 
       const cls = st.clase || null;
       if (cls) {
-  setClaseActual((prev) => {
-    const hTxt = Array.isArray(cls?.habilidades)
-      ? cls.habilidades.join(", ")
-      : (cls?.habilidades ?? prev?.habilidades ?? "(sin habilidades)");
-    return {
-      ...(prev || {}),
-      unidad: cls?.unidad ?? prev?.unidad ?? "(sin unidad)",
-      objetivo: cls?.objetivo ?? prev?.objetivo ?? "(sin objetivo)",
-      habilidades: hTxt,
-      asignatura: cls?.asignatura ?? prev?.asignatura ?? asignaturaProfe ?? "(sin asignatura)",
-      nivel: cls?.nivel ?? prev?.nivel ?? "",
-      seccion: cls?.seccion ?? prev?.seccion ?? "",
-    };
-  });
-}
+        setClaseActual((prev) => {
+          const hTxt = Array.isArray(cls?.habilidades)
+            ? cls.habilidades.join(", ")
+            : (cls?.habilidades ?? prev?.habilidades ?? "(sin habilidades)");
+          return {
+            ...(prev || {}),
+            unidad: cls?.unidad ?? prev?.unidad ?? "(sin unidad)",
+            objetivo: cls?.objetivo ?? prev?.objetivo ?? "(sin objetivo)",
+            habilidades: hTxt,
+            asignatura: cls?.asignatura ?? prev?.asignatura ?? asignaturaProfe ?? "(sin asignatura)",
+            nivel: cls?.nivel ?? prev?.nivel ?? "",
+            seccion: cls?.seccion ?? prev?.seccion ?? "",
+          };
+        });
+      }
     } catch (e) {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -787,7 +806,7 @@ function InicioClase() {
     [oaPlan, oaIndex]
   );
   const nextOA = useMemo(() => {
-    if (!Array.isArray(oaPlan) || !oaPlan.length) return null;
+    if (!Array.isArray(oaPlan) || oaPlan.length) return null;
     const idx = Math.min((oaIndex ?? 0) + 1, oaPlan.length - 1);
     return idx > oaPlan.length - 1 ? null : oaPlan[idx] || null;
   }, [oaPlan, oaIndex]);
@@ -816,12 +835,11 @@ function InicioClase() {
       }
     } else {
       key = makeCountKey(currentSlotId);
-      // intenta leer el fin desde el key por-slot o desde el key legacy
       endStr = localStorage.getItem(key) || localStorage.getItem(COUNT_KEY);
       if (!endStr) {
         const endTime = Date.now() + 10 * 60 * 1000; // 10 min
         localStorage.setItem(key, String(endTime));
-        localStorage.setItem(COUNT_KEY, String(endTime)); // compatibilidad atrás
+        localStorage.setItem(COUNT_KEY, String(endTime)); // compat
         endStr = String(endTime);
       }
     }
@@ -829,12 +847,12 @@ function InicioClase() {
     endMs = Number(endStr);
     const tick = () => setRemaining(getRemaining(endMs));
 
-    tick(); // primer cálculo inmediato
+    tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [currentSlotId, oaPlan, oaIndex, activeDurMin]);
 
-  // 🔄 Reinicio manual (segmento actual si hay oaPlan; si no, 10:00 general)
+  // 🔄 Reinicio manual
   const resetCountdown = () => {
     const dur = Array.isArray(oaPlan) && oaPlan.length > 0 ? activeDurMin : 10;
     const endTime = Date.now() + dur * 60 * 1000;
@@ -849,19 +867,17 @@ function InicioClase() {
     setRemaining(getRemaining(endTime));
   };
 
-  // 🧾 NUEVO: helper para construir la ficha a enviar a Desarrollo
+  // 🧾 Bridge para Desarrollo
   const makeFicha = () => {
     const habilidadesTxt =
       Array.isArray(claseActual?.habilidades)
         ? claseActual.habilidades.join("; ")
         : (claseActual?.habilidades ?? "");
     return {
-      // mínimos útiles para FichaClaseSticky
       asignatura: claseActual?.asignatura ?? asignaturaProfe ?? "(sin asignatura)",
       unidad: claseActual?.unidad ?? "(sin unidad)",
       objetivo: claseActual?.objetivo ?? "(sin objetivo)",
       habilidades: habilidadesTxt ?? "(sin habilidades)",
-      // contexto extra que ayuda en Desarrollo
       nivel: claseActual?.nivel ?? "",
       seccion: claseActual?.seccion ?? "",
       bloque: claseActual?.bloque ?? "",
@@ -869,16 +885,12 @@ function InicioClase() {
       codUnidad: claseVigente?.codUnidad ?? planSug?.codUnidad ?? "",
       programaUrl: planSug?.programaUrl ?? "",
       fuentes: Array.isArray(planSug?.fuentes) ? planSug.fuentes : [],
-      // por si tu proxy/plan lo usa
       planId: planSug?.planId ?? "",
-      // ➕ NUEVO: snapshot de OA para /desarrollo
       oaPlan: Array.isArray(oaPlan) ? oaPlan : [],
       oaIndex: Number.isInteger(oaIndex) ? oaIndex : 0,
       updatedAt: Date.now(),
     };
   };
-
-  // ➕➕➕ NUEVO: Bridge para Desarrollo (igual que en CierreClase)
   function persistClaseForDesarrollo({ ficha, slotId, endMs }) {
     try {
       const payload = {
@@ -892,17 +904,15 @@ function InicioClase() {
     } catch (_) {}
   }
 
-  // 🚦 NUEVO: autoavance por OA al terminar el segmento; solo navegar al final
+  // 🚦 Autoavance OA o navegación a Desarrollo
   useEffect(() => {
     if (remaining.m !== 0 || remaining.s !== 0) return;
 
     (async () => {
-      // Si hay plan y quedan segmentos por delante, avanzamos sin navegar
       if (Array.isArray(oaPlan) && oaPlan.length > 0 && (oaIndex || 0) < oaPlan.length - 1) {
         const uid = auth.currentUser?.uid || localStorage.getItem("uid");
         const nextIndex = (oaIndex || 0) + 1;
 
-        // marcar actual como done=true y avanzar oaIndex en Firestore
         try {
           if (uid && currentSlotId) {
             const dref = doc(db, "clases_detalle", uid, "slots", currentSlotId);
@@ -920,10 +930,8 @@ function InicioClase() {
           console.warn("[OA autoavance] persist:", e?.code || e?.message);
         }
 
-        // set estado local
         setOaIndex(nextIndex);
 
-        // iniciar countdown del siguiente OA con su duración
         const durNext =
           Number.isFinite(+oaPlan[nextIndex]?.durMin) && +oaPlan[nextIndex].durMin > 0
             ? Math.floor(+oaPlan[nextIndex].durMin)
@@ -934,10 +942,9 @@ function InicioClase() {
           localStorage.setItem(kNext, String(endTime));
         } catch (e) {}
         setRemaining(getRemaining(endTime));
-        return; // ⛔ no navegamos aún
+        return;
       }
 
-      // Si no hay plan o es el último segmento, navegamos a Desarrollo
       const key =
         Array.isArray(oaPlan) && oaPlan.length > 0
           ? makeSegKey(currentSlotId || "0-0", oaIndex || 0)
@@ -951,7 +958,6 @@ function InicioClase() {
       } catch (e) {}
 
       const ficha = makeFicha();
-      // persistir bridge antes de navegar
       persistClaseForDesarrollo({ ficha, slotId: currentSlotId || "0-0", endMs });
       navigate("/desarrollo", {
         state: {
@@ -959,7 +965,6 @@ function InicioClase() {
           endMs,
           clase: claseActual || null,
           ficha,
-          // ➕ extra: por si quieres leer directo del state
           oaPlan: Array.isArray(oaPlan) ? oaPlan : [],
           oaIndex: Number.isInteger(oaIndex) ? oaIndex : 0,
         },
@@ -967,7 +972,7 @@ function InicioClase() {
     })();
   }, [remaining, navigate, currentSlotId, claseActual, oaPlan, oaIndex]);
 
-  // ========= NUEVO: crear/asegurar sala + armar URL QR =========
+  // ========= SALA: crear/asegurar + URL QR =========
   useEffect(() => {
     (async () => {
       let code = salaCode;
@@ -986,8 +991,7 @@ function InicioClase() {
         console.warn("[sala] setDoc:", e?.code || e?.message);
       }
 
-      // host override para QR
-      const hostOverride = localStorage.getItem("hostOverride"); // ej: http://192.168.0.22:3005
+      const hostOverride = localStorage.getItem("hostOverride");
       const base =
         hostOverride && /^https?:\/\/.*/.test(hostOverride)
           ? hostOverride
@@ -996,8 +1000,6 @@ function InicioClase() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ========= NUEVO (authed): volver a asegurar sala cuando ya hay sesión =========
   useEffect(() => {
     if (!authed) return;
     if (window.__salaInitDone) return;
@@ -1016,7 +1018,7 @@ function InicioClase() {
           { merge: true }
         );
 
-        const hostOverride = localStorage.getItem("hostOverride"); // ej: http://TU_IP_LAN:3000
+        const hostOverride = localStorage.getItem("hostOverride");
         const base =
           hostOverride && /^https?:\/\/.*/.test(hostOverride)
             ? hostOverride
@@ -1043,20 +1045,19 @@ function InicioClase() {
           if (usnap.exists()) {
             const u = usnap.data();
             if (u?.nombre) setNombre(u.nombre);
-            if (u?.asignatura) setAsignaturaProfe(u.asignatura); // ✅ fallback
+            if (u?.asignatura) setAsignaturaProfe(u.asignatura);
           }
         } catch (e) {
           console.warn("[usuarios] read nombre:", e?.code);
         }
       }
-      // ✅ Fallbacks: displayName o prefijo del email si no vino desde usuarios/{uid}
       try {
-         const u = auth.currentUser;
-         if (u && (!nombre || /^\s*Profesor/i.test(nombre))) {
-         const byAuth = u.displayName || (u.email ? u.email.split("@")[0] : "");
-        if (byAuth) setNombre(byAuth);
-          }
-          } catch (_) {}
+        const u = auth.currentUser;
+        if (u && (!nombre || /^\s*Profesor/i.test(nombre))) {
+          const byAuth = u.displayName || (u.email ? u.email.split("@")[0] : "");
+          if (byAuth) setNombre(byAuth);
+        }
+      } catch (_) {}
 
       try {
         const pref = doc(db, "preguntaClase", "actual");
@@ -1067,11 +1068,9 @@ function InicioClase() {
         console.warn("[preguntaClase] read:", e?.code);
       }
     })();
-  }, [authed]);
+  }, [authed, nombre]);
 
-  // ─────────────────────────────────────────────────────────────
-  //  NUEVO BLOQUE: Fallback uniforme desde `profesores/{uid}` y `usuarios/{uid}`
-  // ─────────────────────────────────────────────────────────────
+  // Fallback uniforme desde profesores/ y usuarios/
   useEffect(() => {
     if (!authed) return;
 
@@ -1099,11 +1098,7 @@ function InicioClase() {
               ...(prev || {}),
               unidad: pick(prev?.unidad, p.unidad, p.unidadInicial, "(sin unidad)"),
               objetivo: pick(prev?.objetivo, p.objetivo, p.objetivoInicial, "(sin objetivo)"),
-              habilidades: pick(
-                prev?.habilidades,
-                normHabs(p.habilidades),
-                "(sin habilidades)"
-              ),
+              habilidades: pick(prev?.habilidades, normHabs(p.habilidades), "(sin habilidades)"),
               asignatura: pick(prev?.asignatura, asignaturaProfe, p.asignatura, "(sin asignatura)"),
               curso: pick(prev?.curso, p.curso, "(sin curso)"),
             }));
@@ -1112,7 +1107,7 @@ function InicioClase() {
           console.warn("[Inicio] profesores read:", e?.code || e);
         }
 
-        // 2) usuarios/{uid} como último respaldo (unidadInicial/unidad)
+        // 2) usuarios/{uid}
         try {
           const uref = doc(db, "usuarios", uid);
           const usnap = await getDoc(uref);
@@ -1133,7 +1128,6 @@ function InicioClase() {
       } catch (e) {}
     })();
   }, [authed, asignaturaProfe]);
-  // ─────────────────────────────────────────────────────────────
 
   // si hay horarioConfig.marcas -> clases_detalle/{uid}/slots/{fila}-{col}
   useEffect(() => {
@@ -1143,7 +1137,7 @@ function InicioClase() {
         const uid = auth.currentUser?.uid || localStorage.getItem("uid");
         if (!uid) return;
 
-        // ✅ prioridad: slot por query (?slot=f-c)
+        // ✅ prioridad: slot por query
         const sQ = slotFromQuery();
         if (sQ) {
           setCurrentSlotId(sQ);
@@ -1159,11 +1153,9 @@ function InicioClase() {
               habilidades: det.habilidades ?? prev?.habilidades ?? "(sin habilidades)",
               asignatura: det.asignatura ?? prev?.asignatura ?? asignaturaProfe ?? "(sin asignatura)",
             }));
-            // ➕ lee OA si ya vienen
             if (Array.isArray(det.oaPlan)) setOaPlan(det.oaPlan);
             if (Number.isInteger(det.oaIndex)) setOaIndex(det.oaIndex);
           } else {
-            // 🔁 Fallback: leer celda del horario si existe y sembrar detalle
             try {
               const hcell = await getDoc(doc(db, "horarios", uid, "celdas", sQ));
               if (hcell.exists()) {
@@ -1184,15 +1176,15 @@ function InicioClase() {
               }
             } catch (e) {}
           }
-          return; // no sigas con marcas si ya forzamos slot
+          return;
         }
 
         const uref = doc(db, "usuarios", uid);
         const usnap = await getDoc(uref);
         const cfg = usnap.exists() ? usnap.data().horarioConfig || {} : {};
-        const marcasArr = getMarcasFromConfig(cfg);               // ✅ USO DEL HELPER
+        const marcasArr = getMarcasFromConfig(cfg);
         if (marcasArr.length > 1) {
-          const fila = filaDesdeMarcas(marcasArr);                // ✅ ahora con marcas normalizadas
+          const fila = filaDesdeMarcas(marcasArr);
           const col = colDeHoy();
           const slotId = `${fila}-${col}`;
           setCurrentSlotId(slotId);
@@ -1216,7 +1208,6 @@ function InicioClase() {
             if (Array.isArray(det.oaPlan)) setOaPlan(det.oaPlan);
             if (Number.isInteger(det.oaIndex)) setOaIndex(det.oaIndex);
           } else {
-            // intentar leer la celda del horario
             try {
               const hcell = await getDoc(doc(db, "horarios", uid, "celdas", slotId));
               if (hcell.exists()) {
@@ -1251,7 +1242,6 @@ function InicioClase() {
       const matriz = await readHorarioMatrix(uid);
       if (!matriz) return;
 
-      // 🔁 Fallbacks (se mantienen)
       const bloques = [
         "08:00 - 08:45",
         "08:45 - 09:30",
@@ -1272,7 +1262,6 @@ function InicioClase() {
       ];
       const diasCorrectos = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 
-      // ✅ NUEVO: intento usar marcas desde horarioConfig; si no, dejo el fallback
       let marcas = [
         [8, 0],
         [8, 45],
@@ -1296,7 +1285,7 @@ function InicioClase() {
         const usnap = await getDoc(uref);
         const cfg = usnap.exists() ? usnap.data().horarioConfig || {} : {};
         const m2 = getMarcasFromConfig(cfg);
-        if (m2.length > 1) marcas = m2;                           // ✅ preferimos lo configurado
+        if (m2.length > 1) marcas = m2;
       } catch (e) {}
 
       const forcedSlot = slotFromQuery();
@@ -1337,7 +1326,6 @@ function InicioClase() {
         let found = null,
           foundIdx = filaUsed;
 
-        // si no está forzado, busca la primera clase válida hacia abajo
         if (!forcedSlot) {
           for (let k = filaUsed; k < matriz.length; k++) {
             const c = matriz[k][colUsed];
@@ -1401,8 +1389,6 @@ function InicioClase() {
               if (Array.isArray(det.oaPlan)) setOaPlan(det.oaPlan);
               if (Number.isInteger(det.oaIndex)) setOaIndex(det.oaIndex);
             } else {
-              // 🔎 NUEVO: si el detalle NO existe y la celda del horario trae campos,
-              // los sembramos automáticamente en clases_detalle para que Inicio sea "directo".
               try {
                 const payload = {
                   asignatura: clase.asignatura ?? "",
@@ -1417,7 +1403,6 @@ function InicioClase() {
                 if (hasDetail) {
                   await setDoc(detalleRef, payload, { merge: true });
                 } else {
-                  // último intento: leer doc horarios/celdas/{slot}
                   try {
                     const hcell = await getDoc(doc(db, "horarios", uid, "celdas", slotIdCalc));
                     if (hcell.exists()) {
@@ -1450,10 +1435,10 @@ function InicioClase() {
     })();
   }, [authed, asignaturaProfe]);
 
-  // ========= NUEVO: escuchar palabras SOLO de la sala =========
+  // ========= Palabras =========
   const [palabrasAgg, setPalabrasAgg] = useState([]); // [{text, value}]
   useEffect(() => {
-    if (!salaCode) return; // aún no montó sala
+    if (!salaCode) return;
     const colRef = collection(db, "salas", salaCode, "palabras");
     let qRef = colRef;
     try {
@@ -1467,7 +1452,6 @@ function InicioClase() {
           .map((d) => d.data())
           .filter((x) => (x.texto || "").trim().length > 0);
 
-        // últimos envíos (los 5 más recientes)
         const last = snap.docs
           .map((d) => ({
             id: d.id,
@@ -1478,7 +1462,6 @@ function InicioClase() {
           .slice(0, 5);
         setUltimos(last);
 
-        // agregación por palabra (lower + trim)
         const map = new Map();
         rows.forEach((x) => {
           const key = String(x.texto || "").trim().toLowerCase();
@@ -1492,7 +1475,7 @@ function InicioClase() {
         setPalabrasAgg(agg);
 
         try {
-          window.__lastCloud = agg; // debug
+          window.__lastCloud = agg;
           setTimeout(() => {
             setPalabrasAgg(
               (Array.isArray(agg) ? agg : []).map((x) => ({
@@ -1527,7 +1510,8 @@ function InicioClase() {
   };
 
   // ====== WordCloud: tamaño segun frecuencia + colores ======
-  const palette = [
+  // 🎨 Paleta ajustable por PRESET
+  const paletteDefault = [
     "#2563eb",
     "#16a34a",
     "#f59e0b",
@@ -1539,16 +1523,36 @@ function InicioClase() {
     "#f97316",
     "#84cc16",
   ];
+  const paletteShowtime = [
+    "#ffffff", "#ffd60a", "#00e5ff", "#ff4d6d", "#7bff00",
+    "#ff9f1c", "#8eecf5", "#c77dff", "#72efdd", "#f72585"
+  ];
+  const palette = PRESET === "showtime" ? paletteShowtime : paletteDefault;
+
+  // 🅰️ Tamaño + rotación agresiva en showtime
   const fontSizeMapper = (w) => {
-    const base = 18; // mínimo
-    const step = 10; // incremento por ocurrencia
-    const max = 80; // tope
+    if (PRESET === "showtime") {
+      const base = 24;
+      const step = 14;
+      const max = 110;
+      return Math.min(max, base + (w.value - 1) * step);
+    }
+    const base = 18;
+    const step = 10;
+    const max = 80;
     return Math.min(max, base + (w.value - 1) * step);
   };
-  const rotate = () => 0;
+  const rotate = () => {
+    if (PRESET === "showtime") {
+      const angles = [-90, -60, -30, 0, 30, 60, 90];
+      return angles[Math.floor(Math.random() * angles.length)];
+    }
+    return 0;
+  };
+
   const cloudData = useMemo(() => palabrasAgg, [palabrasAgg]);
 
-  // === NUEVO: agrupar por palabra
+  // === NUEVO: agrupar por palabra (con tu estado palabras opcional)
   const cloudDataGrouped = useMemo(() => {
     const map = new Map();
     for (const w of palabras || []) {
@@ -1565,11 +1569,11 @@ function InicioClase() {
   );
   const fontSizeMapper2 = (w) => {
     const v = Number(w.value || 0);
-    const size = 16 + 44 * (v / (maxValCloud || 1)); // 16..60
+    const size = 16 + 44 * (v / (maxValCloud || 1));
     return Math.max(16, Math.min(60, Math.round(size)));
   };
 
-  // ======== EXTRA: normaliza datos para react-d3-cloud ========
+  // ======== NORMALIZACIÓN para react-d3-cloud ========
   const cloudDataForWC = useMemo(
     () =>
       (cloudData || []).map((w, i) => ({
@@ -1580,7 +1584,7 @@ function InicioClase() {
     [cloudData]
   );
 
-  // === NUEVO: tamaño responsive del SVG de la nube
+  // === Responsive del SVG de la nube
   const cloudWrapRef = useRef(null);
   const [cloudSize, setCloudSize] = useState({ w: 800, h: 420 });
   useEffect(() => {
@@ -1588,14 +1592,14 @@ function InicioClase() {
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver((entries) => {
       const w = Math.max(320, Math.floor(entries[0].contentRect.width - 24));
-      const h = Math.max(220, Math.floor(w * 0.52)); // proporción agradable
+      const h = Math.max(220, Math.floor(w * 0.52));
       setCloudSize({ w, h });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // === NUEVO: decidir modo de nube automáticamente
+  // === decidir modo de nube automáticamente
   useEffect(() => {
     try {
       const stored = localStorage.getItem("cloudMode");
@@ -1612,7 +1616,7 @@ function InicioClase() {
     }
   }, []);
 
-  // Utilidad de seed (la mantengo como la tenías)
+  // Utilidad de seed
   useEffect(() => {
     window.seedPruebaLunes = async () => {
       try {
@@ -1638,7 +1642,7 @@ function InicioClase() {
     };
   }, []);
 
-  // 🔎 NUEVO: Auto-completar detalle desde currículo si hay codUnidad y faltan campos
+  // 🔎 Auto-completar detalle desde currículo si faltan campos
   useEffect(() => {
     if (!authed || !currentSlotId) return;
     (async () => {
@@ -1656,14 +1660,13 @@ function InicioClase() {
 
         if (!needs) return;
 
-        // Intentamos obtener un codUnidad de donde sea posible
         const cod =
           det?.codUnidad ||
           claseVigente?.codUnidad ||
           planSug?.codUnidad ||
           null;
 
-        if (!cod) return; // sin código no podemos buscar currículo
+        if (!cod) return;
 
         const curSnap = await getDoc(doc(db, "curriculo", cod));
         if (!curSnap.exists()) return;
@@ -1675,7 +1678,7 @@ function InicioClase() {
           objetivo: det.objetivo ?? (Array.isArray(c.objetivos) ? c.objetivos[0] : "") ?? "",
           habilidades:
             det.habilidades ??
-            (Array.isArray(c.habilidades) ? c.habilidades.join("; ") : "") ?? 
+            (Array.isArray(c.habilidades) ? c.habilidades.join("; ") : "") ??
             "",
           updatedAt: serverTimestamp(),
         };
@@ -1688,20 +1691,17 @@ function InicioClase() {
     })();
   }, [authed, currentSlotId, claseVigente, planSug]);
 
-  // ✅ NUEVO: Si el objetivo está vacío o "(sin objetivo)", intentar obtener el primer OA
-  // usando curso → nivel (helper nivelDesdeCurso) + getPrimerOA
+  // ✅ Rellenar objetivo con primer OA si falta
   useEffect(() => {
     if (!authed) return;
 
     const texto = String(claseActual?.objetivo || "").trim();
     const objetivoFaltante = !texto || /^\(sin/i.test(texto);
-
     if (!objetivoFaltante) return;
 
     (async () => {
       try {
-        const asignatura =
-          claseActual?.asignatura || asignaturaProfe || "";
+        const asignatura = claseActual?.asignatura || asignaturaProfe || "";
         const curso = claseActual?.curso || claseVigente?.curso || "";
         const nivel =
           claseActual?.nivel ||
@@ -1712,21 +1712,16 @@ function InicioClase() {
         const unidad = claseActual?.unidad || claseVigente?.unidad || "";
         if (!asignatura || !nivel || !unidad) return;
 
-        // Si tu servicio admite (asignatura, nivel, codUnidad?, unidad?),
-        // le pasamos codUnidad por si ayuda a resolver más preciso:
         const primerOA = await getPrimerOA(
           asignatura,
           nivel,
           claseVigente?.codUnidad || null,
           unidad
         );
-
         if (!primerOA) return;
 
-        // Actualiza estado
         setClaseActual((prev) => ({ ...(prev || {}), objetivo: primerOA }));
 
-        // Persiste en el slot actual
         const uid = auth.currentUser?.uid || localStorage.getItem("uid");
         if (uid && currentSlotId) {
           await setDoc(
@@ -1739,7 +1734,7 @@ function InicioClase() {
         console.warn("[getPrimerOA autofill]", e?.code || e?.message);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     authed,
     currentSlotId,
@@ -1754,7 +1749,7 @@ function InicioClase() {
     claseActual?.asignatura,
   ]);
 
-  // ➕➕ NUEVO: suscripción live a oaPlan/oaIndex del slot actual
+  // suscripción live a oaPlan/oaIndex
   useEffect(() => {
     if (!authed || !currentSlotId) return;
     const uid = auth.currentUser?.uid || localStorage.getItem("uid");
@@ -1773,33 +1768,39 @@ function InicioClase() {
     return () => unsub();
   }, [authed, currentSlotId]);
 
-  // 🛡️ NUEVO: modo seguro
+  // ⬅️ pega esto justo antes del guard SAFE_MODE
+if (!authReady) {
+  return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#334155" }}>
+      Cargando sesión segura…
+    </div>
+  );
+}
+
+
+  // 🛡️ Modo seguro
   if (SAFE_MODE) {
     return (
       <div style={page}>
         <ICDebugBadge
           show={DEBUG_ON}
-          data={{ SAFE_MODE, DISABLE_CLOUD, mounted: true }}
+          data={{ SAFE_MODE, DISABLE_CLOUD, mounted: true, preset: PRESET }}
         />
         <div style={{ ...card, maxWidth: 960, margin: "20px auto" }}>
           ✅ <b>InicioClase</b> montó en <b>modo seguro</b>.<br />
-          Quita <code>?safe=1</code> o usa <code>?nocloud=1</code> para aislar la
-          nube si fuese necesario.
+          Quita <code>?safe=1</code> o usa <code>?nocloud=1</code>.
         </div>
       </div>
     );
   }
 
-  /* 🔖🔖 NUEVO HELPER DE HABILIDADES (chips) 🔖🔖
-     Normaliza desde claseActual.habilidades (string/array/objetos) o curriculo.habilidades */
+  // 🔖 Normalización chips habilidades
   const habilidadesList = useMemo(() => {
     const raw =
       (claseActual?.habilidades ?? null) ??
       (curriculo?.habilidades ?? null);
 
     if (!raw) return [];
-
-    // Array: strings u objetos { codigo, descripcion }
     if (Array.isArray(raw)) {
       return raw
         .map((x) =>
@@ -1813,19 +1814,16 @@ function InicioClase() {
         )
         .filter(Boolean);
     }
-
-    // String: "H1, H4" o texto con separadores
     if (typeof raw === "string") {
       return raw
         .split(/[,;•\n]+/)
         .map((s) => s.trim())
         .filter(Boolean);
     }
-
     return [];
   }, [claseActual, curriculo]);
 
-  // ➕ NUEVO: acciones de UI para segmentos OA
+  // ➕ Acciones OA
   const handleNextOA = async () => {
     if (!Array.isArray(oaPlan) || oaPlan.length === 0) return;
     const last = (oaIndex || 0) >= oaPlan.length - 1;
@@ -1833,7 +1831,6 @@ function InicioClase() {
     if (!uid || !currentSlotId) return;
 
     if (last) {
-      // si ya es el último, vamos a desarrollo
       const key = makeSegKey(currentSlotId || "0-0", oaIndex || 0);
       const endStr =
         localStorage.getItem(key) || localStorage.getItem(COUNT_KEY) || String(Date.now());
@@ -1862,7 +1859,6 @@ function InicioClase() {
     }
     setOaIndex(nextIndex);
 
-    // reset de timer del siguiente segmento
     const durNext =
       Number.isFinite(+oaPlan[nextIndex]?.durMin) && +oaPlan[nextIndex].durMin > 0
         ? Math.floor(+oaPlan[nextIndex].durMin)
@@ -1872,17 +1868,15 @@ function InicioClase() {
     try { localStorage.setItem(kNext, String(endTime)); } catch (e) {}
     setRemaining(getRemaining(endTime));
   };
-
   const handleResetOA = () => resetCountdown();
 
-  // === ASISTENCIA: estados, helpers y suscripciones =========================
-  const [asistenciaRows, setAsistenciaRows] = useState([]); // docs válidos de la ventana actual
-  const [asistenciaDedup, setAsistenciaDedup] = useState([]); // deduplicado por numeroLista o uid
+  // === ASISTENCIA =========================
+  const [asistenciaRows, setAsistenciaRows] = useState([]);
+  const [asistenciaDedup, setAsistenciaDedup] = useState([]);
   const [asistManualNum, setAsistManualNum] = useState("");
   const [asistManualNom, setAsistManualNom] = useState("");
   const yearWeekNow = getYearWeek();
 
-  // total esperado (configurable, persistido en localStorage por usuario/curso)
   const totalKey = useMemo(() => {
     const uid = auth.currentUser?.uid || localStorage.getItem("uid") || "anon";
     const curso = (claseActual?.curso || claseVigente?.curso || "general").toString();
@@ -1905,13 +1899,12 @@ function InicioClase() {
     if (!participaURL) return "";
     const params = new URLSearchParams();
     params.set("code", salaCode || "");
-    params.set("m", "asis"); // modo asistencia
+    params.set("m", "asis");
     params.set("slot", currentSlotId || "0-0");
     params.set("yw", yearWeekNow);
     return `${(participaURL.split("?")[0])}?${params.toString()}`;
   }, [participaURL, salaCode, currentSlotId, yearWeekNow]);
 
-  // Suscripción a /salas/{code}/asistencia
   useEffect(() => {
     if (!salaCode) return;
     const colRef = collection(db, "salas", salaCode, "asistencia");
@@ -1923,7 +1916,6 @@ function InicioClase() {
       qRef,
       (snap) => {
         const now = Date.now();
-        // ventana de seguridad por si no llega slot/yw desde cliente (últimas 6h)
         const SIX_H = 6 * 60 * 60 * 1000;
 
         const rows = snap.docs
@@ -1943,13 +1935,11 @@ function InicioClase() {
             const okYW = !x.yw || String(x.yw) === String(yearWeekNow);
             const okSlot = !x.slotId || String(x.slotId) === String(currentSlotId);
             const recent = x._ts ? now - x._ts < SIX_H : true;
-            // Permitir si coincide slot+yw o si faltan y está reciente (fallback)
             return (okYW && okSlot) || (!x.yw && !x.slotId && recent);
           });
 
         setAsistenciaRows(rows);
 
-        // deduplicar por numeroLista (o por uidAlumno si existiera)
         const map = new Map();
         for (const r of rows) {
           const key =
@@ -1957,7 +1947,6 @@ function InicioClase() {
             (Number.isFinite(+r.numeroLista) ? `n${+r.numeroLista}` : null) ||
             r.id;
           if (!key) continue;
-          // conservar el más nuevo
           const prev = map.get(key);
           if (!prev || (r._ts || 0) > (prev._ts || 0)) map.set(key, r);
         }
@@ -1968,7 +1957,6 @@ function InicioClase() {
     return () => unsub();
   }, [salaCode, currentSlotId, yearWeekNow]);
 
-  // Persistir resumen rápido en clases_detalle (conteo)
   useEffect(() => {
     (async () => {
       try {
@@ -1988,7 +1976,6 @@ function InicioClase() {
     })();
   }, [asistenciaDedup.length, currentSlotId]);
 
-  // Marcar asistencia manualmente (por número y opcional nombre)
   const marcarAsistenciaManual = async () => {
     try {
       if (!salaCode) return;
@@ -2011,7 +1998,6 @@ function InicioClase() {
     }
   };
 
-  // Exportar CSV rápido
   const exportAsistenciaCSV = () => {
     try {
       const header = ["numeroLista", "nombre", "slotId", "yw", "source", "ts"];
@@ -2037,7 +2023,6 @@ function InicioClase() {
       console.warn("[export CSV] error:", e);
     }
   };
-  // === FIN ASISTENCIA =======================================================
 
   return (
     <GlobalBoundary>
@@ -2049,6 +2034,7 @@ function InicioClase() {
           authed,
           salaCode: salaCode || "(none)",
           cloudMode,
+          preset: PRESET,
           palabras: (Array.isArray(cloudData) && cloudData.length) || 0,
           oaLen: Array.isArray(oaPlan) ? oaPlan.length : 0,
           oaIndex: oaIndex ?? 0,
@@ -2056,7 +2042,7 @@ function InicioClase() {
       />
 
       <div style={page}>
-        {/* ADICIONAL: Banner de clase vigente */}
+        {/* Banner clase vigente */}
         {claseVigente && (
           <div
             style={{
@@ -2118,6 +2104,9 @@ function InicioClase() {
               <button onClick={resetCountdown} style={btnTiny} title="Reiniciar segmento">
                 ♻️
               </button>
+              <button onClick={irAHorario} style={btnTiny} title="Editar horario">
+                🗓️
+              </button>
             </div>
           </div>
 
@@ -2136,7 +2125,6 @@ function InicioClase() {
               {claseActual?.habilidades ?? "(sin habilidades)"}
             </div>
 
-            {/* 🔖 Chips visuales de habilidades (no reemplaza tu línea, la complementa) */}
             {habilidadesList.length > 0 && (
               <div
                 style={{
@@ -2163,7 +2151,6 @@ function InicioClase() {
               </div>
             )}
 
-            {/* ➕➕ NUEVO: Bloque de OA por segmentos con avance */}
             {Array.isArray(oaPlan) && oaPlan.length > 0 && (
               <div
                 style={{
@@ -2185,25 +2172,26 @@ function InicioClase() {
                     </button>
                   </div>
                 </div>
-
-                {/* Texto del OA actual */}
                 <div style={{ marginTop: 6 }}>
                   <strong>Actual:</strong>{" "}
-                  {currentOA?.titulo || currentOA?.texto || "(sin texto)"}
+                  {(currentOA?.titulo || currentOA?.texto || "(sin texto)")}
                   {Number.isFinite(+currentOA?.durMin) && +currentOA.durMin > 0 ? (
                     <em style={{ color: COLORS.textMuted }}> · {Math.floor(+currentOA.durMin)} min</em>
                   ) : null}
                 </div>
-
-                {/* Vista previa del siguiente OA */}
-                {nextOA && (
-                  <div style={{ marginTop: 4, color: COLORS.textMuted }}>
-                    <strong>Siguiente:</strong> {nextOA?.titulo || nextOA?.texto}
-                    {Number.isFinite(+nextOA?.durMin) && +nextOA.durMin > 0 ? (
-                      <em> · {Math.floor(+nextOA.durMin)} min</em>
-                    ) : null}
-                  </div>
-                )}
+                {(() => {
+                  if (!Array.isArray(oaPlan) || oaPlan.length === 0) return null;
+                  const idx = Math.min((oaIndex ?? 0) + 1, oaPlan.length - 1);
+                  const next = idx > oaPlan.length - 1 ? null : oaPlan[idx];
+                  return next ? (
+                    <div style={{ marginTop: 4, color: COLORS.textMuted }}>
+                      <strong>Siguiente:</strong> {next?.titulo || next?.texto}
+                      {Number.isFinite(+next?.durMin) && +next.durMin > 0 ? (
+                        <em> · {Math.floor(+next.durMin)} min</em>
+                      ) : null}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
 
@@ -2294,11 +2282,17 @@ function InicioClase() {
 
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem" }}>
           <div style={card} ref={cloudWrapRef}>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>💬 Nube de palabras</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>
+              💬 Nube de palabras
+              {PRESET === "showtime" ? " · SHOWTIME" : ""}
+            </h3>
+
+            {/* Opcional: muestra también tu componente propio si lo necesitas */}
+            {/* <div className="nube-container"><NubeDePalabras words={palabras} /></div> */}
 
             {DISABLE_CLOUD ? (
               <div style={{ color: COLORS.textMuted, padding: "1rem 0" }}>
-                (Nube desactivada con <code>?nocloud=1</code> para pruebas)
+                (Nube desactivada con <code>?nocloud=1</code>)
               </div>
             ) : (
               <>
@@ -2316,6 +2310,7 @@ function InicioClase() {
                         width={cloudSize.w}
                         height={cloudSize.h}
                         fontSize={fontSizeMapper}
+                        onEditHorario={irAHorario}
                       />
                     ) : (
                       <CloudBoundary
@@ -2326,6 +2321,7 @@ function InicioClase() {
                             width={cloudSize.w}
                             height={cloudSize.h}
                             fontSize={fontSizeMapper}
+                            onEditHorario={irAHorario}
                           />
                         }
                       >
@@ -2385,7 +2381,7 @@ function InicioClase() {
                 </div>
               )}
 
-              {/* === ASISTENCIA: link directo al modo asistencia en Participa === */}
+              {/* === ASISTENCIA: link directo al modo asistencia === */}
               {salaCode && (
                 <div style={{ marginTop: 12, textAlign: "center" }}>
                   <div style={{ fontWeight: 700, marginBottom: 6 }}>🟢 Modo asistencia</div>
@@ -2426,7 +2422,7 @@ function InicioClase() {
               </ul>
             </div>
 
-            {/* === ASISTENCIA: panel compacto a la derecha === */}
+            {/* === ASISTENCIA: panel compacto === */}
             <div style={card}>
               <h4 style={{ marginTop: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span>✅ Asistencia</span>
@@ -2542,7 +2538,6 @@ function InicioClase() {
                 )}
               </div>
             </div>
-            {/* === FIN PANEL ASISTENCIA === */}
           </div>
         </div>
 
@@ -2561,7 +2556,6 @@ function InicioClase() {
             justifyContent: "center",
           }}
         >
-          
           <button
             onClick={() => {
               const key =
@@ -2573,7 +2567,6 @@ function InicioClase() {
               const endMs = endStr ? Number(endStr) : 0;
               try { localStorage.setItem("__lastSlotId", currentSlotId || "0-0"); } catch (e) {}
               const ficha = makeFicha();
-              // ✅ NUEVO: bridge antes de navegar
               persistClaseForDesarrollo({ ficha, slotId: currentSlotId || "0-0", endMs });
               navigate("/desarrollo", {
                 state: {
@@ -2590,6 +2583,9 @@ function InicioClase() {
           >
             🚀 Ir a Desarrollo
           </button>
+          <button onClick={irAHorario} style={btnWhite}>
+            🗓️ Modificar horario
+          </button>
           <button onClick={() => navigate("/home")} style={btnWhite}>
             ⬅️ Volver al Inicio
           </button>
@@ -2600,6 +2596,7 @@ function InicioClase() {
 }
 
 export default InicioClase;
+
 
 
 

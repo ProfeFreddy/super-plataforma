@@ -9,7 +9,11 @@ import { PlanContext } from "../context/PlanContext";
 import { PLAN_CAPS } from "../lib/planCaps";
 // ⛔ TEMP: desactivamos para deploy porque Vercel no encuentra este módulo
 // import { syncSlotsFromHorario } from "../services/slots";
-import FichaClaseSticky from "../components/FichaClaseSticky";
+// (Se removió import FichaClaseSticky porque no se usa en este archivo)
+import NubeDePalabras from "../components/NubeDePalabras";
+
+import { auth } from "../firebase";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 
 import {
   collection,
@@ -21,10 +25,6 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { auth } from "../firebase";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
-/* ⚠️ Duplicado conservado */
-import * as FichaClaseSticky__DUP from "../components/FichaClaseSticky";
 
 // NUEVO: helper de nivel y servicio OA
 import { nivelDesdeCurso } from "../lib/niveles";
@@ -75,6 +75,37 @@ function getInicioClasePath() {
   } catch {
     return INICIO_CLASE_CANDIDATES[0];
   }
+}
+
+// Guard liviano: asegura user (anónimo si hace falta) y evita redirigir a /login
+function useAuthReadyLight() {
+  const [ready, setReady] = React.useState(false);
+  const [user, setUser] = React.useState(null);
+
+  React.useEffect(() => {
+    let alive = true;
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!alive) return;
+      try {
+        if (!u) {
+          // crea sesión anónima y continúa
+          const cred = await signInAnonymously(auth);
+          if (!alive) return;
+          setUser(cred.user ?? null);
+        } else {
+          setUser(u);
+        }
+      } catch {
+        // incluso si falla, no redirigimos: dejamos entrar en modo offline
+        setUser(null);
+      } finally {
+        if (alive) setReady(true);
+      }
+    });
+    return () => { alive = false; unsub && unsub(); };
+  }, []);
+
+  return { ready, user, isAnon: !!user?.isAnonymous };
 }
 
 /* =========================================================
@@ -170,7 +201,7 @@ const formatMMSS = (m, s) =>
 // MODO PRUEBA: forzar hora/día vía query (?at=HH:MM&dow=1..5)
 // ------------------------------------------------------------
 function nowFromQuery() {
-  const q = new URLSearchParams(window.location.search);
+  const q = new URLSearchParams(window.location.search || "");
   const at = q.get("at");
   if (!at) return new Date();
   const [hh, mm] = at.split(":").map(Number);
@@ -182,7 +213,7 @@ function nowFromQuery() {
   return d;
 }
 function dowFromQuery() {
-  const q = new URLSearchParams(window.location.search);
+  const q = new URLSearchParams(window.location.search || "");
   const v = Number(q.get("dow"));
   return v >= 1 && v <= 5 ? v : null;
 }
@@ -569,8 +600,7 @@ function ICDebugBadge({ show, data }) {
     try {
       return JSON.stringify(val);
     } catch {
-      return "[obj]";
-    }
+      return "[obj]";}
   };
 
   const row = (k, v) => (
@@ -629,9 +659,29 @@ function ICDebugBadge({ show, data }) {
   );
 }
 
+/* ───────────────────────────────────────────────
+   NUEVO: helper para nube “tipo Mentimeter”
+   (normaliza/agrupa por palabra, case-insensitive)
+─────────────────────────────────────────────── */
+function buildCloud(items = []) {
+  const map = new Map();
+  for (const r of items) {
+    const k = String(r?.text || r?.texto || "").trim();
+    if (!k) continue;
+    const key = k.toLowerCase(); // une “Triángulo” y “triángulo” (solo case)
+    const v = Number(r?.value ?? r?.count ?? 1);
+    map.set(key, (map.get(key) || 0) + (isFinite(v) ? v : 1));
+  }
+  return Array.from(map, ([text, value]) => ({ text, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 120);
+}
+
 function InicioClase() {
   const navigate = useNavigate();
   const location = useLocation();
+  // al inicio de function InicioClase()
+  const { ready: authReady, user: authUser, isAnon: isAnonLight } = useAuthReadyLight();
 
   // ✅ NUEVO: guardamos si es sesión anónima o real
   const [isAnon, setIsAnon] = useState(false);
@@ -654,8 +704,10 @@ function InicioClase() {
   const SAFE_MODE = __qs.get("safe") === "1";
   const DISABLE_CLOUD = __qs.get("nocloud") === "1";
   const DEBUG_ON = __qs.get("debug") === "1";
+  const BYPASS_NAV = __qs.get("bypass") === "1"; // ⬅️ NUEVO: no navegar auto
+  const LEGACY_CLOUD = __qs.get("legacycloud") === "1"; // ⬅️ NUEVO: compara render anterior
   try {
-    console.log("[InicioClase] flags", { SAFE_MODE, DISABLE_CLOUD });
+    console.log("[InicioClase] flags", { SAFE_MODE, DISABLE_CLOUD, BYPASS_NAV, LEGACY_CLOUD });
   } catch {}
 
   /* Uso del contexto con fallback */
@@ -669,6 +721,11 @@ function InicioClase() {
   const [currentSlotId, setCurrentSlotId] = useState("0-0");
   const [authed, setAuthed] = useState(false);
   const [nombre, setNombre] = useState("Profesor");
+
+  // NUEVO: slogan configurable (por defecto)
+  const DEFAULT_SLOGAN = "De un profe para los profes";
+  const [slogan, setSlogan] = useState(DEFAULT_SLOGAN);
+
   const [asignaturaProfe, setAsignaturaProfe] = useState("");
   const [horaActual, setHoraActual] = useState("");
   const [claseActual, setClaseActual] = useState(null);
@@ -751,6 +808,7 @@ function InicioClase() {
     try {
       const prof = st.profesor || {};
       if (prof?.nombre) setNombre(prof.nombre);
+      if (prof?.slogan) setSlogan(String(prof.slogan).trim() || DEFAULT_SLOGAN);
 
       const cls = st.clase || null;
       if (cls) {
@@ -833,7 +891,7 @@ function InicioClase() {
   // =========================
   const [remaining, setRemaining] = useState({ m: 10, s: 0 });
 
-  // controla el countdown por SLOT
+  // controla el countdown por SLOT (con reset si expiró)
   useEffect(() => {
     if (!currentSlotId) return;
 
@@ -841,7 +899,8 @@ function InicioClase() {
     // intenta leer el fin desde el key por-slot o desde el key legacy
     let endStr = localStorage.getItem(key) || localStorage.getItem(COUNT_KEY);
 
-    if (!endStr) {
+    // ⬅️ Reset automático si no hay fin o ya expiró
+    if (!endStr || Number(endStr) < Date.now()) {
       const endTime = Date.now() + 10 * 60 * 1000; // 10 min
       localStorage.setItem(key, String(endTime));
       localStorage.setItem(COUNT_KEY, String(endTime)); // compatibilidad atrás
@@ -889,8 +948,9 @@ function InicioClase() {
     };
   };
 
-  // cuando termina el countdown, navega a /desarrollo
+  // cuando termina el countdown, navega a /desarrollo (salvo bypass)
   useEffect(() => {
+    if (BYPASS_NAV) return; // ⬅️ NUEVO: no navegar en modo prueba
     if (!chronoDone && remaining.m === 0 && remaining.s === 0) {
       setChronoDone(true);
       const key = makeCountKey(currentSlotId || "0-0");
@@ -904,13 +964,13 @@ function InicioClase() {
       navigate("/desarrollo", {
         state: {
           slotId: currentSlotId || "0-0",
-          endMs,
+        endMs,
           clase: claseActual || null,
           ficha,
         },
       });
     }
-  }, [remaining, navigate, currentSlotId, claseActual, chronoDone]);
+  }, [remaining, navigate, currentSlotId, claseActual, chronoDone, BYPASS_NAV]);
 
   // crear/asegurar sala + armar URL QR
   useEffect(() => {
@@ -932,19 +992,13 @@ function InicioClase() {
       }
 
       // host override para QR
-      // IMPORTANTE:
-      // Para que el estudiante NO caiga en la vista del profe,
-      // apuntamos directamente a la ruta pública hash "#/sala/:code"
-      // que ya redirige internamente a /participa?... y muestra el formulario alumno.
-      const hostOverride = localStorage.getItem("hostOverride"); // ej: http://192.168.0.22:3005
+      const hostOverride = localStorage.getItem("hostOverride"); // ej: http://192.168.0.22:5174
       const base =
         hostOverride && /^https?:\/\/.*/.test(hostOverride)
           ? hostOverride
           : window.location.origin;
 
-      // URL alumno final en el QR:
-      //   https://pragmaprofe.com/#/sala/12345
-      // (fallback simple si no hay code)
+      // URL alumno final en el QR (#/sala/<code>)
       const studentURL = code
         ? `${base}/#/sala/${code}`
         : `${base}/#/participa`;
@@ -973,13 +1027,12 @@ function InicioClase() {
           { merge: true }
         );
 
-        const hostOverride = localStorage.getItem("hostOverride"); // ej: http://TU_IP_LAN:3000
+        const hostOverride = localStorage.getItem("hostOverride"); // ej: http://TU_IP_LAN:5174
         const base =
           hostOverride && /^https?:\/\/.*/.test(hostOverride)
             ? hostOverride
             : window.location.origin;
 
-        // MISMO FIX AQUÍ TAMBIÉN:
         const studentURL = code
           ? `${base}/#/sala/${code}`
           : `${base}/#/participa`;
@@ -994,22 +1047,37 @@ function InicioClase() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed, salaCode]);
 
-  // nombre profe + pregunta
+  // nombre profe + pregunta + slogan
   useEffect(() => {
     if (!authed) return;
     (async () => {
       const uid = auth.currentUser?.uid || localStorage.getItem("uid");
       if (uid) {
         try {
+          // Preferencia: usuarios/{uid}
           const uref = doc(db, "usuarios", uid);
           const usnap = await getDoc(uref);
           if (usnap.exists()) {
             const u = usnap.data();
             if (u?.nombre) setNombre(u.nombre);
             if (u?.asignatura) setAsignaturaProfe(u.asignatura);
+            if (u?.slogan) setSlogan(String(u.slogan).trim() || DEFAULT_SLOGAN);
           }
         } catch (e) {
-          console.warn("[usuarios] read nombre:", e?.code);
+          console.warn("[usuarios] read nombre/slogan:", e?.code);
+        }
+        try {
+          // Fallback: profesores/{uid}
+          const pref = doc(db, "profesores", uid);
+          const psnap = await getDoc(pref);
+          if (psnap.exists()) {
+            const p = psnap.data() || {};
+            if (p?.slogan && (!slogan || slogan === DEFAULT_SLOGAN)) {
+              setSlogan(String(p.slogan).trim() || DEFAULT_SLOGAN);
+            }
+          }
+        } catch (e) {
+          console.warn("[profesores] read slogan:", e?.code);
         }
       }
       try {
@@ -1021,7 +1089,7 @@ function InicioClase() {
         console.warn("[preguntaClase] read:", e?.code);
       }
     })();
-  }, [authed]);
+  }, [authed]); // ← incluye slogan
 
   // fallback profesores/usuarios
   useEffect(() => {
@@ -1513,7 +1581,7 @@ function InicioClase() {
     }, 400);
   };
 
-  // ====== WordCloud config ======
+  // ====== WordCloud config (se mantiene para legacy) ======
   const palette = [
     "#2563eb",
     "#16a34a",
@@ -1535,7 +1603,7 @@ function InicioClase() {
   const rotate = () => 0;
   const cloudData = useMemo(() => palabrasAgg, [palabrasAgg]);
 
-  // === agrupar por palabra (fallback)
+  // === agrupar por palabra (fallback antiguo) ===
   const cloudDataGrouped = useMemo(() => {
     const map = new Map();
     for (const w of palabras || []) {
@@ -1560,7 +1628,7 @@ function InicioClase() {
     return Math.max(16, Math.min(60, Math.round(size)));
   };
 
-  // normaliza datos para react-d3-cloud
+  // normaliza datos para react-d3-cloud (legacy)
   const cloudDataForWC = useMemo(
     () =>
       (cloudData || []).map((w, i) => ({
@@ -1798,6 +1866,9 @@ function InicioClase() {
   // ✅ ASISTENCIA: helper de hora legible
   const fmtTime = (ms) => (ms ? new Date(ms).toLocaleTimeString() : "");
 
+  // NUEVO: data para Nube “Mentimeter”
+  const cloudMentData = useMemo(() => buildCloud(palabrasAgg), [palabrasAgg]);
+
   return (
     <GlobalBoundary>
       <ICDebugBadge
@@ -1809,7 +1880,8 @@ function InicioClase() {
           isAnon,
           salaCode: salaCode || "(none)",
           cloudMode,
-          palabras: (Array.isArray(cloudData) && cloudData.length) || 0,
+          palabras: (Array.isArray(cloudMentData) && cloudMentData.length) || 0,
+          BYPASS_NAV, // ⬅️ visible en debug
         }}
       />
 
@@ -1904,6 +1976,7 @@ function InicioClase() {
                 phase="inicio"
                 defaultMinutes={10}
                 onFinish={() => {
+                  if (BYPASS_NAV) return; // ⬅️ NUEVO: no navegar si bypass
                   if (chronoDone) return;
                   setChronoDone(true);
                   const key = makeCountKey(currentSlotId || "0-0");
@@ -2024,6 +2097,10 @@ function InicioClase() {
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontWeight: 800 }}>{nombre}</div>
+              {/* NUEVO: Slogan visible y configurable */}
+              <div style={{ color: COLORS.textMuted, fontStyle: "italic", marginTop: 2 }}>
+                {slogan || DEFAULT_SLOGAN}
+              </div>
               <div style={{ color: COLORS.textMuted }}>
                 {claseActual?.asignatura ??
                   asignaturaProfe ??
@@ -2097,47 +2174,48 @@ function InicioClase() {
               </div>
             ) : (
               <>
-                {cloudData.length === 0 ? (
+                {cloudMentData.length === 0 ? (
                   <div style={{ color: COLORS.textMuted, padding: "1rem 0" }}>
                     Aún no hay palabras. Pide a tus estudiantes que escaneen el
                     QR y envíen una palabra.
                   </div>
-                ) : (
+                ) : LEGACY_CLOUD ? (
+                  // Renderer anterior (por si quieres comparar con ?legacycloud=1)
                   <div style={{ width: "100%", overflow: "hidden" }}>
-                    {cloudMode === "html" ? (
-                      <CanvasCloud
-                        data={cloudDataForWC}
-                        palette={palette}
-                        width={cloudSize.w}
-                        height={cloudSize.h}
-                        fontSize={fontSizeMapper}
-                      />
-                    ) : (
-                      <CloudBoundary
-                        fallback={
-                          <CanvasCloud
-                            data={cloudDataForWC}
-                            palette={palette}
-                            width={cloudSize.w}
-                            height={cloudSize.h}
-                            fontSize={fontSizeMapper}
-                          />
-                        }
-                      >
-                        <WordCloud
+                    <CloudBoundary
+                      fallback={
+                        <CanvasCloud
                           data={cloudDataForWC}
-                          font="Segoe UI, sans-serif"
-                          fontSizeMapper={fontSizeMapper}
-                          rotate={rotate}
-                          padding={2}
+                          palette={palette}
                           width={cloudSize.w}
                           height={cloudSize.h}
-                          fill={(w, i) => palette[i % palette.length]}
-                          spiral="archimedean"
+                          fontSize={fontSizeMapper}
                         />
-                      </CloudBoundary>
-                    )}
+                      }
+                    >
+                      <WordCloud
+                        data={cloudDataForWC}
+                        font="Segoe UI, sans-serif"
+                        fontSizeMapper={fontSizeMapper}
+                        rotate={0}
+                        padding={2}
+                        width={cloudSize.w}
+                        height={cloudSize.h}
+                        fill={(w, i) => palette[i % palette.length]}
+                        spiral="archimedean"
+                      />
+                    </CloudBoundary>
                   </div>
+                ) : (
+                  // NUEVO renderer “tipo Mentimeter”
+                  <NubeDePalabras
+                    items={cloudMentData}
+                    palette="menti"     // "menti" | "pastel" | "warm" | "cool"
+                    minFont={20}
+                    maxFont={88}
+                    animate
+                    darkBg={false}
+                  />
                 )}
               </>
             )}
@@ -2334,12 +2412,5 @@ function InicioClase() {
   );
 }
 
+export default InicioClase;
 export { InicioClase };
-
-
-
-
-
-
-
-

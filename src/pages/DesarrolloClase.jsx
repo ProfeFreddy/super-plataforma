@@ -33,6 +33,13 @@ import "react-pdf/dist/Page/TextLayer.css";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.js?url";
 pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
+// --- helper para pedir JSON sin headers raros (evita preflight) ---
+async function fetchJSON(url) {
+  const r = await fetch(url, { method: "GET", mode: "cors" });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
 /* ===== Copias originales (NO eliminadas) — comentadas para evitar colisión ===== */
 // import "react-pdf/dist/Page/AnnotationLayer.css";
 // import "react-pdf/dist/Page/TextLayer.css";
@@ -70,7 +77,7 @@ const PROXY_BASE =
     ? `${window.location.origin}/api`
     : "http://localhost:8080");
 
-    // Ejemplo en Inicio/Desarrollo/Cierre:
+/* ⛔ Bloque que rompía el build (dejado como referencia, pero comentado):
 // Ejemplo en Inicio/Desarrollo/Cierre:
 const { auth: authFromHook } = typeof useAuthX === "function"
   ? useAuthX()
@@ -78,12 +85,11 @@ const { auth: authFromHook } = typeof useAuthX === "function"
 
 const user = (authFromHook || auth)?.currentUser;
 // si además cargas perfil Firestore (profesores/{uid}):
-
-// si además cargas perfil Firestore (profesores/{uid}):
 // const perfil = ... nombre leído desde Firestore
 const nombre = user?.displayName || perfil?.nombre || "Profesor/a";
 
 <h2>Hola, {nombre}</h2>
+*/
 
 /* helpers de tiempo/slot para demo (?at=HH:MM&dow=1..5) */
 const FORCE_TEST_TIME = false;
@@ -1864,7 +1870,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             💾 Guardar enlace
           </button>
 
-        {/* NUEVO: botones de modo + usar mineduc */}
+          {/* NUEVO: botones de modo + usar mineduc */}
           <div style={{ display: "flex", gap: 6 }}>
             <button
               style={{ ...btnTool, opacity: pdfMode === "flip" ? 1 : 0.6 }}
