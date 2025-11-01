@@ -77,6 +77,24 @@ function getInicioClasePath() {
   }
 }
 
+/* === NUEVO: helper de URL consistente (HashRouter/BrowserRouter) === */
+function makeUrl(path) {
+  // normaliza
+  const p = path.startsWith("/") ? path : `/${path}`;
+  const hostOverride = localStorage.getItem("hostOverride"); // ej: http://IP:5174
+  const base =
+    hostOverride && /^https?:\/\/.*/.test(hostOverride)
+      ? hostOverride.replace(/\/+$/, "")
+      : window.location.origin;
+
+  // detecta si estamos usando hash (#/ruta) mirando la URL actual
+  const useHash =
+    typeof window !== "undefined" &&
+    (window.location.hash?.startsWith("#/") || window.location.href.includes("/#/"));
+
+  return useHash ? `${base}/#${p}` : `${base}${p}`;
+}
+
 // Guard liviano: asegura user (anónimo si hace falta) y evita redirigir a /login
 function useAuthReadyLight() {
   const [ready, setReady] = React.useState(false);
@@ -964,7 +982,7 @@ function InicioClase() {
       navigate("/desarrollo", {
         state: {
           slotId: currentSlotId || "0-0",
-        endMs,
+          endMs,
           clase: claseActual || null,
           ficha,
         },
@@ -972,7 +990,7 @@ function InicioClase() {
     }
   }, [remaining, navigate, currentSlotId, claseActual, chronoDone, BYPASS_NAV]);
 
-  // crear/asegurar sala + armar URL QR
+  // crear/asegurar sala + armar URL QR (USANDO makeUrl)
   useEffect(() => {
     (async () => {
       let code = salaCode;
@@ -991,24 +1009,14 @@ function InicioClase() {
         console.warn("[sala] setDoc:", e?.code || e?.message);
       }
 
-      // host override para QR
-      const hostOverride = localStorage.getItem("hostOverride"); // ej: http://192.168.0.22:5174
-      const base =
-        hostOverride && /^https?:\/\/.*/.test(hostOverride)
-          ? hostOverride
-          : window.location.origin;
-
-      // URL alumno final en el QR (#/sala/<code>)
-      const studentURL = code
-        ? `${base}/#/sala/${code}`
-        : `${base}/#/participa`;
-
+      // URL alumno final en el QR
+      const studentURL = code ? makeUrl(`/sala/${code}`) : makeUrl("/participa");
       setParticipaURL(studentURL);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // volver a asegurar sala cuando ya hay sesión
+  // volver a asegurar sala cuando ya hay sesión (USANDO makeUrl)
   useEffect(() => {
     if (!authed) return;
     if (window.__salaInitDone) return;
@@ -1027,16 +1035,7 @@ function InicioClase() {
           { merge: true }
         );
 
-        const hostOverride = localStorage.getItem("hostOverride"); // ej: http://TU_IP_LAN:5174
-        const base =
-          hostOverride && /^https?:\/\/.*/.test(hostOverride)
-            ? hostOverride
-            : window.location.origin;
-
-        const studentURL = code
-          ? `${base}/#/sala/${code}`
-          : `${base}/#/participa`;
-
+        const studentURL = code ? makeUrl(`/sala/${code}`) : makeUrl("/participa");
         setParticipaURL(studentURL);
 
         window.__salaInitDone = true;
@@ -2242,7 +2241,7 @@ function InicioClase() {
                 }}
               >
                 <QRCode
-                  value={participaURL || window.location.origin}
+                  value={participaURL || makeUrl("/participa")}
                   size={200}
                 />
               </div>
@@ -2267,7 +2266,7 @@ function InicioClase() {
                   <button
                     style={{ ...btnTiny, marginLeft: 8 }}
                     onClick={() => {
-                      navigator.clipboard.writeText(participaURL);
+                      navigator.clipboard.writeText(participaURL || makeUrl("/participa"));
                     }}
                   >
                     Copiar
