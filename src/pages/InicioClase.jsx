@@ -56,6 +56,10 @@ function clearAllCountdowns() {
     toDelete.forEach((k) => localStorage.removeItem(k));
   } catch (e) {}
 }
+const ORIGIN = window.location.origin || "https://www.pragmaprofe.com";
+const BASE = `${ORIGIN}/#/participa`;
+const urlQR = `${BASE}?code=${salaCode}&slot=${slotId}&yw=${yearWeek}`;
+
 
 // posibles rutas reales del tablero del profe
 const INICIO_CLASE_CANDIDATES = [

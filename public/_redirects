@@ -1,1 +1,9 @@
-﻿/*  /index.html  200
+﻿# 1) Fuerza www (apex -> www)
+https://pragmaprofe.com/*       https://www.pragmaprofe.com/:splat   301!
+
+# 2) Fuerza dominio principal si alguien abre el .netlify.app
+https://super-plataforma-pragma.netlify.app/*   https://www.pragmaprofe.com/:splat   301!
+
+# 3) SPA fallback (deja React funcionando)
+#    OJO: esta va al final para que no tape las 301 de arriba
+/*   /index.html   200

@@ -4,14 +4,12 @@ import { db, rtdb, auth } from "../firebase";
 import {
   collection,
   doc,
-  getDoc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-// ✅ RTDB
 import {
   ref as rRef,
   push as rPush,
@@ -21,24 +19,29 @@ import {
 } from "firebase/database";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
-signInAnonymously(auth).catch(() => {}); // <- evita ser pateado a /login
+/* ───────────────── Auth: guard liviano (evita pantallas en blanco) ─────────── */
+function useAnonReady() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const off = onAuthStateChanged(auth, async (u) => {
+      try {
+        if (!u) {
+          await signInAnonymously(auth).catch(() => {});
+        }
+      } finally {
+        if (alive) setReady(true);
+      }
+    });
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
+  return ready;
+}
 
-// Promesa que se resuelve cuando YA hay user (anónimo o normal)
-let _resolveAuthReady;
-export const authReady = new Promise((res) => (_resolveAuthReady = res));
-
-onAuthStateChanged(auth, (u) => {
-  if (u) {
-    _resolveAuthReady?.();
-  } else {
-    // Fuerza sesión anónima en dev/local o mientras pruebas
-    signInAnonymously(auth).finally(() => _resolveAuthReady?.());
-  }
-});
-
-/* ───────────────────────────────────────────────
-   Helpers de URL y estado local
-─────────────────────────────────────────────── */
+/* ───────────────── Helpers URL ───────────────── */
 function useQuery() {
   const [q, setQ] = useState(() => new URLSearchParams(window.location.search));
   useEffect(() => {
@@ -56,21 +59,15 @@ function setQueryParams(obj = {}) {
   });
   window.history.replaceState({}, "", url.toString());
 }
-
-/* ===== Nuevo: Normalizador FUERTE del código de sala ===== */
 function extractSalaFromHash() {
-  // Soporta hash routes tipo "#/sala/26134" o "#/participa?code=26134"
   const h = String(window.location.hash || "");
-  // #/sala/xxxx  -> captura xxxx
   const m1 = h.match(/#\/sala\/([^?&#/]+)/i);
   if (m1 && m1[1]) return m1[1];
-  // #/participa?...&code=xxxx
   const m2 = h.match(/[?&]code=([^&#]+)/i);
   if (m2 && m2[1]) return m2[1];
   return "";
 }
 function sanitizeSalaCode(raw) {
-  // Quita espacios, querys, hashes y segmentos de ruta. Solo permite [A-Za-z0-9_-]
   return String(raw || "")
     .split("?")[0]
     .split("#").pop()
@@ -79,15 +76,13 @@ function sanitizeSalaCode(raw) {
     .replace(/[^A-Za-z0-9_-]/g, "");
 }
 
+/* ───────────────── Estilos ───────────────── */
 const COLORS = {
   brandA: "#2193b0",
   brandB: "#6dd5ed",
   text: "#0f172a",
   muted: "#475569",
   border: "#e5e7eb",
-  ok: "#16a34a",
-  warn: "#f59e0b",
-  danger: "#ef4444",
   white: "#fff",
 };
 
@@ -99,7 +94,6 @@ const pageStyle = {
   color: COLORS.white,
   boxSizing: "border-box",
 };
-
 const card = {
   background: COLORS.white,
   color: COLORS.text,
@@ -110,7 +104,6 @@ const card = {
   maxWidth: 900,
   margin: "0 auto",
 };
-
 const input = {
   width: "100%",
   padding: "0.7rem 0.9rem",
@@ -120,7 +113,6 @@ const input = {
   fontSize: "1rem",
   boxSizing: "border-box",
 };
-
 const btn = {
   background: COLORS.white,
   color: COLORS.brandA,
@@ -132,7 +124,7 @@ const btn = {
   boxShadow: "0 2px 6px rgba(0,0,0,.08)",
 };
 
-// ID anónimo por dispositivo
+/* ───────────────── Utils ───────────────── */
 function getDeviceId() {
   try {
     const k = "ic_device_id";
@@ -147,10 +139,9 @@ function getDeviceId() {
   }
 }
 
-/* ───────────────────────────────────────────────
-   Componente principal
-─────────────────────────────────────────────── */
+/* ───────────────── Componente ───────────────── */
 export default function Participa() {
+  const ready = useAnonReady(); // <- clave
   const q = useQuery();
 
   const mode = (q.get("m") || "").toLowerCase() === "asis" ? "asis" : "cloud";
@@ -164,21 +155,13 @@ export default function Participa() {
   const [slotId, setSlotId] = useState(initialSlot);
   const [yearWeek, setYearWeek] = useState(initialYW);
 
-  // Si llegó algo sucio vía URL (p. ej. "http://...#/sala/26134"), lo corrige una vez.
   useEffect(() => {
     const cleaned = sanitizeSalaCode(salaCode);
     if (cleaned !== salaCode) setSalaCode(cleaned);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Garantiza sesión anónima para no “pegarse”
-  useEffect(() => {
-    if (!auth.currentUser) {
-      signInAnonymously(auth).catch(() => {});
-    }
-  }, []);
-
-  // Pregunta en vivo (Firestore)
+  // Pregunta en vivo
   const [pregunta, setPregunta] = useState("");
   useEffect(() => {
     const ref = doc(db, "preguntaClase", "actual");
@@ -192,7 +175,7 @@ export default function Participa() {
     return () => unsub();
   }, []);
 
-  // Prefills
+  // Prefills (nombre / lista guardados por sala)
   const storageKey = useMemo(() => `part:${salaCode || "nocode"}`, [salaCode]);
   const [numeroLista, setNumeroLista] = useState(() => {
     try {
@@ -222,17 +205,15 @@ export default function Participa() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  // Validaciones
   const canSendWord = salaCode.trim().length > 0 && textWord.trim().length > 0;
   const canSendAsis =
     salaCode.trim().length > 0 && Number.isFinite(parseInt(numeroLista, 10));
 
-  // Últimos (Firestore principal + fallback RTDB)
+  // Últimos (FS principal + fallback RTDB)
   const [ultimos, setUltimos] = useState([]);
   useEffect(() => {
     if (!salaCode) return;
 
-    // 1) Firestore (lo que usa tu InicioClase)
     const colRef = collection(db, "salas", salaCode, "palabras");
     let qRef = colRef;
     try {
@@ -255,7 +236,6 @@ export default function Participa() {
       () => {}
     );
 
-    // 2) Fallback RTDB (solo si FS no tiene nada aún)
     const rPath = rRef(rtdb, `salas/${salaCode}/palabras`);
     const unsubRT = rOnValue(rPath, (snap) => {
       const val = snap.val() || {};
@@ -281,7 +261,6 @@ export default function Participa() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [salaCode]);
 
-  // Persistir query (ya sale saneado)
   useEffect(() => {
     setQueryParams({
       code: salaCode || null,
@@ -291,10 +270,7 @@ export default function Participa() {
     });
   }, [salaCode, mode, slotId, yearWeek]);
 
-  /* ───────────────────────────────────────────────
-     Acciones (DOBLE ESCRITURA FS + RTDB)
-  ─────────────────────────────────────────────── */
-  // Anti-spam: 1 envío cada 8s por sala
+  // Anti-spam 8s
   const canSendNow = () => {
     const k = `lastSend:${salaCode}`;
     const last = Number(localStorage.getItem(k) || 0);
@@ -312,7 +288,6 @@ export default function Participa() {
       setMsg({ type: "warn", text: "Espera unos segundos antes de enviar otra palabra." });
       return;
     }
-
     setLoading(true);
     setMsg(null);
     try {
@@ -326,11 +301,9 @@ export default function Participa() {
         yw: yearWeek || null,
         timestamp: serverTimestamp(),
       };
-      // Firestore (compat con InicioClase actual)
       const refFS = doc(collection(db, "salas", salaCode, "palabras"));
       await setDoc(refFS, payloadFS, { merge: true });
 
-      // RTDB (baja latencia)
       const payloadRT = {
         texto: clean,
         numeroLista: Number.isFinite(+numeroLista) ? +numeroLista : null,
@@ -347,7 +320,7 @@ export default function Participa() {
       setTextWord("");
       markSend();
       setMsg({ type: "ok", text: "¡Enviado! Gracias por participar." });
-    } catch (e) {
+    } catch {
       setMsg({
         type: "err",
         text: "No se pudo enviar. Revisa tu conexión e inténtalo otra vez.",
@@ -358,7 +331,7 @@ export default function Participa() {
   };
 
   const marcarAsistencia = async () => {
-    if (!canSendAsis) {
+    if (!(salaCode && Number.isFinite(parseInt(numeroLista, 10)))) {
       setMsg({
         type: "warn",
         text: "Ingresa tu número de lista (y tu nombre si es posible).",
@@ -376,31 +349,27 @@ export default function Participa() {
         source: "web",
         deviceId: getDeviceId(),
       };
-
-      // Firestore (mantengo tus colecciones)
       const refAsis = doc(collection(db, "salas", salaCode, "asistencia"));
       await setDoc(
         refAsis,
         { ...payloadCommon, ts: serverTimestamp(), timestamp: serverTimestamp() },
         { merge: true }
       );
-
       const refPres = doc(collection(db, "salas", salaCode, "presentes"));
       await setDoc(
         refPres,
         { ...payloadCommon, ts: serverTimestamp(), timestamp: serverTimestamp() },
         { merge: true }
       );
-
-      // RTDB (lo que leerá InicioClase si migras)
       const presRT = rRef(rtdb, `salas/${salaCode}/presentes`);
-      await rSet(
-        rPush(presRT),
-        { ...payloadCommon, ts: Date.now(), serverTs: rServerTimestamp() }
-      );
+      await rSet(rPush(presRT), {
+        ...payloadCommon,
+        ts: Date.now(),
+        serverTs: rServerTimestamp(),
+      });
 
       setMsg({ type: "ok", text: "¡Listo! Tu asistencia ha sido registrada." });
-    } catch (e) {
+    } catch {
       setMsg({
         type: "err",
         text: "No pudimos registrar tu asistencia. Inténtalo nuevamente.",
@@ -410,87 +379,90 @@ export default function Participa() {
     }
   };
 
-  /* ───────────────────────────────────────────────
-     UI
-  ─────────────────────────────────────────────── */
+  /* ───────────────── Render ───────────────── */
+  if (!ready) {
+    return (
+      <div style={pageStyle}>
+        <div style={{ ...card, textAlign: "center" }}>
+          Iniciando… (autenticando de forma anónima)
+        </div>
+      </div>
+    );
+  }
+
+  const contentHeader = (
+    <div
+      style={{
+        marginTop: 10,
+        padding: "10px 12px",
+        borderRadius: 10,
+        background: "rgba(255,255,255,.5)",
+        display: "grid",
+        gap: 8,
+      }}
+    >
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 12, color: COLORS.muted }}>Código de sala</div>
+          <input
+            style={input}
+            placeholder="Ej: 12345"
+            value={salaCode}
+            onChange={(e) => setSalaCode(sanitizeSalaCode(e.target.value))}
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, color: COLORS.muted }}># de lista</div>
+          <input
+            style={input}
+            placeholder="Ej: 12"
+            inputMode="numeric"
+            value={numeroLista}
+            onChange={(e) => setNumeroLista(e.target.value)}
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, color: COLORS.muted }}>Tu nombre (opcional)</div>
+          <input
+            style={input}
+            placeholder="Tu nombre"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 12, color: COLORS.muted }}>Slot (opcional)</div>
+          <input
+            style={input}
+            placeholder="0-0"
+            value={slotId}
+            onChange={(e) => setSlotId(e.target.value)}
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, color: COLORS.muted }}>Año-Semana (opcional)</div>
+          <input
+            style={input}
+            placeholder="YYYY-WW"
+            value={yearWeek}
+            onChange={(e) => setYearWeek(e.target.value)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={pageStyle}>
       <div style={{ ...card, marginBottom: 16 }}>
         <h1 style={{ marginTop: 0 }}>Participa</h1>
-        <p style={{ marginTop: 4, color: COLORS.muted }}>
-          Vista de participación.
-        </p>
+        <p style={{ marginTop: 4, color: COLORS.muted }}>Vista de participación.</p>
 
-        {/* Encabezado */}
-        <div
-          style={{
-            marginTop: 10,
-            padding: "10px 12px",
-            borderRadius: 10,
-            background: "rgba(255,255,255,.5)",
-            display: "grid",
-            gap: 8,
-          }}
-        >
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 12, color: COLORS.muted }}>Código de sala</div>
-              <input
-                style={input}
-                placeholder="Ej: 12345"
-                value={salaCode}
-                onChange={(e) =>
-                  setSalaCode(sanitizeSalaCode(e.target.value))
-                }
-              />
-            </div>
+        {contentHeader}
 
-            <div>
-              <div style={{ fontSize: 12, color: COLORS.muted }}># de lista</div>
-              <input
-                style={input}
-                placeholder="Ej: 12"
-                inputMode="numeric"
-                value={numeroLista}
-                onChange={(e) => setNumeroLista(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <div style={{ fontSize: 12, color: COLORS.muted }}>Tu nombre (opcional)</div>
-              <input
-                style={input}
-                placeholder="Tu nombre"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Campos informativos si vienen del QR */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 12, color: COLORS.muted }}>Slot (opcional)</div>
-              <input
-                style={input}
-                placeholder="0-0"
-                value={slotId}
-                onChange={(e) => setSlotId(e.target.value)}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: COLORS.muted }}>Año-Semana (opcional)</div>
-              <input
-                style={input}
-                placeholder="YYYY-WW"
-                value={yearWeek}
-                onChange={(e) => setYearWeek(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Mensajes */}
         {msg && (
           <div
             style={{
@@ -522,15 +494,12 @@ export default function Participa() {
         )}
       </div>
 
-      {/* Bloque según modo */}
       {mode === "asis" ? (
         <div style={card}>
           <h2 style={{ marginTop: 0 }}>🟢 Asistencia</h2>
           <p style={{ color: COLORS.muted, marginTop: 0 }}>
-            Presiona el botón para registrar tu asistencia. Asegúrate de haber
-            ingresado tu <b>número de lista</b>.
+            Presiona el botón para registrar tu asistencia. Asegúrate de haber ingresado tu <b>número de lista</b>.
           </p>
-
           <button
             disabled={!canSendAsis || loading || !salaCode}
             onClick={marcarAsistencia}
@@ -541,7 +510,6 @@ export default function Participa() {
           >
             {loading ? "Marcando..." : "Estoy presente"}
           </button>
-
           <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 12 }}>
             Consejo: guarda el código de la sala para no escribirlo cada vez.
           </div>
@@ -549,6 +517,7 @@ export default function Participa() {
       ) : (
         <div style={card}>
           <h2 style={{ marginTop: 0 }}>💬 Responde</h2>
+
           <div
             style={{
               marginBottom: 10,
@@ -590,30 +559,23 @@ export default function Participa() {
             </button>
           </div>
 
-          {/* Últimos envíos */}
           <div style={{ marginTop: 16 }}>
             <div style={{ fontWeight: 700, marginBottom: 6 }}>Últimos envíos</div>
-            {ultimos.length === 0 ? (
-              <div style={{ fontSize: 14, color: COLORS.muted }}>
-                Aún no hay palabras enviadas.
-              </div>
-            ) : (
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {ultimos.map((r) => (
-                  <li key={r.id}>
-                    {r.texto}{" "}
-                    <span style={{ color: COLORS.muted }}>
-                      {r.numeroLista ? `( #${r.numeroLista} )` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* lista compacta */}
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {(ultimos || []).map((r) => (
+                <li key={r.id}>
+                  {r.texto}{" "}
+                  <span style={{ color: COLORS.muted }}>
+                    {r.numeroLista ? `( #${r.numeroLista} )` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       )}
 
-      {/* Pie */}
       <div style={{ ...card, marginTop: 16 }}>
         <div style={{ fontSize: 12, color: COLORS.muted }}>
           Código de dispositivo: <code>{getDeviceId().slice(0, 8)}</code>
