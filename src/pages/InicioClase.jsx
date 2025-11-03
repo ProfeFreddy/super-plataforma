@@ -1,4 +1,4 @@
-// InicioClase.jsx 
+// InicioClase.jsx
 import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import QRCode from "react-qr-code";
@@ -56,9 +56,9 @@ function clearAllCountdowns() {
     toDelete.forEach((k) => localStorage.removeItem(k));
   } catch (e) {}
 }
-const ORIGIN = window.location.origin || "https://www.pragmaprofe.com";
-const BASE = `${ORIGIN}/#/participa`;
-const urlQR = `${BASE}?code=${salaCode}&slot=${slotId}&yw=${yearWeek}`;
+// const ORIGIN = window.location.origin || "https://www.pragmaprofe.com";
+// const BASE = `${ORIGIN}/#/participa`;
+// const urlQR = `${BASE}?code=${salaCode}&slot=${slotId}&yw=${yearWeek}`;
 
 
 // posibles rutas reales del tablero del profe
@@ -97,6 +97,15 @@ function makeUrl(path) {
     (window.location.hash?.startsWith("#/") || window.location.href.includes("/#/"));
 
   return useHash ? `${base}/#${p}` : `${base}${p}`;
+}
+
+/* === NUEVO: helper seguro para leer el código de sala sin romper en top-level === */
+function getSalaCodeSafe() {
+  try {
+    return localStorage.getItem("salaCode") || "";
+  } catch {
+    return "";
+  }
 }
 
 // Guard liviano: asegura user (anónimo si hace falta) y evita redirigir a /login
@@ -764,7 +773,7 @@ function InicioClase() {
   const [claseVigente, setClaseVigente] = useState(null);
 
   // Sala / Código y URL para estudiantes
-  const [salaCode, setSalaCode] = useState(localStorage.getItem("salaCode") || "");
+  const [salaCode, setSalaCode] = useState(getSalaCodeSafe());
   const [participaURL, setParticipaURL] = useState("");
 
   // Para mantener tu bloque opcional más abajo:
@@ -1881,7 +1890,7 @@ function InicioClase() {
           DISABLE_CLOUD,
           authed,
           isAnon,
-          salaCode: salaCode || "(none)",
+          salaCode: (typeof salaCode === "string" && salaCode) || getSalaCodeSafe() || "(none)",
           cloudMode,
           palabras: (Array.isArray(cloudMentData) && cloudMentData.length) || 0,
           BYPASS_NAV, // ⬅️ visible en debug
@@ -2402,9 +2411,9 @@ function InicioClase() {
             Volver al Inicio
           </button>
 
-          {/* Editar horario */}
+          {/* Editar horario (ajustado a /horario) */}
           <button
-            onClick={() => navigate("/horario/editar")}
+            onClick={() => navigate("/horario")}
             style={btnWhite}
           >
             Editar horario
@@ -2417,3 +2426,4 @@ function InicioClase() {
 
 export default InicioClase;
 export { InicioClase };
+
