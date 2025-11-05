@@ -1,4 +1,4 @@
-// InicioClase.jsx
+// InicioClase.jsx 
 import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import QRCode from "react-qr-code";
@@ -69,6 +69,15 @@ const INICIO_CLASE_CANDIDATES = [
   "/Inicioclase",
   "/inicio", // por si lo montaste como /inicio
 ];
+
+// Utils para construir URL de sala con flags seguros
+function getSalaUrl(codigo) {
+  const base =
+    (typeof window !== "undefined" && window.location?.origin) ||
+    "https://www.pragmaprofe.com";
+  // fuerza safe y nocache para móviles iOS
+  return `${base}/#/sala/${codigo}?safe=1&nocache=1`;
+}
 
 // decide a dónde volver cuando decimos "Volver al Inicio"
 function getInicioClasePath() {
@@ -2426,4 +2435,3 @@ function InicioClase() {
 
 export default InicioClase;
 export { InicioClase };
-

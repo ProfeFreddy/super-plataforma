@@ -95,6 +95,15 @@ const functions = getFunctions(app, "southamerica-east1");
 const storage = getStorage(app);
 const rtdb = getDatabase(app);
 
+/* ------------------------- (opcional) App Check en dev ------------------------- */
+/* Si tienes App Check en "Enforced", habilita el debug en dev: */
+try {
+  if (import.meta.env.DEV) {
+    // @ts-ignore
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true; // solo habilita si lo necesitas
+  }
+} catch { /* noop */ }
+
 /* ------------------------- AUTO-ANON EN DEV (desactivado) ------------------------- */
 /* Mantener desactivado aquí para no pisar sesiones reales.
    Si alguna pantalla lo necesita, que haga signInAnonymously localmente. */
@@ -105,21 +114,37 @@ const rtdb = getDatabase(app);
 //   });
 // }
 
-/* ------------------------- ANALYTICS (opcional) ------------------------- */
-let analytics;
+/* ------------------------- ANALYTICS (opcional y seguro) ------------------------- */
+let analytics = null;
 try {
-  if (firebaseConfig.measurementId) {
-    isSupported().then((ok) => {
-      if (ok) {
-        analytics = getAnalytics(app);
-        console.log("[FB] Analytics ON");
-      }
-    });
+  const analyticsExplicitlyDisabled =
+    String(import.meta.env.VITE_DISABLE_ANALYTICS || "").toLowerCase() === "true";
+
+  if (!analyticsExplicitlyDisabled && import.meta.env.PROD && firebaseConfig.measurementId) {
+    // Solo en PROD y si el navegador lo soporta; cualquier error se ignora.
+    isSupported()
+      .then((ok) => {
+        if (ok) {
+          try {
+            analytics = getAnalytics(app);
+            console.log("[FB] Analytics ON");
+          } catch (e) {
+            console.warn("[FB] Analytics no inicializado:", e?.message || e);
+          }
+        } else {
+          console.warn("[FB] Analytics no soportado por este navegador.");
+        }
+      })
+      .catch(() => {
+        /* noop */
+      });
+  } else {
+    if (!import.meta.env.PROD) console.log("[FB] Analytics desactivado en DEV.");
   }
 } catch { /* noop */ }
 
 /* ------------------------- EXPORTS ------------------------- */
-export { app, auth, db, functions, storage, rtdb };
+export { app, auth, db, functions, storage, rtdb, analytics };
 
 /* ------------------------- Helper Flow (pago) ------------------------- */
 export async function callFlowCreateV2(payload) {
@@ -142,6 +167,7 @@ export async function callFlowCreateV2(payload) {
     };
   }
 }
+
 
 
 

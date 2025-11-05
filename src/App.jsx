@@ -162,7 +162,7 @@ class ErrorBoundary extends React.Component {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
                 fontSize: ".9rem",
                 whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
+                wordBreak: "word-break",
                 marginBottom: "1rem",
               }}
             >
@@ -284,19 +284,64 @@ function DesarrolloRouteWrapper() {
   const navigate = useNavigate();
   return <DesarrolloClase duracion={30} onIrACierre={() => navigate("/cierre")} />;
 }
-function AsistenciaWrapper() {
-  const { code } = useParams();
-  const search = new URLSearchParams();
-  search.set("m", "asis");
-  if (code) search.set("code", code);
-  return <Navigate to={`/participa?${search.toString()}`} replace />;
-}
+
+/* ========= NUEVO: Wrappers que MONTAN Participa directamente (sin Navigate) ========= */
 function SalaWrapper() {
   const { code } = useParams();
-  const search = new URLSearchParams();
-  if (code) search.set("code", code);
-  return <Navigate to={`/participa?${search.toString()}`} replace />;
+  const loc = useLocation();
+  const nav = useNavigate();
+
+  // Si llega /sala/:code sin ?code, lo añadimos al query con replace,
+  // pero SIN cambiar de ruta ni de componente (evita pantallas en blanco en móvil).
+  React.useEffect(() => {
+    const sp = new URLSearchParams(loc.search);
+    let changed = false;
+    if (code && !sp.get("code")) {
+      sp.set("code", code);
+      changed = true;
+    }
+    if (changed) {
+      nav({ pathname: loc.pathname, search: `?${sp.toString()}`, hash: loc.hash }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, loc.pathname, loc.search, loc.hash]);
+
+  return (
+    <RequireAuthAllowAnon>
+      <Participa />
+    </RequireAuthAllowAnon>
+  );
 }
+
+function AsistenciaWrapper() {
+  const { code } = useParams();
+  const loc = useLocation();
+  const nav = useNavigate();
+
+  React.useEffect(() => {
+    const sp = new URLSearchParams(loc.search);
+    let changed = false;
+    if (!sp.get("m")) {
+      sp.set("m", "asis");
+      changed = true;
+    }
+    if (code && !sp.get("code")) {
+      sp.set("code", code);
+      changed = true;
+    }
+    if (changed) {
+      nav({ pathname: loc.pathname, search: `?${sp.toString()}`, hash: loc.hash }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, loc.pathname, loc.search, loc.hash]);
+
+  return (
+    <RequireAuthAllowAnon>
+      <Participa />
+    </RequireAuthAllowAnon>
+  );
+}
+/* ========================================================================= */
 
 /* ─────────────────────────────────────────
    🔧 HashRedirector (soporte #/ruta)
@@ -326,7 +371,6 @@ function ForceInicioClaseDev({ children }) {
   const nav = useNavigate();
   const loc = useLocation();
   React.useEffect(() => {
-    // Si algo externo nos manda a /home, re-enrutamos a /InicioClase
     if (loc.pathname === "/home") {
       nav("/InicioClase", { replace: true });
     }
@@ -375,6 +419,11 @@ export default function App() {
             }
           />
 
+          {/* ✅ Compatibilidad con QR/URLs */}
+          <Route path="/sala" element={<Navigate to="/participa" replace />} />
+          <Route path="/sala/:code" element={<SalaWrapper />} />
+          <Route path="/asistencia/:code" element={<AsistenciaWrapper />} />
+
           <Route
             path="/desarrollo"
             element={
@@ -421,7 +470,9 @@ export default function App() {
           <Route
             path="*"
             element={
-              window.location.hash && window.location.hash.startsWith("#/")
+              (typeof window !== "undefined" &&
+                window.location.hash &&
+                window.location.hash.startsWith("#/"))
                 ? null
                 : <Navigate to="/home" replace />
             }
@@ -431,6 +482,7 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
 
 
 

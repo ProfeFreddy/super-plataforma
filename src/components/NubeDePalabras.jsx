@@ -1,5 +1,5 @@
 // src/components/NubeDePalabras.jsx
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import WordCloud from "react-d3-cloud";
 
 /**
@@ -17,7 +17,16 @@ import WordCloud from "react-d3-cloud";
  *  - maxFont: number (px)
  *  - animate: boolean
  *  - darkBg: boolean (si el fondo es oscuro)
+ *
+ * Extras opcionales:
+ *  - salaCode?: string   → si viene, escucha en RTDB: salas/{salaCode}/palabras
+ *  - rtdbPath?: string   → sobreescribe la ruta (p.ej. "nube/{code}")
+ *  - maxItems?: number   → límite de palabras a mostrar (default 120)
+ *  - maxWordLength?: number → recorte por palabra (default 28)
+ *  - allowNumbers?: boolean → si false, filtra palabras puramente numéricas (default true)
+ *  - lowercase?: boolean → normaliza a minúsculas (default true)
  */
+
 export default function NubeDePalabras({
   items = [],
   palette = "menti",
@@ -25,22 +34,107 @@ export default function NubeDePalabras({
   maxFont = 78,
   animate = true,
   darkBg = false,
+
+  // extras
+  salaCode,
+  rtdbPath,
+  maxItems = 120,
+  maxWordLength = 28,
+  allowNumbers = true,
+  lowercase = true,
 }) {
-  // Normaliza/filtra (por si llegan duplicados o vacíos)
-  const data = useMemo(() => {
+  // =========================
+  // Estado: datos desde RTDB
+  // =========================
+  const [liveItems, setLiveItems] = useState([]);
+
+  // Suscripción liviana a RTDB (si existe y si hay salaCode/ruta)
+  useEffect(() => {
+    let unsub = null;
+    (async () => {
+      try {
+        if (!salaCode && !rtdbPath) return;
+
+        // import dinámico: NO rompe si el proyecto no exporta rtdb
+        const mod = await import("../firebase").catch(() => null);
+        if (!mod || !mod.rtdb) return;
+
+        const { rtdb } = mod;
+        const { ref, onValue, off } = await import("firebase/database");
+
+        const path =
+          rtdbPath ||
+          (salaCode ? `salas/${String(salaCode)}/palabras` : null);
+        if (!path) return;
+
+        const nodo = ref(rtdb, path);
+
+        const handler = (snap) => {
+          const val = snap.val();
+          // Esperamos objetos { key: { text: "..." } } o { key: "texto" }
+          const arr = [];
+          if (val && typeof val === "object") {
+            for (const k of Object.keys(val)) {
+              const v = val[k];
+              if (v && typeof v === "object" && v.text) {
+                arr.push(String(v.text));
+              } else if (typeof v === "string") {
+                arr.push(v);
+              }
+            }
+          }
+          setLiveItems(
+            arr.map((t) => ({
+              text: String(t ?? ""),
+              value: 1,
+            }))
+          );
+        };
+
+        onValue(nodo, handler);
+        unsub = () => off(nodo, "value", handler);
+      } catch (e) {
+        // Silencioso: si falla, seguimos con props.items
+        console.warn("[NubeDePalabras] RTDB off/skip:", e?.message || e);
+      }
+    })();
+
+    return () => {
+      try {
+        if (typeof unsub === "function") unsub();
+      } catch {}
+    };
+  }, [salaCode, rtdbPath]);
+
+  // =========================
+  // Normaliza/combina datos
+  // =========================
+  const combined = useMemo(() => {
+    const all = [...items, ...liveItems];
     const map = new Map();
-    for (const r of items) {
-      const k = String(r.text || "").trim();
-      if (!k) continue;
-      const v = Number(r.value || 0);
-      map.set(k, (map.get(k) || 0) + (isFinite(v) ? v : 0));
+
+    for (const r of all) {
+      let txt = String((r && r.text) || "").trim();
+      if (!txt) continue;
+
+      if (lowercase) txt = txt.toLowerCase();
+      if (!allowNumbers && /^\d+$/.test(txt)) continue;
+
+      // recorte de palabras MUY largas (evita romper layout móvil)
+      if (txt.length > maxWordLength) txt = txt.slice(0, maxWordLength) + "…";
+
+      const v = Number(r?.value ?? 1);
+      map.set(txt, (map.get(txt) || 0) + (isFinite(v) ? v : 0));
     }
+
     return Array.from(map, ([text, value]) => ({ text, value }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 120); // límite razonable
-  }, [items]);
+      .slice(0, Math.max(1, maxItems));
+  }, [items, liveItems, allowNumbers, lowercase, maxItems, maxWordLength]);
 
+  // =========================
   // Paletas “estilo menti”
+  // =========================
   const palettes = {
     menti: [
       "#1abc9c", "#2ecc71", "#3498db", "#9b59b6",
@@ -56,9 +150,11 @@ export default function NubeDePalabras({
     cool: ["#22c55e", "#06b6d4", "#3b82f6", "#6366f1", "#14b8a6"],
   };
 
+  // =========================
   // Escalas rápidas
-  const min = data.length ? Math.min(...data.map(d => d.value)) : 0;
-  const max = data.length ? Math.max(...data.map(d => d.value)) : 1;
+  // =========================
+  const min = combined.length ? Math.min(...combined.map((d) => d.value)) : 0;
+  const max = combined.length ? Math.max(...combined.map((d) => d.value)) : 1;
 
   const sizeScale = (val) => {
     // escala log para diferenciar sin aplastar los chicos
@@ -84,7 +180,7 @@ export default function NubeDePalabras({
 
   const font = "Inter, system-ui, Segoe UI, Roboto, sans-serif";
 
-  const cloudData = data.map((d, i) => ({
+  const cloudData = combined.map((d, i) => ({
     ...d,
     text: d.text,
     value: sizeScale(d.value),
@@ -92,8 +188,29 @@ export default function NubeDePalabras({
     rotate: rotate(),
   }));
 
+  // =========================
+  // Responsivo al contenedor
+  // =========================
+  const wrapRef = useRef(null);
+  const [dims, setDims] = useState({ w: 520, h: 320 });
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0].contentRect;
+      const w = Math.max(320, Math.floor(r.width - 16));
+      // altura proporcional con mínimo
+      const h = Math.max(240, Math.floor(w * 0.6));
+      setDims({ w, h });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div
+      ref={wrapRef}
       style={{
         width: "100%",
         height: "100%",
@@ -114,8 +231,8 @@ export default function NubeDePalabras({
         rotate={(w) => w.rotate}
         padding={2}
         spiral="archimedean"
-        height={320}
-        width={520}
+        height={dims.h}
+        width={dims.w}
         random={(a) => a} // estable
         onWordMouseOver={(e, d) => {
           const el = e?.target;
@@ -148,10 +265,11 @@ export default function NubeDePalabras({
           userSelect: "none",
         }}
       >
-        {data.length ? "Tamaño = frecuencia" : "Sin palabras aún"}
+        {combined.length ? "Tamaño = frecuencia" : "Sin palabras aún"}
       </div>
     </div>
   );
 }
+
 
 

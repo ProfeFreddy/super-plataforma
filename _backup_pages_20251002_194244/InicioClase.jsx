@@ -2362,7 +2362,16 @@ if (!authReady) {
                   border: `1px solid ${COLORS.border}`,
                 }}
               >
-                <QRCode value={participaURL || window.location.origin} size={200} />
+               // cerca de donde calculas salaCode:
+const base = window.location.origin.replace(/\/$/, "");
+const urlSala = `${base}/sala/${salaCode}`;
+const urlAsistencia = `${base}/asistencia/${salaCode}`;
+
+// …y en el render:
+<QRCode value={urlSala} size={200} />
+…
+<QRCode value={urlAsistencia} size={200} />
+
               </div>
               <code style={{ fontSize: 12, marginTop: 8, color: COLORS.textMuted }}>
                 {participaURL}
@@ -2393,7 +2402,16 @@ if (!authReady) {
                       border: `1px solid ${COLORS.border}`,
                     }}
                   >
-                    <QRCode value={participaURLAsistencia || window.location.origin} size={160} />
+                    // cerca de donde calculas salaCode:
+const base = window.location.origin.replace(/\/$/, "");
+const urlSala = `${base}/sala/${salaCode}`;
+const urlAsistencia = `${base}/asistencia/${salaCode}`;
+
+// …y en el render:
+<QRCode value={urlSala} size={200} />
+…
+<QRCode value={urlAsistencia} size={200} />
+
                   </div>
                   <code style={{ fontSize: 12, marginTop: 6, color: COLORS.textMuted, display: "block" }}>
                     {participaURLAsistencia}

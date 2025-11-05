@@ -1054,10 +1054,11 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             let lang = "es";
 
             const wikiSearchEs = await api.get(
-              `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-                q1
-              )}&format=json&origin=*`
-            );
+  `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+    q1
+  )}&format=json&origin=*`
+);
+
             firstTitle = wikiSearchEs?.data?.query?.search?.[0]?.title || "";
             lang = "es";
 
@@ -1201,10 +1202,11 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
         let lang = "es";
 
         const wikiSearchEs = await api.get(
-          `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-            q
-          )}&format=json&origin=*`
-        );
+  `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+    q1
+  )}&format=json&origin=*`
+);
+
         firstTitle = wikiSearchEs?.data?.query?.search?.[0]?.title || "";
 
         if (!firstTitle) {

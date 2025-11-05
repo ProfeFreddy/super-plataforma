@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:web": "vite",
-    "web": "vite",
+    "dev:web": "vite --host --port 5174",
+    "web": "vite --host --port 5174",
     "api": "nodemon server/server.js",
-    "dev": "concurrently -n FRONT,API -c green,cyan \"vite\" \"nodemon server/server.js\"",
+    "dev": "concurrently -n FRONT,API -c green,cyan \"vite --host --port 5174\" \"nodemon server/server.js\"",
     "build": "vite build",
     "preview": "vite preview --port 5174"
   },
