@@ -1,4 +1,4 @@
-// src/firebase.js
+// src/firebase.js 
 // Inicialización sólida para Auth, Firestore y RTDB (nube de palabras)
 
 import { initializeApp, getApps, getApp } from "firebase/app";
@@ -11,6 +11,7 @@ import {
 import {
   initializeFirestore,
   persistentSingleTabManager,
+  persistentLocalCache,            // ✅ añadido para cache persistente correcta
 } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getStorage } from "firebase/storage";
@@ -84,11 +85,16 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(() => {});
 
-// ✅ Firestore robusto para redes “difíciles” (evita 400/streaming)
+// ✅ Firestore robusto para redes “difíciles” (evita 400/streaming/QUIC)
 const db = initializeFirestore(app, {
-  localCache: persistentSingleTabManager(),
+  // Cache persistente + coordinación de pestañas
+  localCache: persistentLocalCache({
+    tabManager: persistentSingleTabManager(),
+  }),
+  // Transporte a prueba de firewalls que rompen HTTP/3/QUIC
   experimentalAutoDetectLongPolling: true,
-  useFetchStreams: false, // evita fetch streaming que a veces rompe
+  experimentalForceLongPolling: true,   // ✅ añadido: fuerza long-polling si hace falta
+  useFetchStreams: false,               // evita fetch streaming que a veces rompe
 });
 
 const functions = getFunctions(app, "southamerica-east1");
@@ -167,6 +173,7 @@ export async function callFlowCreateV2(payload) {
     };
   }
 }
+
 
 
 
