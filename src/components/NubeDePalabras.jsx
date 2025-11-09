@@ -1,4 +1,3 @@
-// src/components/NubeDePalabras.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import WordCloud from "react-d3-cloud";
 
@@ -19,12 +18,13 @@ import WordCloud from "react-d3-cloud";
  *  - darkBg: boolean (si el fondo es oscuro)
  *
  * Extras opcionales:
- *  - salaCode?: string   → si viene, escucha en RTDB: salas/{salaCode}/palabras
- *  - rtdbPath?: string   → sobreescribe la ruta (p.ej. "nube/{code}")
- *  - maxItems?: number   → límite de palabras a mostrar (default 120)
+ *  - salaCode?: string      → compat: escucha RTDB legacy en salas/{code}/palabras
+ *  - roomCode?: string      → NUEVO: escucha RTDB en rooms/{code}/words (estándar)
+ *  - rtdbPath?: string      → sobreescribe la ruta completa
+ *  - maxItems?: number      → límite de palabras a mostrar (default 120)
  *  - maxWordLength?: number → recorte por palabra (default 28)
- *  - allowNumbers?: boolean → si false, filtra palabras puramente numéricas (default true)
- *  - lowercase?: boolean → normaliza a minúsculas (default true)
+ *  - allowNumbers?: boolean → si false, filtra palabras numéricas (default true)
+ *  - lowercase?: boolean    → normaliza a minúsculas (default true)
  */
 
 export default function NubeDePalabras({
@@ -36,7 +36,8 @@ export default function NubeDePalabras({
   darkBg = false,
 
   // extras
-  salaCode,
+  salaCode,         // legacy
+  roomCode,         // preferido
   rtdbPath,
   maxItems = 120,
   maxWordLength = 28,
@@ -48,63 +49,73 @@ export default function NubeDePalabras({
   // =========================
   const [liveItems, setLiveItems] = useState([]);
 
-  // Suscripción liviana a RTDB (si existe y si hay salaCode/ruta)
+  // Suscripción RTDB (doble: estándar y legacy) sin romper props.items
   useEffect(() => {
-    let unsub = null;
+    let cleanups = [];
     (async () => {
       try {
-        if (!salaCode && !rtdbPath) return;
+        if (!roomCode && !salaCode && !rtdbPath) return;
 
-        // import dinámico: NO rompe si el proyecto no exporta rtdb
+        // import dinámico: no rompe si no existe rtdb
         const mod = await import("../firebase").catch(() => null);
         if (!mod || !mod.rtdb) return;
 
         const { rtdb } = mod;
         const { ref, onValue, off } = await import("firebase/database");
 
-        const path =
-          rtdbPath ||
-          (salaCode ? `salas/${String(salaCode)}/palabras` : null);
-        if (!path) return;
+        // 1) Path explícito siempre gana
+        const paths = [];
+        if (rtdbPath) {
+          paths.push(rtdbPath);
+        } else {
+          // 2) Estándar → rooms/{code}/words
+          if (roomCode) paths.push(`rooms/${String(roomCode)}/words`);
+          // 3) Compat → salas/{code}/palabras (si viene salaCode)
+          if (salaCode) paths.push(`salas/${String(salaCode)}/palabras`);
+        }
 
-        const nodo = ref(rtdb, path);
+        if (!paths.length) return;
 
-        const handler = (snap) => {
+        const aggregate = new Map();
+        const applySnap = (snap) => {
           const val = snap.val();
-          // Esperamos objetos { key: { text: "..." } } o { key: "texto" }
-          const arr = [];
           if (val && typeof val === "object") {
-            for (const k of Object.keys(val)) {
-              const v = val[k];
-              if (v && typeof v === "object" && v.text) {
-                arr.push(String(v.text));
-              } else if (typeof v === "string") {
-                arr.push(v);
-              }
-            }
+            Object.values(val).forEach((v) => {
+              // admitimos {texto: "..."} o {t: "..."} o string
+              const raw =
+                (v && (v.texto || v.t || v.text)) ||
+                (typeof v === "string" ? v : "");
+              const t = String(raw || "").trim();
+              if (!t) return;
+              const key = t.toLowerCase();
+              aggregate.set(key, (aggregate.get(key) || 0) + 1);
+            });
           }
-          setLiveItems(
-            arr.map((t) => ({
-              text: String(t ?? ""),
-              value: 1,
-            }))
-          );
+          // volcamos a estado
+          const arr = [...aggregate.entries()].map(([text, value]) => ({
+            text,
+            value,
+          }));
+          setLiveItems(arr);
         };
 
-        onValue(nodo, handler);
-        unsub = () => off(nodo, "value", handler);
+        paths.forEach((p) => {
+          const nodo = ref(rtdb, p);
+          const handler = (snap) => applySnap(snap);
+          onValue(nodo, handler);
+          cleanups.push(() => off(nodo, "value", handler));
+        });
       } catch (e) {
-        // Silencioso: si falla, seguimos con props.items
         console.warn("[NubeDePalabras] RTDB off/skip:", e?.message || e);
       }
     })();
 
     return () => {
       try {
-        if (typeof unsub === "function") unsub();
+        cleanups.forEach((fn) => fn && fn());
       } catch {}
     };
-  }, [salaCode, rtdbPath]);
+  }, [roomCode, salaCode, rtdbPath]);
 
   // =========================
   // Normaliza/combina datos
@@ -270,6 +281,7 @@ export default function NubeDePalabras({
     </div>
   );
 }
+
 
 
 

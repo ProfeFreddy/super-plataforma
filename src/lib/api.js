@@ -1,13 +1,34 @@
 // src/lib/api.js 
 import axios from "axios";
-
+import { API_BASE } from "../utils/apiBase";
 /**
  * Base para endpoints relativos. Si tienes VITE_PROXY_BASE, Ãºsala.
  * Si no, dejamos "" y Vite harÃ¡ proxy segÃºn tu vite.config.js.
  */
+// ⬇️ ya importado arriba: export const MINEDUC_ENABLED = ...
+
+export async function buscarAsignaturaMineduc(params) {
+  if (!MINEDUC_ENABLED) {
+    console.debug("[MINEDUC] OFF → skip fetch (CORS bloqueado en browser)");
+    // Devuelve una forma compatible con tu UI
+    return { ok: false, offline: true, items: [] };
+  }
+
+  // ⬇️ TU CÓDIGO ORIGINAL (no lo borres)
+  // const url = `https://curriculumnacional.mineduc.cl/api/v1/oa/buscar?...`;
+  // const res = await fetch(url, { headers: { ... } });
+  // const data = await res.json();
+  // return data;
+}
+
 const BASE = import.meta.env.VITE_API_BASE || "/api";
 // Un Ãºnico cliente axios.
 // Nota: para URLs absolutas (https://...), axios ignora baseURL â€” perfecto.
+// 🔒 Flag global (no borres tu código existente)
+export const MINEDUC_ENABLED =
+  (import.meta?.env?.VITE_MINEDUC_PROXY_ENABLED === "true") ||
+  (typeof localStorage !== "undefined" && localStorage.getItem("__MINEDUC_ON") === "1");
+
 export const api = axios.create({
   baseURL: BASE,      // ej: "", "/api" o "http://localhost:8080"
   timeout: 30000,

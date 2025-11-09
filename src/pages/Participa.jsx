@@ -1,4 +1,3 @@
-// src/pages/Participa.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { db, rtdb, auth } from "../firebase";
 import {
@@ -18,6 +17,10 @@ import {
   serverTimestamp as rServerTimestamp,
 } from "firebase/database";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { useLocation, useParams } from "react-router-dom";
+
+/* ───────────────── PRAGMA: frase motivacional ───────────────── */
+const PRAGMA_MOTTO = "De un profe para los profes — PRAGMA";
 
 /* ───────────────── Auth: guard liviano (evita pantallas en blanco) ─────────── */
 function useAnonReady() {
@@ -74,6 +77,15 @@ function sanitizeSalaCode(raw) {
     .split("/").pop()
     .trim()
     .replace(/[^A-Za-z0-9_-]/g, "");
+}
+
+/* 🔧 Patch robusto: acepta pin desde ruta (/sala/:code) o query (?code=...) */
+function usePin() {
+  const { code: pinParam } = useParams();
+  const loc = useLocation();
+  const q = new URLSearchParams(loc.search);
+  const pinQuery = q.get("code") || q.get("pin") || q.get("p");
+  return sanitizeSalaCode(pinParam || pinQuery || "");
 }
 
 /* ───────────────── Estilos ───────────────── */
@@ -143,10 +155,11 @@ function getDeviceId() {
 export default function Participa() {
   const ready = useAnonReady(); // <- clave
   const q = useQuery();
+  const pinFromRoute = usePin();
 
   const mode = (q.get("m") || "").toLowerCase() === "asis" ? "asis" : "cloud";
   const initialCodeRaw =
-    q.get("code") || q.get("sala") || extractSalaFromHash() || "";
+    pinFromRoute || q.get("code") || q.get("sala") || extractSalaFromHash() || "";
   const initialCode = sanitizeSalaCode(initialCodeRaw);
   const initialSlot = q.get("slot") || "";
   const initialYW = q.get("yw") || "";
@@ -154,6 +167,14 @@ export default function Participa() {
   const [salaCode, setSalaCode] = useState(initialCode);
   const [slotId, setSlotId] = useState(initialSlot);
   const [yearWeek, setYearWeek] = useState(initialYW);
+
+  /* Sincroniza cambios de la ruta /sala/:code en caliente */
+  useEffect(() => {
+    if (pinFromRoute && pinFromRoute !== salaCode) {
+      setSalaCode(pinFromRoute);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinFromRoute]);
 
   useEffect(() => {
     const cleaned = sanitizeSalaCode(salaCode);
@@ -209,7 +230,7 @@ export default function Participa() {
   const canSendAsis =
     salaCode.trim().length > 0 && Number.isFinite(parseInt(numeroLista, 10));
 
-  // Últimos (FS principal + fallback RTDB)
+  // Últimos (FS principal + fallbacks RTDB rooms/words y legacy salas/palabras)
   const [ultimos, setUltimos] = useState([]);
   useEffect(() => {
     if (!salaCode) return;
@@ -236,12 +257,34 @@ export default function Participa() {
       () => {}
     );
 
-    const rPath = rRef(rtdb, `salas/${salaCode}/palabras`);
-    const unsubRT = rOnValue(rPath, (snap) => {
+    // RTDB estándar
+    const rPathStd = rRef(rtdb, `rooms/${salaCode}/words`);
+    const unsubRT1 = rOnValue(rPathStd, (snap) => {
       const val = snap.val() || {};
       const rows = Object.entries(val).map(([id, v]) => ({
         id,
-        ...v,
+        texto: v?.texto || v?.t || v?.text || "",
+        numeroLista: v?.numeroLista || null,
+        ts: typeof v?.ts === "number" ? v.ts : 0,
+      }));
+      if (rows.length && ultimos.length === 0) {
+        setUltimos(
+          rows
+            .filter((x) => (x.texto || "").trim())
+            .sort((a, b) => b.ts - a.ts)
+            .slice(0, 5)
+        );
+      }
+    });
+
+    // RTDB legacy (compat)
+    const rPathLegacy = rRef(rtdb, `salas/${salaCode}/palabras`);
+    const unsubRT2 = rOnValue(rPathLegacy, (snap) => {
+      const val = snap.val() || {};
+      const rows = Object.entries(val).map(([id, v]) => ({
+        id,
+        texto: v?.texto || v?.t || v?.text || "",
+        numeroLista: v?.numeroLista || null,
         ts: typeof v?.ts === "number" ? v.ts : 0,
       }));
       if (rows.length && ultimos.length === 0) {
@@ -256,7 +299,8 @@ export default function Participa() {
 
     return () => {
       unsubFS();
-      unsubRT();
+      unsubRT1();
+      unsubRT2();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [salaCode]);
@@ -314,8 +358,17 @@ export default function Participa() {
         ts: Date.now(),
         serverTs: rServerTimestamp(),
       };
-      const refRT = rRef(rtdb, `salas/${salaCode}/palabras`);
-      await rSet(rPush(refRT), payloadRT);
+
+      // RTDB estándar
+      try {
+        const refRT1 = rRef(rtdb, `rooms/${salaCode}/words`);
+        await rSet(rPush(refRT1), payloadRT);
+      } catch {}
+      // RTDB legacy (compatibilidad)
+      try {
+        const refRT2 = rRef(rtdb, `salas/${salaCode}/palabras`);
+        await rSet(rPush(refRT2), payloadRT);
+      } catch {}
 
       setTextWord("");
       markSend();
@@ -401,6 +454,11 @@ export default function Participa() {
         gap: 8,
       }}
     >
+      {/* Frase PRAGMA */}
+      <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>
+        {PRAGMA_MOTTO}
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
         <div>
           <div style={{ fontSize: 12, color: COLORS.muted }}>Código de sala</div>
@@ -455,6 +513,17 @@ export default function Participa() {
     </div>
   );
 
+  // Mensaje minimal si falta código
+  const MissingCode = (
+    <div style={{ ...card, textAlign: "left" }}>
+      <h2 style={{ marginTop: 0 }}>Falta el código de sala</h2>
+      <p>
+        Abre con <code>#/sala/38619</code> o <code>#/sala?code=38619</code> o escribe el
+        código en el cuadro superior.
+      </p>
+    </div>
+  );
+
   return (
     <div style={pageStyle}>
       <div style={{ ...card, marginBottom: 16 }}>
@@ -494,11 +563,14 @@ export default function Participa() {
         )}
       </div>
 
-      {mode === "asis" ? (
+      {!salaCode ? (
+        MissingCode
+      ) : mode === "asis" ? (
         <div style={card}>
           <h2 style={{ marginTop: 0 }}>🟢 Asistencia</h2>
           <p style={{ color: COLORS.muted, marginTop: 0 }}>
-            Presiona el botón para registrar tu asistencia. Asegúrate de haber ingresado tu <b>número de lista</b>.
+            Presiona el botón para registrar tu asistencia. Asegúrate de haber ingresado tu{" "}
+            <b>número de lista</b>.
           </p>
           <button
             disabled={!canSendAsis || loading || !salaCode}
@@ -584,6 +656,7 @@ export default function Participa() {
     </div>
   );
 }
+
 
 
 

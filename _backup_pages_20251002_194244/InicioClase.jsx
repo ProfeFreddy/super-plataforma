@@ -53,6 +53,12 @@ function getNowForSchedule() {
   return FORCE_TEST_TIME ? new Date(TEST_DATETIME_ISO) : new Date();
 }
 
+// Asegura base correcta aun con # hash
+const base = window.location.origin;
+const participaURL           = `${base}/#/sala/${salaCode}`;
+const participaURLAsistencia = `${base}/#/asistencia/${salaCode}`;
+const joinURL                = `${base}/#/join/${salaCode}`;
+
 /* ✅ Fallback seguro para el contexto (sin hooks) */
 const PLAN_DEFAULTS = {
   user: null,
@@ -220,6 +226,7 @@ async function readHorarioMatrix(uid) {
   }
   return null;
 }
+
 
 // 🔢 helpers para calcular el slot actual usando horarioConfig.marcas
 const colDeHoy = () => {

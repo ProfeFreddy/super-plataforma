@@ -1,4 +1,4 @@
-﻿// src/pages/CierreClase.jsx
+﻿// src/pages/CierreClase.jsx 
 import React, {
   useEffect,
   useState,
@@ -72,7 +72,7 @@ function useAuthSafe() {
         }
       } catch (err) {
         console.error("[CierreClase] useAuthSafe error:", err);
-        setUserObj(u || null);
+        setUserObj(null); // FIX: antes intentaba usar 'u' que no existe en este scope
         // fallback: si ya hay uid guardado en localStorage consideramos "ready"
         if (localStorage.getItem("uid")) {
           setReady(true);
@@ -1988,6 +1988,7 @@ export default function CierreClase({ duracion = 10 }) {
     </div>
   );
 }
+
 
 
 

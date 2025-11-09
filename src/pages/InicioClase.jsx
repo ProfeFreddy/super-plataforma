@@ -1,4 +1,4 @@
-// InicioClase.jsx 
+// InicioClase.jsx    
 import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import QRCode from "react-qr-code";
@@ -32,6 +32,9 @@ import { getPrimerOA } from "../services/curriculoService";
 
 // ✅ NUEVO: Cronómetro global reutilizable
 import CronometroGlobal from "../components/CronometroGlobal";
+
+/* ======== SHOWTIME PRESET (import) ======== */
+import { SHOWTIME_PRESET } from "../lib/cloudPresets";
 
 /* =========================================================
    NUEVO: helpers comunes para navegación "segura"
@@ -2228,14 +2231,28 @@ function InicioClase() {
                     </CloudBoundary>
                   </div>
                 ) : (
-                  // NUEVO renderer “tipo Mentimeter”
+                  // NUEVO renderer “tipo Mentimeter” + SHOWTIME
                   <NubeDePalabras
                     items={cloudMentData}
                     palette="menti"     // "menti" | "pastel" | "warm" | "cool"
-                    minFont={20}
-                    maxFont={88}
+                    minFont={(SHOWTIME_PRESET?.fontSizes?.[0]) ?? 20}
+                    maxFont={(SHOWTIME_PRESET?.fontSizes?.[1]) ?? 88}
                     animate
                     darkBg={false}
+                    /* SHOWTIME extras (no rompen si el componente las ignora) */
+                    preset="showtime"
+                    cloudPreset={SHOWTIME_PRESET}
+                    rotationAggressive
+                    contrastBoost={SHOWTIME_PRESET.contrastBoost}
+                    angles={SHOWTIME_PRESET.rotate?.angles}
+                    colors={SHOWTIME_PRESET.colors}
+                    fontFamily={SHOWTIME_PRESET.fontFamily}
+                    fontWeight={SHOWTIME_PRESET.fontWeight}
+                    spiral={SHOWTIME_PRESET.spiral}
+                    shuffle={SHOWTIME_PRESET.shuffle}
+                    padding={SHOWTIME_PRESET.padding}
+                    /* 🔗 Nuevo: también escucha RTDB en salas/{salaCode}/palabras */
+                    salaCode={salaCode}
                   />
                 )}
               </>

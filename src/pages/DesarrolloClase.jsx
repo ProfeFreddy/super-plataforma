@@ -10,6 +10,14 @@ import React, {
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { db } from "../firebase";
+import { MINEDUC_ENABLED } from "../lib/api";
+
+import {
+  buscarAsignaturaMineduc,
+  buscarUnidadMineduc,
+  buscarHabilidadesMineduc,
+} from "../lib/api";
+
 import {
   getDoc,
   doc,
@@ -19,19 +27,22 @@ import {
   where,
 } from "firebase/firestore"; // +collection/getDocs/query/where
 import CronometroGlobal from "../components/CronometroGlobal";
+import { subscribeEmergency } from "../services/emergencyService"; // ✅ QUEDA ESTA
+import HTMLFlipBook from "react-pageflip"; // ✅ QUEDA ESTA
 import FichaClaseSticky from "../components/FichaClaseSticky";
 import { PlanContext } from "../context/PlanContext";
 import { PLAN_CAPS } from "../lib/planCaps";
 
 /* ---- PDF (react-pdf) ---- */
 import { Document, Page, pdfjs } from "react-pdf";
-// Usar rutas sin `/esm/` para tu versión:
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-/* CAMBIO: importar el worker existente (.min.js) y asignarlo (orden correcto) */
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.js?url";
-pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+/* Worker estable por CDN (evita diferencias de ruta entre versiones) */
+pdfjs.GlobalWorkerOptions.workerSrc =
+  "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+
+import { ensurePdfJs } from "../lib/pdfSafe";
 
 // --- helper para pedir JSON sin headers raros (evita preflight) ---
 async function fetchJSON(url) {
@@ -40,27 +51,12 @@ async function fetchJSON(url) {
   return r.json();
 }
 
-/* ===== Copias originales (NO eliminadas) — comentadas para evitar colisión ===== */
-// import "react-pdf/dist/Page/AnnotationLayer.css";
-// import "react-pdf/dist/Page/TextLayer.css";
-// import pdfWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
-// pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
-//
-// /* FIX: usa las rutas sin `esm` (tu paquete no trae esa carpeta) */
-// import "react-pdf/dist/Page/AnnotationLayer.css";
-// import "react-pdf/dist/Page/TextLayer.css";
-// import pdfWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
-// pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
-
 /* ADICIONAL */
 import { getClaseVigente, getYearWeek } from "../services/PlanificadorService";
 
 /* auth para garantizar sesión antes de tocar Firestore */
 import { auth } from "../firebase";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
-
-/* Flipbook */
-import HTMLFlipBook from "react-pageflip";
 
 /* 🔁 CAMBIO API_BASE: import base dinámica para llamadas a serverless */
 import { API_BASE } from "../utils/apiBase";
@@ -76,20 +72,6 @@ const PROXY_BASE =
   (typeof window !== "undefined"
     ? `${window.location.origin}/api`
     : "http://localhost:8080");
-
-/* ⛔ Bloque que rompía el build (dejado como referencia, pero comentado):
-// Ejemplo en Inicio/Desarrollo/Cierre:
-const { auth: authFromHook } = typeof useAuthX === "function"
-  ? useAuthX()
-  : { auth: null };
-
-const user = (authFromHook || auth)?.currentUser;
-// si además cargas perfil Firestore (profesores/{uid}):
-// const perfil = ... nombre leído desde Firestore
-const nombre = user?.displayName || perfil?.nombre || "Profesor/a";
-
-<h2>Hola, {nombre}</h2>
-*/
 
 /* helpers de tiempo/slot para demo (?at=HH:MM&dow=1..5) */
 const FORCE_TEST_TIME = false;
@@ -308,7 +290,6 @@ function asigToSlug(asig = "") {
 }
 
 function nivelToApi(cursoStr = "", prefer = "") {
-  // si dice "basico" -> basica, si no -> media
   const s = norm(cursoStr || prefer);
   if (/basico|basica/i.test(s)) return "basica";
   return "media";
@@ -334,7 +315,6 @@ function slotFromQuery() {
 /* ===============================
    CONFIG: catálogos de Apps
    =============================== */
-// (Se conserva, no se elimina)
 const APP_GROUPS = {
   Generales: [
     { id: "youtube", name: "YouTube", url: "https://youtube.com", icon: "YT", embed: true },
@@ -462,33 +442,16 @@ const appTitle = { fontWeight: 800, fontSize: 14, lineHeight: 1.15, color: COLOR
 const appGroupLabel = { fontSize: 11, color: COLORS.textMuted };
 
 /* ===============================
-   *** BLOQUE DUPLICADO ORIGINAL — LO MANTENGO COMENTADO ***
-   (Esto evitaba compilar por imports y export duplicados)
-   ======================================================================
-   // ... Aquí venía nuevamente TODO el encabezado de imports y constantes ...
-   // ... junto con otro 'export default function DesarrolloClase(...)' ...
-   // Para preservar tu contenido sin ELIMINAR, queda comentado:
-   ======================================================================
-
-   // src/pages/DesarrolloClase.jsx
-   // import React, { useEffect, useState, useRef, useContext, useLayoutEffect } from "react";
-   // import { useNavigate, useLocation } from "react-router-dom";
-   // import { api } from "../lib/api";
-   // import React, { useEffect, useState, useRef, useContext, useLayoutEffect, useMemo } from "react";
-   // import { useNavigate, useLocation } from "react-router-dom";
-   // import { api } from "../lib/api";
-   // import { db } from "../firebase";
-   // import { getDoc, doc, collection, getDocs, query, where } from "firebase/firestore"; // +collection/getDocs/query/where
-   // ...
-   // export default function DesarrolloClase({ duracion = 30, onIrACierre }) { ... }
-*/
-
-/* ===============================
-   COMPONENTE PRINCIPAL (única exportación activa)
+   COMPONENTE PRINCIPAL
    =============================== */
 export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // FIX: mover a dentro del componente (los hooks no van a nivel de módulo)
+  useEffect(() => {
+    ensurePdfJs().catch(console.warn);
+  }, []);
 
   // useContext dentro del componente
   const planCtx = useContext(PlanContext) || {};
@@ -514,6 +477,9 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   // detalle clase
   const [objetivo, setObjetivo] = useState("");
   const [habilidades, setHabilidades] = useState("");
+
+  // NUEVO: estado de emergencia (lectura live)
+  const [emergency, setEmergency] = useState(null);
 
   // herramientas rápidas
   const [ytQuery, setYtQuery] = useState("");
@@ -632,7 +598,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
         return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(u)}`;
       }
 
-      // CAMBIO: Wikipedia ya NO usa readerWrap (para que se vea como Wikipedia)
+      // Wikipedia directa
       if (parsed.hostname.includes("wikipedia.org")) return u;
     } catch {
       return ytEmbedFromQuery(urlOrQuery);
@@ -762,7 +728,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
 
   const handleOpenYouTubeIcon = () => handleOpenYouTube();
 
-  // CAMBIO: abrir Wikipedia DIRECTA (sin readerWrap)
+  // Wikipedia DIRECTA
   const handleOpenWikipedia = () => {
     if (wikipediaUrl) trySetMain(wikipediaUrl);
     else trySetMain("https://es.wikipedia.org");
@@ -794,6 +760,15 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
     });
     return () => unsub();
   }, []);
+
+  /* NUEVO: suscripción live a Clase de Emergencia (cuando ya hay sesión) */
+  useEffect(() => {
+    if (!authed) return;
+    const uid = auth.currentUser?.uid || localStorage.getItem("uid");
+    if (!uid) return;
+    const off = subscribeEmergency(uid, setEmergency);
+    return () => off && off();
+  }, [authed]);
 
   /* preferir lo que venga desde Inicio (state) */
   useEffect(() => {
@@ -842,6 +817,77 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
     } catch {}
   }, []); // eslint-disable-line
 
+  // ====== ESTADOS NUEVOS PARA OA/UNIDAD/HABILIDADES (MINEDUC) ======
+  const [oaData, setOaData] = useState(null);       // Objetivos / OA
+  const [unidadData, setUnidadData] = useState(null);
+  const [habData, setHabData] = useState(null);     // Habilidades
+
+  // ====== FUNCIONES QUE ME PEDISTE PEGAR (DENTRO DEL COMPONENTE) ======
+  async function cargarOA(params) {
+    try {
+      if (!MINEDUC_ENABLED) {
+        console.debug("[MINEDUC] OFF → skip OA");
+        setOaData((prev) => prev ?? { items: [] });
+        return;
+      }
+      const data = await buscarAsignaturaMineduc(params); // ← tus params reales
+      setOaData(data);
+    } catch (err) {
+      console.warn("[MINEDUC] OA error/controlado:", err);
+      setOaData((prev) => prev ?? { items: [] });
+    }
+  }
+
+  async function cargarUnidad(params) {
+    try {
+      if (!MINEDUC_ENABLED) {
+        console.debug("[MINEDUC] OFF → skip Unidad");
+        setUnidadData((prev) => prev ?? { items: [] });
+        return;
+      }
+      const data = await buscarUnidadMineduc(params);
+      setUnidadData(data);
+    } catch (err) {
+      console.warn("[MINEDUC] Unidad error/controlado:", err);
+      setUnidadData((prev) => prev ?? { items: [] });
+    }
+  }
+
+  async function cargarHabilidades(params) {
+    try {
+      if (!MINEDUC_ENABLED) {
+        console.debug("[MINEDUC] OFF → skip Habilidades");
+        setHabData((prev) => prev ?? { items: [] });
+        return;
+      }
+      const data = await buscarHabilidadesMineduc(params);
+      setHabData(data);
+    } catch (err) {
+      console.warn("[MINEDUC] Habilidades error/controlado:", err);
+      setHabData((prev) => prev ?? { items: [] });
+    }
+  }
+
+  // Disparador para poblar catálogos MINEDUC sin romper tu flujo actual
+  useEffect(() => {
+    const unidadParaOA = (location?.state?.clase?.unidad || unidad || "").trim();
+    const asigForOA = (location?.state?.clase?.asignatura || asignatura || "Matemática").trim();
+    const cursoForOA = (location?.state?.clase?.curso || curso || "").trim();
+
+    if (!unidadParaOA && !asigForOA && !cursoForOA) return;
+
+    const params = {
+      asignatura: asigToSlug(asigForOA),
+      nivel: nivelToApi(cursoForOA, claseVigente?.nivel || ""),
+      unidad: unidadParaOA,
+    };
+    // No afectan tu render actual: solo llenan oaData/unidadData/habData
+    cargarOA(params);
+    cargarUnidad(params);
+    cargarHabilidades(params);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asignatura, curso, unidad, MINEDUC_ENABLED]);
+
   // carga datos base + OA + Wikipedia (por unidad, con fallback objetivo)
   useEffect(() => {
     if (!authed) return;
@@ -870,10 +916,9 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           const uref = doc(db, "usuarios", uid);
           const usnap = await getDoc(uref);
           if (usnap.exists()) {
-            const udata = usnap.data() || {};
-            // nombre si aún no lo tenemos
+            const u = usnap.data() || {};
             if (nombreProfesor === "Profesor") {
-              const nombreU = udata.nombre || udata.nombreCompleto || null;
+              const nombreU = u.nombre || u.nombreCompleto || null;
               if (nombreU) setNombreProfesor(nombreU);
             }
           }
@@ -1010,7 +1055,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             console.warn("[Desarrollo] clases_detalle fallback:", e?.code || e);
         }
 
-        // OA + Wikipedia (por UNIDAD; luego habrá un efecto por OBJETIVO)
+        // OA + Wikipedia (flujo existente)
         const unidadParaOA = location?.state?.clase?.unidad || unidadInicial || unidad || "";
         const asigForOA = location?.state?.clase?.asignatura || asignatura || "Matemática";
         const cursoForOA = location?.state?.clase?.curso || curso || "";
@@ -1020,7 +1065,6 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           const nivelApi = nivelToApi(cursoForOA, claseVigente?.nivel || "");
 
           try {
-            // 🔁 CAMBIO API_BASE: usar base dinámica
             const proxyUrl = `${API_BASE}/mineduc?asignatura=${encodeURIComponent(
               asigSlug
             )}&nivel=${encodeURIComponent(nivelApi)}&unidad=${encodeURIComponent(unidadParaOA)}`;
@@ -1054,10 +1098,10 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             let lang = "es";
 
             const wikiSearchEs = await api.get(
-  `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-    q1
-  )}&format=json&origin=*`
-);
+              `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+                q1
+              )}&format=json&origin=*`
+            );
 
             firstTitle = wikiSearchEs?.data?.query?.search?.[0]?.title || "";
             lang = "es";
@@ -1202,10 +1246,10 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
         let lang = "es";
 
         const wikiSearchEs = await api.get(
-  `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-    q1
-  )}&format=json&origin=*`
-);
+          `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+            q
+          )}&format=json&origin=*`
+        );
 
         firstTitle = wikiSearchEs?.data?.query?.search?.[0]?.title || "";
 
@@ -1219,7 +1263,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           if (firstTitle) lang = "en";
         }
 
-        if (!firstTitle) return; // si no hay resultados, no sobreescribimos
+        if (!firstTitle) return;
 
         const base = lang === "es" ? "https://es.wikipedia.org" : "https://en.wikipedia.org";
         const full = `${base}/wiki/${encodeURIComponent(firstTitle)}`;
@@ -1324,7 +1368,6 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
     setGenMsg("Generando modelo…");
 
     try {
-      // 🔁 CAMBIO API_BASE: usar base dinámica
       const r = await fetch(`${API_BASE}/shape/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1537,11 +1580,41 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   };
   const subtle = { fontSize: 12, color: COLORS.textMuted };
 
-  // NUEVO: oculta los íconos duplicados (YouTube/GeoGebra/Desmos/PhET/Drive/Wiki)
-  const SHOW_DUPLICATE_APP_ICONS = false;
+  // ======= Overrides de vista si hay EMERGENCIA activa =======
+  const unidadShown = emergency?.active ? (emergency.unidad || unidad) : unidad;
+  const objetivoShown = emergency?.active ? (emergency.objetivo || objetivo) : objetivo;
+  const habilidadesShown = emergency?.active
+    ? (Array.isArray(emergency.habilidades) ? emergency.habilidades.join(", ") : emergency.habilidades || habilidades)
+    : habilidades;
 
   return (
     <div style={page}>
+      {/* Banner de Clase de Emergencia (si corresponde) */}
+      {emergency?.active && (
+        <div
+          style={{
+            ...card,
+            marginBottom: "1rem",
+            border: "1px solid #fecaca",
+            background: "linear-gradient(90deg, #fee2e2, #ffffff)",
+          }}
+        >
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ background:'#fee2e2', color:'#991b1b', borderRadius:999, padding:'4px 10px', fontWeight:800 }}>
+              🔴 Emergencia activa
+            </span>
+            {emergency?.language && (
+              <span style={{ background:'#e0f2fe', color:'#075985', borderRadius:999, padding:'4px 10px', fontWeight:700 }}>
+                🌐 {String(emergency.language).toUpperCase()}
+              </span>
+            )}
+            <span style={{ color: COLORS.textDark }}>
+              <b>{emergency.unidad || "(sin unidad)"}</b> — {emergency.objetivo || "(sin objetivo)"}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ADICIONAL: Banner de clase vigente */}
       {claseVigente && (
         <div
@@ -1589,15 +1662,20 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             Unidad
           </div>
           <div style={{ marginBottom: 6 }}>
-            <strong>{unidad || "(sin unidad)"} </strong>
+            <strong>{unidadShown || "(sin unidad)"} </strong>
+            {emergency?.active && emergency?.language && (
+              <span style={{ marginLeft: 8, background:'#e0f2fe', color:'#075985', borderRadius:999, padding:'2px 8px', fontSize:12 }}>
+                🌐 {String(emergency.language).toUpperCase()}
+              </span>
+            )}
           </div>
 
           {/* Objetivo y Habilidades */}
           <div style={{ marginBottom: 6 }}>
-            <strong>Objetivo:</strong> {objetivo || "(sin objetivo)"}
+            <strong>Objetivo:</strong> {objetivoShown || "(sin objetivo)"}
           </div>
           <div>
-            <strong>Habilidades:</strong> {habilidades || "(sin habilidades)"}
+            <strong>Habilidades:</strong> {habilidadesShown || "(sin habilidades)"}
           </div>
 
           {oaMinisterio && (
@@ -1624,6 +1702,30 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           </div>
         </div>
       </div>
+
+      {/* Bloque de fases de EMERGENCIA (Desarrollo) */}
+      {emergency?.active && emergency?.fases?.desarrollo && (
+        <div
+          style={{
+            ...card,
+            border: "1px dashed #ef4444",
+            background: "#fff",
+            marginBottom: "1rem",
+          }}
+        >
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <strong>🔴 Emergencia — Desarrollo:</strong>
+            {emergency?.language && (
+              <span style={{ background:'#e0f2fe', color:'#075985', borderRadius:999, padding:'2px 8px', fontSize:12 }}>
+                🌐 {String(emergency.language).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <p style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
+            {emergency.fases.desarrollo}
+          </p>
+        </div>
+      )}
 
       {/* Contenido principal */}
       <div style={{ ...card, textAlign: "center", marginBottom: "1rem" }}>
@@ -1731,9 +1833,9 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             </button>
           </div>
 
-          {/* barra de íconos — Duplicados ocultos */}
+          {/* barra de íconos */}
           <div style={iconsRow}>
-            {/* Presentar (se mantiene) */}
+            {/* Presentar */}
             <button
               style={iconBtn}
               onClick={presentChooser}
@@ -1742,24 +1844,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
               <IconPresent />
             </button>
 
-            {/* Duplicados ocultos (NO eliminados) */}
-            <button style={{ ...iconBtn, display: "none" }} onClick={presentChooser}>
-              <IconPresent />
-            </button>
-            <button style={{ ...iconBtn, display: "none" }} onClick={presentChooser}>
-              <IconPresent />
-            </button>
-            <button style={{ ...iconBtn, display: "none" }} onClick={presentChooser}>
-              <IconPresent />
-            </button>
-            <button style={{ ...iconBtn, display: "none" }} onClick={presentChooser}>
-              <IconPresent />
-            </button>
-            <button style={{ ...iconBtn, display: "none" }} onClick={presentChooser}>
-              <IconPresent />
-            </button>
-
-            {/* accesos 3D (se mantienen) */}
+            {/* accesos 3D */}
             <button style={iconBtn} onClick={openShapE} title="Shap-E (texto→3D)">
               <img src={ico("huggingface.co")} alt="Shap-E" style={iconImg} />
             </button>
@@ -2063,7 +2148,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           >
             <h3 style={{ margin: 0 }}>📚 Introducción (Wikipedia)</h3>
             <div style={subtle}>
-              Relacionado con: <strong>{unidad || objetivo || "la temática de la clase"}</strong>
+              Relacionado con: <strong>{unidadShown || objetivoShown || "la temática de la clase"}</strong>
             </div>
           </div>
 
@@ -2105,12 +2190,12 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
         </div>
       )}
 
-      {/* Artículo de Wikipedia embebido (bonito, sin readerWrap) */}
+      {/* Artículo de Wikipedia embebido (directo) */}
       {wikipediaUrl && (
         <div style={{ ...card }}>
           <h3 style={{ marginTop: 0, textAlign: "center" }}>📚 Información complementaria</h3>
           <iframe
-            src={wikipediaUrl} // directo, sin r.jina.ai
+            src={wikipediaUrl}
             width="100%"
             height="420"
             title="Contenido Wikipedia"
@@ -2127,4 +2212,3 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
     </div>
   );
 }
-

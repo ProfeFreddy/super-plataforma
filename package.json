@@ -4,23 +4,37 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:web": "vite --host --port 5174",
-    "web": "vite --host --port 5174",
-    "api": "nodemon server/server.js",
-    "dev": "concurrently -n FRONT,API -c green,cyan \"vite --host --port 5174\" \"nodemon server/server.js\"",
-    "build": "vite build",
-    "preview": "vite preview --port 5174"
+    "dev": "vite",
+    "build": "cross-env ROLLUP_SKIP_NODEJS_NATIVE=true vite build",
+    "preview": "vite preview --port 4173"
   },
-  "keywords": [],
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "firebase": "^10.14.0",
+    "framer-motion": "^11.0.0",
+    "pdfjs-dist": "^5.4.394",
+    "react": "^18.3.1",
+    "react-d3-cloud": "1.0.6",
+    "react-dom": "^18.3.1",
+    "react-pageflip": "^2.0.3",
+    "react-pdf": "^10.2.0",
+    "react-qr-code": "^2.0.12",
+    "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",
     "concurrently": "^8.2.2",
-    "nodemon": "^3.1.0",
+    "cross-env": "^10.1.0",
+    "nodemon": "^3.1.10",
     "vite": "^5.4.0"
-  }
+  },
+  "engines": {
+    "node": "20.x",
+    "npm": ">=10"
+  },
+  "packageManager": "npm@10.9.0"
 }
+
 

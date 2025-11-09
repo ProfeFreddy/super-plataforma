@@ -91,10 +91,10 @@ const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentSingleTabManager(),
   }),
-  // Transporte a prueba de firewalls que rompen HTTP/3/QUIC
-  experimentalAutoDetectLongPolling: true,
-  experimentalForceLongPolling: true,   // ✅ añadido: fuerza long-polling si hace falta
-  useFetchStreams: false,               // evita fetch streaming que a veces rompe
+  // Transporte a prueba de firewalls
+  experimentalAutoDetectLongPolling: true, // ✅ dejamos autodetección
+  // experimentalForceLongPolling: true,   // ⛔ NO puede convivir con la línea de arriba (se deja comentado)
+  useFetchStreams: false,                 // evita fetch streaming que a veces rompe
 });
 
 const functions = getFunctions(app, "southamerica-east1");
@@ -173,6 +173,7 @@ export async function callFlowCreateV2(payload) {
     };
   }
 }
+
 
 
 

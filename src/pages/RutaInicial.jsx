@@ -1,14 +1,19 @@
-// src/pages/RutaInicial.jsx
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { getClaseVigente } from "../services/PlanificadorService";
 import Home from "./Home";
 
 /*
   RutaInicial (ruta "/"):
   - Visitante o sesión anónima → muestra <Home /> (landing).
-  - Usuario autenticado “real” (no anónimo) → redirige a /InicioClase.
+  - Usuario autenticado “real” (no anónimo):
+      * si perfil incompleto → /registro
+      * si no tiene horario → /horario
+      * si tiene horario y hay clase activa → /InicioClase
+      * si tiene horario y NO hay clase activa → /proximas-clases
   - Respeta overrides por query (?go=horario | ?go=inicio) y flags de registro.
 */
 
@@ -20,17 +25,18 @@ export default function RutaInicial() {
   const [userInfo, setUserInfo] = React.useState({
     hasUser: false,
     isAnon: false,
+    uid: null,
   });
 
   const unsubRef = React.useRef(null);
 
-  // ✅ Este helper evita saltos múltiples en el mismo tick
+  // ✅ helper evita saltos múltiples en el mismo tick
   const goOnce = React.useCallback(
-    (path) => {
+    (path, state) => {
       if (window.__ROUTE_JUMPING__) return;
       window.__ROUTE_JUMPING__ = true;
       try {
-        navigate(path, { replace: true });
+        navigate(path, { replace: true, state });
       } finally {
         setTimeout(() => {
           window.__ROUTE_JUMPING__ = false;
@@ -77,9 +83,9 @@ export default function RutaInicial() {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (!alive) return;
       if (u) {
-        setUserInfo({ hasUser: true, isAnon: !!u.isAnonymous });
+        setUserInfo({ hasUser: true, isAnon: !!u.isAnonymous, uid: u.uid });
       } else {
-        setUserInfo({ hasUser: false, isAnon: false });
+        setUserInfo({ hasUser: false, isAnon: false, uid: null });
       }
       setReady(true);
     });
@@ -92,21 +98,62 @@ export default function RutaInicial() {
     };
   }, []);
 
-  // ===== Redirección automática SOLO en "/" y solo si es user real =====
+  // ===== Redirección con reglas de negocio =====
   React.useEffect(() => {
     if (!ready || !isRoot) return;
 
+    // Demo opcional
     const params = new URLSearchParams(location.search || "");
-    const forceGo = params.get("autogo") === "1"; // demo opcional
+    const forceGo = params.get("autogo") === "1";
 
-    if (userInfo.hasUser && !userInfo.isAnon) {
-      goOnce("/InicioClase");
+    // Si no hay usuario → Home
+    if (!userInfo.hasUser) return;
+
+    // Si es anónimo: solo permitimos “autogo” explícito a InicioClase (demo)
+    if (userInfo.isAnon) {
+      if (forceGo) goOnce("/InicioClase");
       return;
     }
-    // Demo: permite saltar a la clase con sesión anónima si ?autogo=1
-    if (forceGo && (userInfo.hasUser || userInfo.isAnon)) {
-      goOnce("/InicioClase");
-    }
+
+    // Usuario real (no anónimo): aplicamos la secuencia
+    (async () => {
+      try {
+        const uref = doc(db, "usuarios", String(userInfo.uid));
+        const usnap = await getDoc(uref);
+        const udata = usnap.data() || {};
+
+        // 1) perfil incompleto
+        if (!udata.nombre || !udata.email || !udata.rol) {
+          goOnce("/registro");
+          return;
+        }
+
+        // 2) horario no cargado
+        if (!Array.isArray(udata.horario) || !udata.horario.length) {
+          goOnce("/horario");
+          return;
+        }
+
+        // 3) clase activa?
+        let vigente = null;
+        try {
+          vigente = await getClaseVigente(new Date());
+        } catch {
+          vigente = null;
+        }
+
+        if (vigente && vigente.activa) {
+          goOnce("/InicioClase", { slotId: vigente.slotId, clase: vigente });
+          return;
+        }
+
+        // 4) sin clase activa → próximas
+        goOnce("/proximas-clases");
+      } catch {
+        // fallback seguro
+        goOnce("/InicioClase");
+      }
+    })();
   }, [ready, isRoot, userInfo, location.search, goOnce]);
 
   // ===== Loader breve mientras Auth responde la primera vez =====
@@ -148,6 +195,7 @@ export default function RutaInicial() {
   // Visitante nuevo o sesión anónima → Home (landing pública)
   return <Home />;
 }
+
 
 
 

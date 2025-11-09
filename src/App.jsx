@@ -1,3 +1,4 @@
+// App.jsx
 import React, { Suspense, lazy } from "react";
 import {
   Routes,
@@ -8,10 +9,10 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
+import "./pdf-worker-setup";
 
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { auth } from "./firebase";
-import "./pdf-worker-setup";
 
 import Home from "./pages/Home";
 import Registro from "./pages/Registro";
@@ -196,37 +197,47 @@ class ErrorBoundary extends React.Component {
 function useAuthReady() {
   const [ready, setReady] = React.useState(false);
   const [user, setUser] = React.useState(null);
+
   React.useEffect(() => {
     let alive = true;
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!alive) return;
-      if (!u) {
-        try {
+      try {
+        if (!u) {
           const cred = await signInAnonymously(auth);
           if (!alive) return;
-          setUser(cred.user || null);
+          const usr = cred.user || null;
+          setUser(usr);
+          try {
+            if (usr?.uid) localStorage.setItem("uid", usr.uid);
+          } catch {}
           setReady(true);
-        } catch (err) {
-          console.error("No pude crear sesión anónima", err);
-          if (!alive) return;
-          setUser(null);
+        } else {
+          setUser(u || null);
+          try {
+            if (u?.uid) localStorage.setItem("uid", u.uid);
+          } catch {}
           setReady(true);
         }
-      } else {
-        setUser(u || null);
+      } catch (err) {
+        console.error("No pude crear sesión anónima", err);
+        setUser(null);
         setReady(true);
       }
     });
+
     const t = setTimeout(() => {
       if (!alive) return;
       setReady(true);
     }, 1500);
+
     return () => {
       alive = false;
       clearTimeout(t);
       if (unsub) unsub();
     };
   }, []);
+
   const isAnon = !!user && !!user.isAnonymous;
   const isLoggedIn = !!user && !user.isAnonymous;
   return { ready, user, isAnon, isLoggedIn };
@@ -285,14 +296,12 @@ function DesarrolloRouteWrapper() {
   return <DesarrolloClase duracion={30} onIrACierre={() => navigate("/cierre")} />;
 }
 
-/* ========= NUEVO: Wrappers que MONTAN Participa directamente (sin Navigate) ========= */
+/* ========= Wrappers que MONTAN Participa directamente ========= */
 function SalaWrapper() {
   const { code } = useParams();
   const loc = useLocation();
   const nav = useNavigate();
 
-  // Si llega /sala/:code sin ?code, lo añadimos al query con replace,
-  // pero SIN cambiar de ruta ni de componente (evita pantallas en blanco en móvil).
   React.useEffect(() => {
     const sp = new URLSearchParams(loc.search);
     let changed = false;
@@ -344,17 +353,16 @@ function AsistenciaWrapper() {
 /* ========================================================================= */
 
 /* ─────────────────────────────────────────
-   🔧 HashRedirector (soporte #/ruta)
+   HashRedirector (soporte #/ruta)
    ───────────────────────────────────────── */
 function HashRedirector() {
   const loc = useLocation();
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    // Soporta /#/Ruta y también /algo#/Ruta
     const full = (loc.pathname || "") + (loc.hash || "");
     if (full.includes("#/")) {
-      const target = full.substring(full.indexOf("#") + 1); // desde #
+      const target = full.substring(full.indexOf("#") + 1);
       if (target && target !== loc.pathname) {
         navigate(target, { replace: true });
       }
@@ -365,13 +373,16 @@ function HashRedirector() {
 }
 
 /* ─────────────────────────────────────────
-   🔒 Parche anti-redirecciones a /home mientras debug
+   Parche dev anti-redirecciones a /home
    ───────────────────────────────────────── */
 function ForceInicioClaseDev({ children }) {
   const nav = useNavigate();
   const loc = useLocation();
   React.useEffect(() => {
-    if (loc.pathname === "/home") {
+    const flag =
+      (typeof window !== "undefined" && window.__FORCE_INICIO) ||
+      (typeof localStorage !== "undefined" && localStorage.getItem("__FORCE_INICIO") === "1");
+    if (flag && loc.pathname === "/home") {
       nav("/InicioClase", { replace: true });
     }
   }, [loc.pathname, nav]);
@@ -385,12 +396,20 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Suspense fallback={<div style={{ padding: 16 }}>Cargando…</div>}>
-        {/* ✅ HashRedirector antes de las rutas */}
         <HashRedirector />
         <Routes>
           <Route path="/" element={<RutaInicial />} />
           <Route path="/home" element={<Home />} />
           <Route path="/registro" element={<Registro />} />
+
+          {/* ⛔ Duplicada con la versión con wrapper más abajo. La dejo comentada para conservarla.
+          <Route path="/desarrollo" element={<DesarrolloClase duracion={30} />} />
+          */}
+
+          {/* ⛔ Catch-all simple: comentado porque abajo hay un fallback más completo.
+          <Route path="*" element={<Home />} />
+          */}
+
           <Route
             path="/login"
             element={
@@ -409,7 +428,7 @@ export default function App() {
             }
           />
 
-          {/* ⛑️ Forzado temporal anti-redirect al probar InicioClase */}
+          {/* Forzado temporal anti-redirect al probar InicioClase */}
           <Route
             path="/InicioClase"
             element={
@@ -418,12 +437,18 @@ export default function App() {
               </ForceInicioClaseDev>
             }
           />
+          {/* Compatibilidad con variantes */}
+          <Route path="/inicio" element={<Navigate to="/InicioClase" replace />} />
+          <Route path="/inicioClase" element={<Navigate to="/InicioClase" replace />} />
+          <Route path="/inicioclase" element={<Navigate to="/InicioClase" replace />} />
+          <Route path="/Inicioclase" element={<Navigate to="/InicioClase" replace />} />
 
-          {/* ✅ Compatibilidad con QR/URLs */}
+          {/* Compatibilidad con QR/URLs */}
           <Route path="/sala" element={<Navigate to="/participa" replace />} />
           <Route path="/sala/:code" element={<SalaWrapper />} />
           <Route path="/asistencia/:code" element={<AsistenciaWrapper />} />
 
+          {/* ✅ ÚNICA ruta /desarrollo activa (con wrapper y guard anónimo) */}
           <Route
             path="/desarrollo"
             element={
@@ -432,6 +457,7 @@ export default function App() {
               </RequireAuthAllowAnon>
             }
           />
+
           <Route
             path="/cierre"
             element={
@@ -440,7 +466,9 @@ export default function App() {
               </RequireAuthAllowAnon>
             }
           />
+
           <Route path="/demo" element={<InicioClase />} />
+
           <Route
             path="/horario"
             element={
@@ -457,11 +485,13 @@ export default function App() {
               </AllowAnonWithPlan>
             }
           />
+
           <Route path="/plan-clase" element={<PlanClaseEditor />} />
           <Route path="/planificaciones" element={<Planificaciones />} />
           <Route path="/planes" element={<Planes />} />
           <Route path="/pago" element={<Pago />} />
           <Route path="/confirmacion-pago" element={<ConfirmacionPago />} />
+
           <Route element={<GuardedLayout />}>
             <Route path="/perfil" element={<Perfil />} />
           </Route>
