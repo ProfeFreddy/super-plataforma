@@ -1,54 +1,45 @@
-// src/lib/api.js 
+// src/lib/api.js
 import axios from "axios";
 import { API_BASE } from "../utils/apiBase";
-/**
- * Base para endpoints relativos. Si tienes VITE_PROXY_BASE, Ãºsala.
- * Si no, dejamos "" y Vite harÃ¡ proxy segÃºn tu vite.config.js.
- */
-// ⬇️ ya importado arriba: export const MINEDUC_ENABLED = ...
 
-export async function buscarAsignaturaMineduc(params) {
-  if (!MINEDUC_ENABLED) {
-    console.debug("[MINEDUC] OFF → skip fetch (CORS bloqueado en browser)");
-    // Devuelve una forma compatible con tu UI
-    return { ok: false, offline: true, items: [] };
-  }
+/* ================== FLAGS / CONFIG ================== */
 
-  // ⬇️ TU CÓDIGO ORIGINAL (no lo borres)
-  // const url = `https://curriculumnacional.mineduc.cl/api/v1/oa/buscar?...`;
-  // const res = await fetch(url, { headers: { ... } });
-  // const data = await res.json();
-  // return data;
-}
-
-const BASE = import.meta.env.VITE_API_BASE || "/api";
-// Un Ãºnico cliente axios.
-// Nota: para URLs absolutas (https://...), axios ignora baseURL â€” perfecto.
-// 🔒 Flag global (no borres tu código existente)
+// Habilita llamadas reales al proxy/back-end del MINEDUC.
+// También puede forzarse con localStorage("__MINEDUC_ON" = "1")
 export const MINEDUC_ENABLED =
   (import.meta?.env?.VITE_MINEDUC_PROXY_ENABLED === "true") ||
-  (typeof localStorage !== "undefined" && localStorage.getItem("__MINEDUC_ON") === "1");
+  (typeof localStorage !== "undefined" &&
+    localStorage.getItem("__MINEDUC_ON") === "1");
+
+// Base del API para axios (usa util si existe; cae a env; luego a /api)
+const BASE = API_BASE ?? import.meta.env?.VITE_API_BASE ?? "/api";
+
+/* ================== CLIENTE AXIOS ================== */
 
 export const api = axios.create({
-  baseURL: BASE,      // ej: "", "/api" o "http://localhost:8080"
-  timeout: 30000,
+  baseURL: BASE, // "", "/api" o "https://tu-cloud-run..."
+  timeout: 30_000,
 });
 
-// Opcional: pequeÃ±o log en desarrollo
+// Log de requests en modo dev
 if (import.meta.env?.DEV) {
   api.interceptors.request.use((cfg) => {
-    console.debug("[api]", cfg.method?.toUpperCase(), cfg.baseURL + (cfg.url || ""));
+    try {
+      // Evita loggear credenciales en consola
+      const full = (cfg.baseURL || "") + (cfg.url || "");
+      console.debug("[api]", (cfg.method || "get").toUpperCase(), full);
+    } catch {}
     return cfg;
   });
 }
 
-/* ======== ADITIVOS: robustez de red, sin eliminar nada ======== */
-
-// Header idempotente simple por request (evita dobles compras/acciones en backend)
+// Idempotencia simple por request
 api.interceptors.request.use((cfg) => {
   try {
     const rid =
-      (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+      (typeof crypto !== "undefined" &&
+        crypto.randomUUID &&
+        crypto.randomUUID()) ||
       `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     cfg.headers = cfg.headers || {};
     cfg.headers["X-Client-Request-Id"] = rid;
@@ -56,12 +47,9 @@ api.interceptors.request.use((cfg) => {
   return cfg;
 });
 
-// Reintentos ligeros con backoff para errores transitorios
+// Reintentos ligeros para errores transitorios
 const RETRYABLE_STATUS = new Set([429, 502, 503, 504]);
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 api.interceptors.response.use(
   (res) => res,
@@ -69,14 +57,12 @@ api.interceptors.response.use(
     const cfg = err?.config || {};
     const status = err?.response?.status;
 
-    // Marca especial si la URL apunta a rutas de Flow (para mostrar msjs claros en el front)
+    // Marca especial para rutas /flow/
     try {
-      if ((cfg.url || "").includes("/flow/") || (cfg.baseURL + cfg.url).includes("/flow/")) {
-        err.isFlow = true;
-      }
+      const full = (cfg.baseURL || "") + (cfg.url || "");
+      if (full.includes("/flow/")) err.isFlow = true;
     } catch {}
 
-    // Red o timeouts sin response => retry
     const isNetworkError = axios.isAxiosError(err) && !err.response;
     const shouldRetry = isNetworkError || RETRYABLE_STATUS.has(status);
 
@@ -85,8 +71,7 @@ api.interceptors.response.use(
       const maxRetries = 2;
       if (cfg.__retryCount < maxRetries) {
         cfg.__retryCount += 1;
-        // backoff exponencial simple: 350ms, 700ms
-        await sleep(350 * cfg.__retryCount);
+        await sleep(350 * cfg.__retryCount); // 350ms, 700ms
         return api(cfg);
       }
     }
@@ -95,10 +80,70 @@ api.interceptors.response.use(
   }
 );
 
+/* ================== HELPERS MINEDUC ================== */
 
+async function offlineStub() {
+  // Forma compatible con tu UI sin romper el flujo
+  return { ok: false, offline: true, items: [] };
+}
 
+async function safeGet(url, params) {
+  // Helper genérico para GET con manejo de errores
+  const r = await api.get(url, { params });
+  return { ok: true, items: r.data ?? r };
+}
 
+/**
+ * Las tres funciones siguientes son las que importa DesarrolloClase.jsx:
+ *   - buscarAsignaturaMineduc
+ *   - buscarUnidadMineduc
+ *   - buscarHabilidadesMineduc
+ *
+ * Si MINEDUC_ENABLED = false, devuelven un stub offline que no rompe el build.
+ * Ajusta las rutas `/mineduc/*` a las de tu backend/proxy si ya las tienes.
+ */
 
+export async function buscarAsignaturaMineduc(params = {}) {
+  if (!MINEDUC_ENABLED) {
+    console.debug("[MINEDUC] OFF → buscarAsignaturaMineduc (stub)");
+    return offlineStub();
+  }
+  // TODO: ajusta la ruta a tu backend real
+  return safeGet("/mineduc/asignaturas", params);
+}
 
-// opcional, por si en algÃºn archivo usas `import api from ...`
+export async function buscarUnidadMineduc(params = {}) {
+  if (!MINEDUC_ENABLED) {
+    console.debug("[MINEDUC] OFF → buscarUnidadMineduc (stub)");
+    return offlineStub();
+  }
+  // TODO: ajusta la ruta a tu backend real
+  return safeGet("/mineduc/unidades", params);
+}
+
+export async function buscarHabilidadesMineduc(params = {}) {
+  if (!MINEDUC_ENABLED) {
+    console.debug("[MINEDUC] OFF → buscarHabilidadesMineduc (stub)");
+    return offlineStub();
+  }
+  // TODO: ajusta la ruta a tu backend real
+  return safeGet("/mineduc/habilidades", params);
+}
+
+/* ===== Ejemplo original que mencionaste (lo conservo como comentario) =====
+export async function buscarAsignaturaMineduc(params) {
+  if (!MINEDUC_ENABLED) {
+    console.debug("[MINEDUC] OFF → skip fetch (CORS bloqueado en browser)");
+    return { ok: false, offline: true, items: [] };
+  }
+  // const url = `https://curriculumnacional.mineduc.cl/api/v1/oa/buscar?...`;
+  // const res = await fetch(url, { headers: { ... } });
+  // const data = await res.json();
+  // return data;
+}
+*/
+
+/* ================== EXPORT POR DEFECTO ================== */
+// Por si en algún archivo usas `import api from "..."`.
 export default api;
+

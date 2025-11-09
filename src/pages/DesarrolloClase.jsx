@@ -8,11 +8,10 @@ import React, {
   useMemo,
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { api } from "../lib/api";
 import { db } from "../firebase";
-import { MINEDUC_ENABLED } from "../lib/api";
 
 import {
+  MINEDUC_ENABLED, api,
   buscarAsignaturaMineduc,
   buscarUnidadMineduc,
   buscarHabilidadesMineduc,
