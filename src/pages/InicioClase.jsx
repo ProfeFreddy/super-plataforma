@@ -1,4 +1,4 @@
-// InicioClase.jsx    
+// InicioClase.jsx     
 import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import QRCode from "react-qr-code";
@@ -804,6 +804,11 @@ function InicioClase() {
   // ✅ NUEVO: guard para no disparar navegación doble
   const [chronoDone, setChronoDone] = useState(false);
 
+  // NUEVO: estado para objetivo sugerido desde la nube + guardado de slot
+  const [objetivoIA, setObjetivoIA] = useState("");
+  const [savingSlot, setSavingSlot] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
   // tomar slot forzado o recordado apenas monta
   useEffect(() => {
     const s = slotFromQuery() || localStorage.getItem("__lastSlotId");
@@ -991,6 +996,113 @@ function InicioClase() {
     };
   };
 
+  // NUEVO: helper para payload del slot actual
+  const buildSlotPayload = () => {
+    const habilidadesTxt =
+      Array.isArray(claseActual?.habilidades)
+        ? claseActual.habilidades.join(", ")
+        : (claseActual?.habilidades ?? "");
+    return {
+      asignatura: claseActual?.asignatura ?? asignaturaProfe ?? "",
+      curso: claseActual?.curso ?? claseVigente?.curso ?? "",
+      nivel:
+        claseActual?.nivel ??
+        claseVigente?.nivel ??
+        nivelDesdeCurso(claseActual?.curso || claseVigente?.curso || "") ??
+        "",
+      seccion: claseActual?.seccion ?? "",
+      unidad: claseActual?.unidad ?? claseVigente?.unidad ?? "",
+      objetivo: claseActual?.objetivo ?? "",
+      habilidades: habilidadesTxt || "",
+      bloque: claseActual?.bloque ?? "",
+      dia: claseActual?.dia ?? "",
+      codUnidad: claseVigente?.codUnidad ?? planSug?.codUnidad ?? "",
+      programaUrl: planSug?.programaUrl ?? "",
+    };
+  };
+
+  // NUEVO: guarda slot actual en Firestore + localStorage
+  const saveCurrentSlot = async (extra = {}) => {
+    setSaveError("");
+    if (!authed) return;
+    const uid = auth.currentUser?.uid || localStorage.getItem("uid");
+    if (!uid || !currentSlotId) return;
+    try {
+      setSavingSlot(true);
+      const basePayload = buildSlotPayload();
+      const payload = {
+        ...basePayload,
+        ...extra,
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(
+        doc(db, "clases_detalle", uid, "slots", currentSlotId),
+        payload,
+        { merge: true }
+      );
+      try {
+        localStorage.setItem(
+          "currentSlot",
+          JSON.stringify({
+            slotId: currentSlotId,
+            ...basePayload,
+            ...extra,
+          })
+        );
+      } catch {}
+    } catch (e) {
+      console.warn("[saveCurrentSlot]", e?.code || e?.message);
+      setSaveError(e?.message || "No se pudo guardar la ficha de la clase.");
+    } finally {
+      setSavingSlot(false);
+    }
+  };
+
+  // NUEVO: objetivo sugerido desde la nube de palabras
+  const objetivoDesdeNube = () => {
+    try {
+      const words = (Array.isArray(cloudMentData) && cloudMentData.length
+        ? cloudMentData
+        : palabrasAgg
+      ) || [];
+
+      if (!words.length) {
+        setObjetivoIA("");
+        setSaveError("Aún no hay suficientes palabras en la nube para sugerir un objetivo.");
+        return;
+      }
+
+      const top = [...words].sort((a, b) => b.value - a.value).slice(0, 3);
+      const lista = top.map((w) => String(w.text || "").toLowerCase()).join(", ");
+
+      const asig =
+        claseActual?.asignatura ||
+        asignaturaProfe ||
+        "la asignatura";
+      const unidadTxt =
+        claseActual?.unidad ||
+        claseVigente?.unidad ||
+        "la unidad";
+
+      const obj =
+        `Al finalizar la clase, las y los estudiantes serán capaces de explicar y aplicar los conceptos de ${lista} ` +
+        `en el contexto de ${unidadTxt} de ${asig}.`;
+
+      setClaseActual((prev) => ({
+        ...(prev || {}),
+        objetivo: obj,
+      }));
+      setObjetivoIA(obj);
+      setSaveError("");
+
+      // Persistimos en el slot actual (no esperamos el resultado)
+      saveCurrentSlot({ objetivo: obj });
+    } catch (e) {
+      console.warn("[objetivoDesdeNube]", e?.message);
+      setSaveError("No se pudo generar el objetivo sugerido.");
+    }
+  };
+
   // cuando termina el countdown, navega a /desarrollo (salvo bypass)
   useEffect(() => {
     if (BYPASS_NAV) return; // ⬅️ NUEVO: no navegar en modo prueba
@@ -1004,6 +1116,10 @@ function InicioClase() {
         localStorage.setItem("__lastSlotId", currentSlotId || "0-0");
       } catch {}
       const ficha = makeFicha();
+
+      // NUEVO: guardado rápido del slot al cerrar Inicio
+      saveCurrentSlot();
+
       navigate("/desarrollo", {
         state: {
           slotId: currentSlotId || "0-0",
@@ -2013,6 +2129,10 @@ function InicioClase() {
                     localStorage.setItem("__lastSlotId", currentSlotId || "0-0");
                   } catch {}
                   const ficha = makeFicha();
+
+                  // NUEVO: guardamos slot antes de ir a Desarrollo
+                  saveCurrentSlot();
+
                   navigate("/desarrollo", {
                     state: {
                       slotId: currentSlotId || "0-0",
@@ -2177,8 +2297,103 @@ function InicioClase() {
             )}
           </div>
         ) : (
-          <div style={{ ...card, marginBottom: "1rem", color: COLORS.textMuted }}>
-            No se encontró información curricular para esta unidad.
+          <div style={{ ...card, marginBottom: "1rem" }}>
+            <div style={{ color: COLORS.textMuted }}>
+              No se encontró información curricular para esta unidad.
+            </div>
+
+            {/* NUEVO: Objetivo sugerido desde la nube de palabras */}
+            <div
+              style={{
+                marginTop: 10,
+                paddingTop: 10,
+                borderTop: "1px dashed #e5e7eb",
+                fontSize: 14,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 700,
+                  marginBottom: 4,
+                  color: "#0f172a",
+                }}
+              >
+                Objetivo sugerido desde la nube de palabras
+              </div>
+              <div style={{ color: "#64748b", marginBottom: 8 }}>
+                Usa las palabras más frecuentes que están enviando tus estudiantes
+                para construir un objetivo de aprendizaje base.
+              </div>
+              <button
+                type="button"
+                onClick={objetivoDesdeNube}
+                style={{
+                  ...btnTiny,
+                  fontSize: 12,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                ✨ Generar objetivo con la nube
+              </button>
+              {savingSlot && (
+                <span
+                  style={{
+                    marginLeft: 8,
+                    fontSize: 12,
+                    color: "#0f766e",
+                  }}
+                >
+                  Guardando ficha…
+                </span>
+              )}
+              {objetivoIA && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: 8,
+                    borderRadius: 8,
+                    background: "#f9fafb",
+                    border: "1px solid #e5e7eb",
+                    color: "#0f172a",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      marginBottom: 4,
+                      fontSize: 13,
+                    }}
+                  >
+                    Objetivo sugerido:
+                  </div>
+                  <div style={{ fontSize: 14 }}>
+                    {objetivoIA}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 11,
+                      color: "#94a3b8",
+                    }}
+                  >
+                    (Puedes editar este texto desde aquí o en las pantallas de Desarrollo/Cierre).
+                  </div>
+                </div>
+              )}
+              {saveError && (
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 12,
+                    color: "#b91c1c",
+                  }}
+                >
+                  {saveError}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -2393,6 +2608,9 @@ function InicioClase() {
 
               const ficha = makeFicha();
 
+              // NUEVO: guardamos slot al salir manualmente a Desarrollo
+              saveCurrentSlot();
+
               navigate("/desarrollo", {
                 state: {
                   slotId: currentSlotId || "0-0",
@@ -2421,6 +2639,9 @@ function InicioClase() {
                   currentSlotId || "0-0"
                 );
               } catch {}
+
+              // NUEVO: guardamos la ficha antes de salir
+              saveCurrentSlot();
 
               // navegar a la ruta principal de profe, NO a /home landing
               const homePath = getInicioClasePath();
@@ -2452,3 +2673,4 @@ function InicioClase() {
 
 export default InicioClase;
 export { InicioClase };
+

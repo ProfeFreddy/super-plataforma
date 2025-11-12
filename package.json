@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "cross-env ROLLUP_SKIP_NODEJS_NATIVE=true npm_config_omit=optional vite build",
-    "preview": "vite preview --port 4173"
+    "preview": "vite preview --port 4173",
+    "start": "node server/server.cjs"
   },
   "dependencies": {
     "axios": "^1.7.7",
@@ -27,14 +28,16 @@
     "@vitejs/plugin-react": "^4.3.0",
     "concurrently": "^8.2.2",
     "cross-env": "^10.1.0",
+    "esbuild": "0.21.5",
     "nodemon": "^3.1.10",
-    "vite": "^5.4.0",
     "rollup": "4.21.3",
-    "esbuild": "0.21.5"
+    "vite": "^5.4.0"
   },
   "engines": {
-    "node": "20.x",
+    "node": ">=18",
     "npm": ">=10"
   },
   "packageManager": "npm@10.9.0"
 }
+
+

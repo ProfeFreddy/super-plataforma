@@ -65,6 +65,13 @@ const Planes = lazy(() =>
   }))
 );
 
+// ✅ NUEVO: Clase especial
+const ClaseEspecial = lazy(() =>
+  import("./pages/ClaseEspecial").then((mod) => ({
+    default: mod.ClaseEspecial || mod.default || mod,
+  }))
+);
+
 /* ─────────────────────────────────────────
    ErrorBoundary
    ───────────────────────────────────────── */
@@ -492,6 +499,16 @@ export default function App() {
           <Route path="/pago" element={<Pago />} />
           <Route path="/confirmacion-pago" element={<ConfirmacionPago />} />
 
+          {/* ✅ NUEVA RUTA: Clase especial */}
+          <Route
+            path="/clase-especial"
+            element={
+              <RequireAuthAllowAnon>
+                <ClaseEspecial />
+              </RequireAuthAllowAnon>
+            }
+          />
+
           <Route element={<GuardedLayout />}>
             <Route path="/perfil" element={<Perfil />} />
           </Route>
@@ -512,6 +529,7 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
 
 
 

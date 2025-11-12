@@ -91,20 +91,17 @@ const API_BASE = (() => {
   }
 })();
 
-/* returnUrl que espera backend Flow */
+/* returnUrl que espera backend Flow (hash router) */
 const RETURN_URL =
   (typeof import.meta !== "undefined" &&
     import.meta.env &&
     import.meta.env.VITE_RETURN_URL) ||
-  "https://super-plataforma.web.app/pago/retorno";
+  "https://pragmaprofe.com/#/pago?flowReturn=1";
 
 // diagnóstico
 try {
   console.info(
-    "[Pago] API_BASE =",
-    API_BASE,
-    "| RETURN_URL =",
-    RETURN_URL
+    "[Pago] API_BASE =", API_BASE, "| RETURN_URL =", RETURN_URL
   );
 } catch {}
 
@@ -332,91 +329,103 @@ const callCrearPago = async (payload) => {
   }
 };
 
-// HTTP directo a /flow/init del backend
-const FLOW_HTTP_URL = `${API_BASE}/flow/init`;
+// URLs HTTP candidatas (tolerantes a /api y sin /api)
+const FLOW_HTTP_URLS = [
+  `${API_BASE}/api/flow/init`,
+  `${API_BASE}/flow/init`,
+  `${API_FALLBACK}/flow/init`, // último intento directo a CF
+];
 
 async function crearPagoHttp(plan, precio, email) {
   console.log("🛰️ [DEBUG Pago] API_BASE =", API_BASE);
-  console.log(
-    "🛰️ [DEBUG Pago] Intentando POST →",
-    `${API_BASE}/flow/init`
-  );
 
-  const res = await fetch(FLOW_HTTP_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      plan,
-      email,
-      amount: Number(precio),
-      returnUrl: RETURN_URL,
-    }),
+  const body = JSON.stringify({
+    plan,
+    email,
+    amount: Number(precio),
+    returnUrl: RETURN_URL,
   });
 
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(
-      `HTTP ${res.status} ${t || ""}`.trim()
-    );
-  }
+  let lastErr = null;
 
-  const out = await res.json().catch(() => ({}));
-
-  const payUrl = out?.payUrl || out?.url || null;
-  let token = out?.token;
-
-  if (!token && payUrl) {
+  for (const url of FLOW_HTTP_URLS) {
     try {
-      token = new URL(payUrl).searchParams.get("token");
-    } catch {}
+      console.log("🛰️ [DEBUG Pago] POST →", url);
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status} ${t || ""}`.trim());
+      }
+
+      const out = await res.json().catch(() => ({}));
+
+      const payUrl = out?.payUrl || out?.url || out?.paymentUrl || out?.paymentURL || null;
+      let token = out?.token;
+
+      if (!token && payUrl) {
+        try { token = new URL(payUrl).searchParams.get("token"); } catch {}
+      }
+      if (!token && out?.paymentUrl) {
+        try { token = new URL(out.paymentUrl).searchParams.get("token"); } catch {}
+      }
+      if (!token) {
+        const maybe = normalizeFlowUrl(payUrl || "");
+        try { token = new URL(maybe).searchParams.get("token"); } catch {}
+      }
+      if (!token) throw new Error("No se recibió token (ni payUrl) desde flow/init");
+
+      const isSandbox = /sandbox/i.test(String(payUrl || ""));
+      const host = isSandbox ? "https://sandbox.flow.cl" : "https://www.flow.cl";
+      return `${host}/app/web/pay.php?token=${encodeURIComponent(token)}`;
+    } catch (e) {
+      console.warn(`[Pago][HTTP] Falló ${url}:`, e?.message || e);
+      lastErr = e;
+      // intenta la siguiente URL
+    }
   }
-  if (!token && out?.paymentUrl) {
-    try {
-      token = new URL(
-        out.paymentUrl
-      ).searchParams.get("token");
-    } catch {}
-  }
 
-  if (!token) {
-    const maybe = normalizeFlowUrl(payUrl || "");
-    try {
-      token = new URL(maybe).searchParams.get("token");
-    } catch {}
-  }
-
-  if (!token)
-    throw new Error(
-      "No se recibió token (ni payUrl) desde /flow/init"
-    );
-
-  const isSandbox = /sandbox/i.test(
-    String(payUrl || "")
-  );
-  const host = isSandbox
-    ? "https://sandbox.flow.cl"
-    : "https://www.flow.cl";
-
-  return `${host}/app/web/pay.php?token=${encodeURIComponent(
-    token
-  )}`;
+  // si ninguna ruta sirvió, propaga el último error para que el wrapper haga fallback a callable
+  throw lastErr || new Error("No fue posible crear el pago por HTTP");
 }
 
 /* enviar recordatorios antes de expirar */
+const REMINDERS_HTTP_URLS = [
+  `${API_BASE}/api/billing/schedule-reminders`,
+  `${API_BASE}/billing/schedule-reminders`,
+  `${API_FALLBACK}/billing/schedule-reminders`,
+];
+
 async function scheduleReminders(plan, months = 1) {
   try {
     const u = auth?.currentUser;
     if (!u) return;
-    await fetch(`${API_BASE}/billing/schedule-reminders`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        uid: u.uid,
-        plan,
-        months,
-        days_before: 5,
-      }),
+
+    const payload = JSON.stringify({
+      uid: u.uid,
+      plan,
+      months,
+      days_before: 5,
     });
+
+    for (const ep of REMINDERS_HTTP_URLS) {
+      try {
+        await fetch(ep, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+        });
+        console.log("[Pago] schedule-reminders OK en", ep);
+        break; // listo si uno funcionó
+      } catch (e) {
+        console.warn("[Pago] schedule-reminders falló en", ep, e?.message || e);
+      }
+    }
   } catch {
     // si no existe endpoint, no rompe el flujo
   }
@@ -490,12 +499,9 @@ async function pagarConFlowHttp(plan, precio, months = 1) {
     try {
       if (preWin && !preWin.closed) preWin.close();
     } catch {}
-    console.error("[Pago][HTTP] Error creando pago:", err);
-    alert(
-      `No se pudo iniciar el pago con Flow (HTTP).\nDetalle: ${
-        err?.message || err
-      }`
-    );
+    // Sin alert aquí: dejamos que pagarSmart haga el fallback al callable limpio
+    console.warn("[Pago][HTTP] Error creando pago (haré fallback a callable):", err?.message || err);
+    throw err; // ⬅️ importante: permite que pagarSmart haga fallback a callable
   }
 }
 
@@ -620,6 +626,21 @@ async function pagarConFlow(plan, precio, months = 1) {
         err?.message || err
       }`
     );
+  }
+}
+
+/* ✅ WRAPPER con fallback automático: HTTP → callable */
+async function pagarSmart(plan, precio, months = 1) {
+  try {
+    await pagarConFlowHttp(plan, precio, months);
+  } catch (e) {
+    console.warn("[Pago] HTTP falló, voy a callable:", e?.message || e);
+    try {
+      await pagarConFlow(plan, precio, months);
+    } catch (e2) {
+      console.error("[Pago] Callable también falló:", e2?.message || e2);
+      alert("No se pudo iniciar el pago con Flow. Inténtalo nuevamente en unos minutos.");
+    }
   }
 }
 
@@ -914,7 +935,7 @@ function PlanBox({
         <button
           style={btnPrimary}
           onClick={() =>
-            pagarConFlowHttp(flowPlan, flowPrecio, 1)
+            pagarSmart(flowPlan, flowPrecio, 1)
           }
           aria-label={`Pagar plan ${titulo} mensual con Flow.cl`}
         >
@@ -935,7 +956,7 @@ function PlanBox({
           <button
             style={btnGhost}
             onClick={() =>
-              pagarConFlowHttp(
+              pagarSmart(
                 flowPlan,
                 annualPriceCLP,
                 monthsForAnnualActivation
@@ -1071,9 +1092,7 @@ function Pago() {
 
     autoRef.current = true;
     setAutoMsg(
-      `Abriendo Flow para plan ${planParam} (${
-        annual ? "anual" : "mensual"
-      })…`
+      `Abriendo Flow para plan ${planParam} (${annual ? "anual" : "mensual"})…`
     );
 
     try {
@@ -1082,7 +1101,8 @@ function Pago() {
         monthsToActivate
       );
     } catch {}
-    pagarConFlowHttp(
+    // usar wrapper robusto
+    pagarSmart(
       planParam,
       amount,
       monthsToActivate
@@ -1482,6 +1502,7 @@ export default Pago;
 export {
   pagarConFlow,
   pagarConFlowHttp,
+  pagarSmart,
   intentarActivarSiPendiente,
   marcarPendienteDeActivar,
   activarPlanViaBackend,
@@ -1490,4 +1511,7 @@ export {
   __crearPagoConFallback,
   __pagoDebug,
 };
+
+
+
 

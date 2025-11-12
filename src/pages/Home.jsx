@@ -1,4 +1,4 @@
-// src/pages/Home.jsx
+// src/pages/Home.jsx 
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getClaseVigente } from "../services/PlanificadorService";
@@ -1300,6 +1300,16 @@ export default function Home() {
               >
                 Ver planes
               </HintButton>
+
+              {/* 🆕 Clase especial */}
+              <HintButton
+                as="button"
+                style={btnGhost}
+                hint="Abre una clase fuera de la planificación, con selección de idioma."
+                onClick={() => nav("/clase-especial")}
+              >
+                🧪 Clase especial
+              </HintButton>
             </div>
 
             {hoverHelp && (
@@ -1670,51 +1680,3 @@ function FAQ({ q, a }) {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
