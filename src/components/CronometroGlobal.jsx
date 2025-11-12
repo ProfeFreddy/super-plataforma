@@ -1,4 +1,4 @@
-// src/components/CronometroGlobal.jsx
+// src/components/CronometroGlobal.jsx 
 // Cronómetro global compartido entre Inicio → Desarrollo → Cierre
 // - OCULTA el preset cuando está corriendo (evita "dos cronómetros" en pantalla)
 // - Mantiene compat con COUNT_KEY legacy y clave por slot/semana/usuario
@@ -64,11 +64,21 @@ export default function CronometroGlobal({
 
   // estado base
   const [endMs, setEndMs] = useState(() => {
-    const s = localStorage.getItem(storageKey) || localStorage.getItem(COUNT_KEY_LEGACY);
+    const s =
+      localStorage.getItem(storageKey) ||
+      localStorage.getItem(COUNT_KEY_LEGACY);
     return s ? Number(s) : 0;
   });
   const [tick, setTick] = useState(now());
+
   const prevRunningRef = useRef(false);
+
+  // ✅ NUEVO: referencia segura al callback (evita llamar 0 como función)
+  const onEndRef = useRef(null);
+  useEffect(() => {
+    onEndRef.current =
+      typeof onEnd === "function" ? onEnd : null;
+  }, [onEnd]);
 
   const diffMs = Math.max(0, (endMs || 0) - tick);
   const running = diffMs > 0;
@@ -88,14 +98,19 @@ export default function CronometroGlobal({
     } catch {}
   }, [endMs, storageKey]);
 
-  // disparar onEnd exactamente una vez al pasar de running → no running
+  // ✅ disparar onEnd exactamente una vez al pasar de running → no running,
+  //   y SOLO si onEnd es realmente una función
   useEffect(() => {
     const prevRunning = prevRunningRef.current;
-    if (prevRunning && !running) {
-      onEnd && onEnd();
+    if (prevRunning && !running && onEndRef.current) {
+      try {
+        onEndRef.current();
+      } catch (e) {
+        console.error("[CronometroGlobal] onEnd error:", e);
+      }
     }
     prevRunningRef.current = running;
-  }, [running, onEnd]);
+  }, [running]);
 
   // acciones
   const start = () => {
@@ -119,29 +134,40 @@ export default function CronometroGlobal({
       </div>
       {showInlineControls && running && (
         <>
-          <button style={btnTiny} title="Reiniciar a duración" onClick={reset}>↺</button>
-          <button style={btnTiny} title="+1 minuto" onClick={add1}>+1</button>
+          <button style={btnTiny} title="Reiniciar a duración" onClick={reset}>
+            ↺
+          </button>
+          <button style={btnTiny} title="+1 minuto" onClick={add1}>
+            +1
+          </button>
         </>
       )}
     </div>
   );
 
-  const presetFila = (!running && showPresetWhenStopped) ? (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: ".5rem",
-        marginTop: 6,
-        color: COLORS.muted,
-      }}
-    >
-      <div style={{ fontWeight: 800 }}>{pad2(duracion)}:00</div>
-      <button style={btnTiny} title="Iniciar" onClick={start}>▶</button>
-      <button style={btnTiny} title="Reiniciar a duración" onClick={reset}>↺</button>
-      <button style={btnTiny} title="+1 minuto" onClick={add1}>+1</button>
-    </div>
-  ) : null;
+  const presetFila =
+    !running && showPresetWhenStopped ? (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: ".5rem",
+          marginTop: 6,
+          color: COLORS.muted,
+        }}
+      >
+        <div style={{ fontWeight: 800 }}>{pad2(duracion)}:00</div>
+        <button style={btnTiny} title="Iniciar" onClick={start}>
+          ▶
+        </button>
+        <button style={btnTiny} title="Reiniciar a duración" onClick={reset}>
+          ↺
+        </button>
+        <button style={btnTiny} title="+1 minuto" onClick={add1}>
+          +1
+        </button>
+      </div>
+    ) : null;
 
   return (
     <div>
@@ -161,5 +187,4 @@ export default function CronometroGlobal({
 
 // Compatibilidad por si en algún lugar se usa import { CronometroGlobal } ...
 export { CronometroGlobal };
-
 
