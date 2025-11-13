@@ -1,4 +1,4 @@
-﻿// src/pages/CierreClase.jsx 
+﻿// src/pages/CierreClase.jsx  
 import React, {
   useEffect,
   useState,
@@ -1422,6 +1422,12 @@ export default function CierreClase({ duracion = 10 }) {
     });
   }
 
+  // ✅ capa extra de seguridad: jamás pasamos algo que no sea función a onEnd
+  const safeOnEndCierre =
+    typeof handleEndCierre === "function"
+      ? handleEndCierre
+      : () => {};
+
   /* ========================================================
      Render
      ======================================================== */
@@ -1510,7 +1516,7 @@ export default function CierreClase({ duracion = 10 }) {
           >
             <CronometroGlobal
               {...cronometroPropsCierre}
-              onEnd={handleEndCierre}
+              onEnd={safeOnEndCierre}
             />
           </div>
         </div>
@@ -1988,6 +1994,7 @@ export default function CierreClase({ duracion = 10 }) {
     </div>
   );
 }
+
 
 
 
