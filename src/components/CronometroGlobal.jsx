@@ -188,3 +188,4 @@ export default function CronometroGlobal({
 // Compatibilidad por si en algún lugar se usa import { CronometroGlobal } ...
 export { CronometroGlobal };
 
+
