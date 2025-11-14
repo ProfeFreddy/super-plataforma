@@ -1,4 +1,4 @@
-﻿// src/pages/DesarrolloClase.jsx
+﻿// src/pages/DesarrolloClase.jsx 
 import React, {
   useEffect,
   useState,
