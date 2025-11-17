@@ -1,4 +1,4 @@
-﻿// src/pages/DesarrolloClase.jsx 
+﻿// src/pages/DesarrolloClase.jsx  
 import React, {
   useEffect,
   useState,
@@ -11,7 +11,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { db } from "../firebase";
 
 import {
-  MINEDUC_ENABLED, api,
+  MINEDUC_ENABLED,
+  api,
   buscarAsignaturaMineduc,
   buscarUnidadMineduc,
   buscarHabilidadesMineduc,
@@ -355,7 +356,13 @@ const APP_GROUPS = {
     },
   ],
   Lenguaje: [
-    { id: "wordreference", name: "WordReference", url: "https://www.wordreference.com", icon: "WR", embed: true },
+    {
+      id: "wordreference",
+      name: "WordReference",
+      url: "https://www.wordreference.com",
+      icon: "WR",
+      embed: true,
+    },
     { id: "linguee", name: "Linguee", url: "https://www.linguee.es", icon: "LG", embed: true },
     { id: "docs", name: "Google Docs", url: "https://docs.google.com", icon: "GD", embed: false },
     { id: "padlet", name: "Padlet", url: "https://padlet.com", icon: "PD", embed: false },
@@ -391,19 +398,55 @@ const APP_GROUPS = {
       icon: "AC",
       embed: true,
     },
-    { id: "timeline", name: "KnightLab Timeline", url: "https://timeline.knightlab.com", icon: "TL", embed: false },
+    {
+      id: "timeline",
+      name: "KnightLab Timeline",
+      url: "https://timeline.knightlab.com",
+      icon: "TL",
+      embed: false,
+    },
   ],
   Ingles: [
-    { id: "cambridge", name: "Cambridge Dictionary", url: "https://dictionary.cambridge.org", icon: "CD", embed: true },
-    { id: "reverso", name: "Reverso Context", url: "https://context.reverso.net", icon: "RV", embed: true },
+    {
+      id: "cambridge",
+      name: "Cambridge Dictionary",
+      url: "https://dictionary.cambridge.org",
+      icon: "CD",
+      embed: true,
+    },
+    {
+      id: "reverso",
+      name: "Reverso Context",
+      url: "https://context.reverso.net",
+      icon: "RV",
+      embed: true,
+    },
   ],
   Artes: [
-    { id: "sketchpad", name: "Sketchpad", url: "https://sketch.io/sketchpad", icon: "SP", embed: true },
-    { id: "autodraw", name: "AutoDraw", url: "https://www.autodraw.com", icon: "AD", embed: true },
+    {
+      id: "sketchpad",
+      name: "Sketchpad",
+      url: "https://sketch.io/sketchpad",
+      icon: "SP",
+      embed: true,
+    },
+    {
+      id: "autodraw",
+      name: "AutoDraw",
+      url: "https://www.autodraw.com",
+      icon: "AD",
+      embed: true,
+    },
   ],
   Tecnologia: [
     { id: "scratch", name: "Scratch", url: "https://scratch.mit.edu", icon: "SC", embed: false },
-    { id: "w3schools", name: "W3Schools", url: "https://www.w3schools.com/tryit", icon: "W3", embed: true },
+    {
+      id: "w3schools",
+      name: "W3Schools",
+      url: "https://www.w3schools.com/tryit",
+      icon: "W3",
+      embed: true,
+    },
   ],
 };
 
@@ -630,12 +673,18 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
     if (!file) return;
     const url = URL.createObjectURL(file);
     if (file.type === "application/pdf") {
-      if (presentBlobUrl) try { URL.revokeObjectURL(presentBlobUrl); } catch {}
+      if (presentBlobUrl)
+        try {
+          URL.revokeObjectURL(presentBlobUrl);
+        } catch {}
       setPresentBlobUrl(url);
       setPresentKind("iframe");
       trySetMain(url);
     } else if (file.type.startsWith("image/")) {
-      if (presentBlobUrl) try { URL.revokeObjectURL(presentBlobUrl); } catch {}
+      if (presentBlobUrl)
+        try {
+          URL.revokeObjectURL(presentBlobUrl);
+        } catch {}
       setPresentBlobUrl(url);
       setPresentKind("image");
       setPanelMsg("");
@@ -689,7 +738,10 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
 
   useEffect(() => {
     return () => {
-      if (presentBlobUrl) try { URL.revokeObjectURL(presentBlobUrl); } catch {}
+      if (presentBlobUrl)
+        try {
+          URL.revokeObjectURL(presentBlobUrl);
+        } catch {}
       if (screenStreamRef.current) {
         try {
           screenStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -817,9 +869,9 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   }, []); // eslint-disable-line
 
   // ====== ESTADOS NUEVOS PARA OA/UNIDAD/HABILIDADES (MINEDUC) ======
-  const [oaData, setOaData] = useState(null);       // Objetivos / OA
+  const [oaData, setOaData] = useState(null); // Objetivos / OA
   const [unidadData, setUnidadData] = useState(null);
-  const [habData, setHabData] = useState(null);     // Habilidades
+  const [habData, setHabData] = useState(null); // Habilidades
 
   // ====== FUNCIONES QUE ME PEDISTE PEGAR (DENTRO DEL COMPONENTE) ======
   async function cargarOA(params) {
@@ -1143,7 +1195,10 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
                 setWikiSummary(extract);
                 setWikiThumb(thumb);
               } catch (sumErr) {
-                console.warn("[Desarrollo] Wikipedia summary no disponible:", sumErr?.message || sumErr);
+                console.warn(
+                  "[Desarrollo] Wikipedia summary no disponible:",
+                  sumErr?.message || sumErr
+                );
                 setWikiSummary("");
                 setWikiThumb("");
               }
@@ -1580,10 +1635,12 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   const subtle = { fontSize: 12, color: COLORS.textMuted };
 
   // ======= Overrides de vista si hay EMERGENCIA activa =======
-  const unidadShown = emergency?.active ? (emergency.unidad || unidad) : unidad;
-  const objetivoShown = emergency?.active ? (emergency.objetivo || objetivo) : objetivo;
+  const unidadShown = emergency?.active ? emergency.unidad || unidad : unidad;
+  const objetivoShown = emergency?.active ? emergency.objetivo || objetivo : objetivo;
   const habilidadesShown = emergency?.active
-    ? (Array.isArray(emergency.habilidades) ? emergency.habilidades.join(", ") : emergency.habilidades || habilidades)
+    ? Array.isArray(emergency.habilidades)
+      ? emergency.habilidades.join(", ")
+      : emergency.habilidades || habilidades
     : habilidades;
 
   return (
@@ -1599,11 +1656,27 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           }}
         >
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ background:'#fee2e2', color:'#991b1b', borderRadius:999, padding:'4px 10px', fontWeight:800 }}>
+            <span
+              style={{
+                background: "#fee2e2",
+                color: "#991b1b",
+                borderRadius: 999,
+                padding: "4px 10px",
+                fontWeight: 800,
+              }}
+            >
               🔴 Emergencia activa
             </span>
             {emergency?.language && (
-              <span style={{ background:'#e0f2fe', color:'#075985', borderRadius:999, padding:'4px 10px', fontWeight:700 }}>
+              <span
+                style={{
+                  background: "#e0f2fe",
+                  color: "#075985",
+                  borderRadius: 999,
+                  padding: "4px 10px",
+                  fontWeight: 700,
+                }}
+              >
                 🌐 {String(emergency.language).toUpperCase()}
               </span>
             )}
@@ -1646,9 +1719,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
       <div style={{ ...row("1rem"), marginBottom: "1rem" }}>
         {/* IZQUIERDA */}
         <div style={card}>
-          <div style={{ fontWeight: 800, fontSize: "1.1rem", marginBottom: 6 }}>
-            Desarrollo
-          </div>
+          <div style={{ fontWeight: 800, fontSize: "1.1rem", marginBottom: 6 }}>Desarrollo</div>
           <div style={{ color: COLORS.textMuted, marginBottom: 8 }}>{horaActual}</div>
           <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
             <CronometroGlobal duracion={duracion} onEnd={handleEnd} />
@@ -1657,13 +1728,20 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
 
         {/* CENTRO */}
         <div style={{ ...card, textAlign: "center" }}>
-          <div style={{ fontWeight: 800, fontSize: "1.2rem", marginBottom: 6 }}>
-            Unidad
-          </div>
+          <div style={{ fontWeight: 800, fontSize: "1.2rem", marginBottom: 6 }}>Unidad</div>
           <div style={{ marginBottom: 6 }}>
             <strong>{unidadShown || "(sin unidad)"} </strong>
             {emergency?.active && emergency?.language && (
-              <span style={{ marginLeft: 8, background:'#e0f2fe', color:'#075985', borderRadius:999, padding:'2px 8px', fontSize:12 }}>
+              <span
+                style={{
+                  marginLeft: 8,
+                  background: "#e0f2fe",
+                  color: "#075985",
+                  borderRadius: 999,
+                  padding: "2px 8px",
+                  fontSize: 12,
+                }}
+              >
                 🌐 {String(emergency.language).toUpperCase()}
               </span>
             )}
@@ -1684,8 +1762,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           )}
 
           <div style={{ marginTop: 10, color: COLORS.textMuted }}>
-            <strong>Curso:</strong> {curso} &nbsp;|&nbsp; <strong>Asignatura:</strong>{" "}
-            {asignatura}
+            <strong>Curso:</strong> {curso} &nbsp;|&nbsp; <strong>Asignatura:</strong> {asignatura}
           </div>
         </div>
 
@@ -1715,14 +1792,20 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <strong>🔴 Emergencia — Desarrollo:</strong>
             {emergency?.language && (
-              <span style={{ background:'#e0f2fe', color:'#075985', borderRadius:999, padding:'2px 8px', fontSize:12 }}>
+              <span
+                style={{
+                  background: "#e0f2fe",
+                  color: "#075985",
+                  borderRadius: 999,
+                  padding: "2px 8px",
+                  fontSize: 12,
+                }}
+              >
                 🌐 {String(emergency.language).toUpperCase()}
               </span>
             )}
           </div>
-          <p style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-            {emergency.fases.desarrollo}
-          </p>
+          <p style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{emergency.fases.desarrollo}</p>
         </div>
       )}
 
@@ -1838,7 +1921,9 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             <button
               style={iconBtn}
               onClick={presentChooser}
-              title={sharing ? "Compartiendo… (elige otra opción)" : "Presentar (pantalla o archivo)"}
+              title={
+                sharing ? "Compartiendo… (elige otra opción)" : "Presentar (pantalla o archivo)"
+              }
             >
               <IconPresent />
             </button>
@@ -1907,7 +1992,9 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
                     >
                       <img src={ico(domain)} alt={app.name} style={appIcon} />
                       <div style={{ display: "flex", flexDirection: "column" }}>
-                        <span style={appTitle}>{app.name} {app.embed ? "" : "—"}</span>
+                        <span style={appTitle}>
+                          {app.name} {app.embed ? "" : "—"}
+                        </span>
                         <span style={appGroupLabel}>{app.group}</span>
                       </div>
                     </div>
@@ -1987,8 +2074,9 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
         {!finalPdfUrl ? (
           <div style={{ color: COLORS.textMuted, textAlign: "center" }}>
             Pega la URL del PDF arriba. Si vienes desde <em>Inicio</em> con ficha, uso automáticamente{" "}
-            <code>ficha.programaUrl</code>. Si está vacío, intentamos buscarlo en <code>mineduc_pdfs</code> por tu{" "}
-            {nivelPrefer ? `nivel «${nivelPrefer}»` : "nivel"} y asignatura.
+            <code>ficha.programaUrl</code>. Si está vacío, intentamos buscarlo en{" "}
+            <code>mineduc_pdfs</code> por tu {nivelPrefer ? `nivel «${nivelPrefer}»` : "nivel"} y
+            asignatura.
           </div>
         ) : pdfMode === "scroll" ? (
           <div
@@ -2147,12 +2235,15 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
           >
             <h3 style={{ margin: 0 }}>📚 Introducción (Wikipedia)</h3>
             <div style={subtle}>
-              Relacionado con: <strong>{unidadShown || objetivoShown || "la temática de la clase"}</strong>
+              Relacionado con:{" "}
+              <strong>{unidadShown || objetivoShown || "la temática de la clase"}</strong>
             </div>
           </div>
 
           <div style={wikiIntroWrap}>
-            {wikiThumb ? <img src={wikiThumb} alt={wikiTitle || "Wikipedia"} style={wikiThumbStyle} /> : null}
+            {wikiThumb ? (
+              <img src={wikiThumb} alt={wikiTitle || "Wikipedia"} style={wikiThumbStyle} />
+            ) : null}
             <div>
               {wikiTitle && (
                 <div style={{ fontWeight: 800, marginBottom: 4 }}>

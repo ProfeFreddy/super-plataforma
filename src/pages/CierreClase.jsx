@@ -1,4 +1,4 @@
-﻿// src/pages/CierreClase.jsx  
+﻿// src/pages/CierreClase.jsx 
 import React, {
   useEffect,
   useState,
@@ -14,13 +14,11 @@ import {
   doc,
   collection,
   onSnapshot,
-  addDoc,
   serverTimestamp,
   setDoc,
   updateDoc,
   increment,
   query,
-  orderBy,
   where,
   getDocs,
   writeBatch,
@@ -29,6 +27,9 @@ import CronometroGlobal from "../components/CronometroGlobal";
 import NubeDePalabras from "../components/NubeDePalabras";
 import QRCode from "react-qr-code";
 import FichaClaseSticky from "../components/FichaClaseSticky";
+
+// 🔥 NUEVO: portada del juego PRAGMA (Remy corriendo)
+import portadaCarreraPragma from "../assets/pragmaprofe-carrera.png";
 
 // ===== Compat de PlanContext (soporta export default o named) =====
 import * as PlanCtxAll from "../context/PlanContext";
@@ -40,10 +41,7 @@ const usePlan = PlanCtxAll.usePlan || (() => useContext(PlanContext));
 import { PLAN_CAPS } from "../lib/planCaps";
 import { getClaseVigente } from "../services/PlanificadorService";
 
-import {
-  onAuthStateChanged,
-  signInAnonymously,
-} from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 
 /* ============================================================
    Hook seguro de auth (reemplaza al viejo useAuthX roto)
@@ -72,12 +70,11 @@ function useAuthSafe() {
         }
       } catch (err) {
         console.error("[CierreClase] useAuthSafe error:", err);
-        setUserObj(null); // FIX: antes intentaba usar 'u' que no existe en este scope
-        // fallback: si ya hay uid guardado en localStorage consideramos "ready"
+        setUserObj(null);
         if (localStorage.getItem("uid")) {
           setReady(true);
         } else {
-          setReady(true); // igual marcamos listo para no colgar la UI
+          setReady(true);
         }
       }
     });
@@ -92,18 +89,20 @@ function useAuthSafe() {
 }
 
 /* ============================================================
-   Base del proxy para OA MINEDUC (igual que en Desarrollo)
+   Base del proxy para OA MINEDUC
    ============================================================ */
-const PROXY_BASE =
+
+/* ============================================================
+   Endpoint IA Carrera
+   ============================================================ */
+const IA_CARRERA_ENDPOINT =
   (typeof import.meta !== "undefined" &&
     import.meta.env &&
-    import.meta.env.VITE_PROXY_BASE) ||
-  (typeof process !== "undefined" &&
-    process.env &&
-    (process.env.REACT_APP_PROXY_URL || process.env.VITE_PROXY_BASE)) ||
-  (typeof window !== "undefined"
-    ? `${window.location.origin}/api`
-    : "http://localhost:8080");
+    import.meta.env.VITE_IA_CARRERA_ENDPOINT) ||
+  (typeof window !== "undefined" &&
+  window.location.origin.includes("localhost:5173")
+    ? "http://localhost:8080/api/ia-carrera/genera"
+    : "/api/ia-carrera/genera");
 
 /* ============================================================
    Helpers de normalización / asignatura / nivel
@@ -170,18 +169,10 @@ function filaDesdeMarcas(marcas = []) {
 }
 
 function getMarcasFromConfig(cfg = {}) {
-  // caso [ [8,0], [8,45], ... ]
-  if (Array.isArray(cfg.marcas) && Array.isArray(cfg.marcas[0]))
-    return cfg.marcas;
-  // caso [ {h:8,m:0}, {h:8,m:45}, ... ]
-  if (
-    Array.isArray(cfg.marcas) &&
-    cfg.marcas.length &&
-    typeof cfg.marcas[0] === "object"
-  ) {
+  if (Array.isArray(cfg.marcas) && Array.isArray(cfg.marcas[0])) return cfg.marcas;
+  if (Array.isArray(cfg.marcas) && cfg.marcas.length && typeof cfg.marcas[0] === "object") {
     return cfg.marcas.map((x) => [Number(x.h) || 0, Number(x.m) || 0]);
   }
-  // marcasStr: ["08:00","08:45",...]
   if (Array.isArray(cfg.marcasStr)) {
     return cfg.marcasStr.map((s) => {
       const [h, m] = String(s)
@@ -190,11 +181,8 @@ function getMarcasFromConfig(cfg = {}) {
       return [h, m];
     });
   }
-  // bloquesGenerados fallback
   if (Array.isArray(cfg.bloquesGenerados) && cfg.bloquesGenerados.length) {
-    const startTimes = cfg.bloquesGenerados.map((b) =>
-      String(b).split(" - ")[0]
-    );
+    const startTimes = cfg.bloquesGenerados.map((b) => String(b).split(" - ")[0]);
     const lastEnd = String(cfg.bloquesGenerados.at(-1)).split(" - ")[1];
     return [...startTimes, lastEnd].map((s) => {
       const [h, m] = s.split(":").map((n) => Number(n) || 0);
@@ -208,11 +196,11 @@ function getMarcasFromConfig(cfg = {}) {
    Estilos / UI
    ============================================================ */
 const COLORS = {
-  brandA: "#1b75a6", // un poco más oscuro para más contraste
+  brandA: "#1b75a6",
   brandB: "#60c3eb",
   white: "#ffffff",
   textDark: "#0f172a",
-  textMuted: "#334155", // más contraste
+  textMuted: "#334155",
   border: "#e5e7eb",
   btnText: "#164e63",
 };
@@ -239,7 +227,7 @@ const card = {
   borderRadius: 12,
   padding: "1rem",
   boxShadow:
-    "0 10px 24px rgba(16,24,40,.12), 0 4px 10px rgba(16,24,40,.06)", // sombra un poco más marcada
+    "0 10px 24px rgba(16,24,40,.12), 0 4px 10px rgba(16,24,40,.06)",
   border: `1px solid ${COLORS.border}`,
   maxWidth: "100%",
   overflow: "hidden",
@@ -247,7 +235,6 @@ const card = {
   minWidth: 0,
 };
 
-/* antialias / capa propia para evitar parpadeos de texto */
 const layerFix = {
   willChange: "transform",
   transform: "translateZ(0)",
@@ -279,37 +266,23 @@ const input = {
 const smallMuted = { color: COLORS.textMuted, fontSize: 12 };
 
 /* ============================================================
-   🎆 PRESET "showtime" para NubeDePalabras
-   - Más contraste y rotaciones agresivas
-   - No rompe si el componente no usa estas props
+   SHOWTIME_PRESET para NubeDePalabras
    ============================================================ */
 const SHOWTIME_PRESET = {
   id: "showtime",
-  // Paleta de alto contraste (se puede ignorar si el hijo no la usa)
-  colors: [
-    "#0f172a", // casi negro
-    "#0ea5e9", // celeste vivo
-    "#22c55e", // verde
-    "#ef4444", // rojo
-    "#f59e0b", // ámbar
-    "#a855f7", // violeta
-  ],
+  colors: ["#0f172a", "#0ea5e9", "#22c55e", "#ef4444", "#f59e0b", "#a855f7"],
   fontFamily: "Segoe UI, system-ui, sans-serif",
   fontWeight: [600, 800],
-  fontSizes: [18, 72], // rango más amplio
+  fontSizes: [18, 72],
   padding: 1,
   spiral: "rectangular",
   shuffle: true,
-  // Rotaciones agresivas
   rotate: {
     mode: "steep",
-    // ángulos marcados
     angles: [-90, -60, -30, 0, 30, 60, 90],
     probabilityTilted: 0.75,
   },
-  // “contraste extra” para componentes que lo soporten
   contrastBoost: 1.25,
-  // opción extra para suavizado y nitidez
   rendering: { fontKerning: "none", pixelRatio: 1.0 },
 };
 
@@ -318,45 +291,44 @@ const SHOWTIME_PRESET = {
    ============================================================ */
 const GAMES = [
   {
+    key: "juego1",
+    name: "Trivia relámpago",
+    desc: "Juego de preguntas y respuestas rápidas. Versión en desarrollo.",
+    type: "comingSoon",
+  },
+  {
+    key: "juego2",
+    name: "Rompebloques PRAGMA",
+    desc: "Rompe bloques respondiendo acertijos. Versión en desarrollo.",
+    type: "comingSoon",
+  },
+  {
+    key: "juego3",
+    name: "Memoria matemática",
+    desc: "Encuentra parejas de operaciones y resultados. Versión en desarrollo.",
+    type: "comingSoon",
+  },
+  {
+    key: "juego4",
+    name: "Ruleta de desafíos",
+    desc: "Gira la ruleta y resuelve el reto. Versión en desarrollo.",
+    type: "comingSoon",
+  },
+  {
     key: "pragma",
-    name: "Carrera PRAGMA (en esta página)",
-    desc: "Juego nativo de la plataforma. Publica rondas y muestra ranking.",
+    name: "Carrera PRAGMA",
+    desc: "Juego nativo de la plataforma. Publica rondas, recibe respuestas y muestra el ranking en vivo.",
     type: "internal",
   },
-  {
-    key: "blooket",
-    name: "Blooket",
-    desc: "Lanza sets y comparte PIN con tu clase. Requiere tu cuenta.",
-    type: "external",
-    url: "https://dashboard.blooket.com/discover",
-    premium: true,
-  },
-  {
-    key: "decktoys",
-    name: "Deck.Toys",
-    desc: "Rutas y tableros interactivos. Requiere tu cuenta.",
-    type: "external",
-    url: "https://deck.toys/teacher",
-    premium: true,
-  },
-  {
-    key: "classcraft",
-    name: "Classcraft",
-    desc: "Gamificación del curso a largo plazo. Requiere tu cuenta.",
-    type: "external",
-    url: "https://game.classcraft.com",
-    premium: true,
-  },
 ];
+
 
 /* ============================================================
    utilidades varias
    ============================================================ */
 
-// llave para el cronómetro del CIERRE
 const CIERRE_TIMER_KEY = "crono:cierre:v2";
 
-// limpiar llaves de cronos / countdowns
 function clearAllCountdowns() {
   try {
     const toDelete = [];
@@ -378,15 +350,12 @@ function clearAllCountdowns() {
 const isPlaceholder = (v) => /^\(sin/i.test(String(v || ""));
 
 /* ============================================================
-   Subcomponentes memoizados anti-parpadeo
+   Subcomponentes
    ============================================================ */
 const HoraActualText = React.memo(function HoraActualText() {
   const [t, setT] = useState(new Date().toLocaleTimeString());
   useEffect(() => {
-    const id = setInterval(
-      () => setT(new Date().toLocaleTimeString()),
-      1000
-    );
+    const id = setInterval(() => setT(new Date().toLocaleTimeString()), 1000);
     return () => clearInterval(id);
   }, []);
   return <span className="tnum clock-w">{t}</span>;
@@ -454,12 +423,8 @@ const ProfesorCard = React.memo(
           <button style={btnWhite}>🎓</button>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontWeight: 800, ...layerFix }}>
-            {nombreProfesor}
-          </div>
-          <div style={{ color: COLORS.textMuted, ...layerFix }}>
-            {asignatura}
-          </div>
+          <div style={{ fontWeight: 800, ...layerFix }}>{nombreProfesor}</div>
+          <div style={{ color: COLORS.textMuted, ...layerFix }}>{asignatura}</div>
         </div>
       </div>
     );
@@ -475,55 +440,38 @@ const ProfesorCard = React.memo(
 export default function CierreClase({ duracion = 10 }) {
   const navigate = useNavigate();
 
-  // contexto de plan (lo mantenemos porque es parte de tu diseño comercial)
   const planCtx = useContext(PlanContext) || {};
   const {
-    user: userPlanCtx = null,
     plan = "FREE",
     caps = PLAN_CAPS.FREE,
-    loading = false,
   } = planCtx;
 
-  // auth seguro (sustituye al viejo useAuthX)
   const { ready: authReady, user: authUser } = useAuthSafe();
 
-  const [horaActual, setHoraActual] = useState(""); // compat visual
   const [nombreProfesor, setNombreProfesor] = useState("Profesor");
   const [asignatura, setAsignatura] = useState("(sin asignatura)");
   const [curso, setCurso] = useState("(sin curso)");
   const [unidad, setUnidad] = useState("");
   const [oaMinisterio, setOaMinisterio] = useState(null);
   const [objetivo, setObjetivo] = useState("(sin objetivo)");
-
   const [claseVigente, setClaseVigente] = useState(null);
 
-  // Candado visual para la asignatura (evita que vuelva a "(sin asignatura)" después de tener valor bueno)
   const lastGoodAsignaturaRef = useRef(null);
   useEffect(() => {
     if (asignatura && !isPlaceholder(asignatura)) {
       lastGoodAsignaturaRef.current = asignatura;
     }
   }, [asignatura]);
-  const asignaturaStable =
-    lastGoodAsignaturaRef.current || asignatura;
+  const asignaturaStable = lastGoodAsignaturaRef.current || asignatura;
 
-  // Cargamos info de clase vigente (planificación semanal / slots)
   useEffect(() => {
     (async () => {
       try {
         const res = await getClaseVigente(new Date());
         setClaseVigente(res);
         if (res?.unidad && !unidad) setUnidad(res.unidad);
-        if (
-          res?.asignatura &&
-          asignatura === "(sin asignatura)"
-        )
-          setAsignatura(res.asignatura);
-        if (
-          res?.objetivo &&
-          objetivo === "(sin objetivo)"
-        )
-          setObjetivo(res.objetivo);
+        if (res?.asignatura && asignatura === "(sin asignatura)") setAsignatura(res.asignatura);
+        if (res?.objetivo && objetivo === "(sin objetivo)") setObjetivo(res.objetivo);
       } catch (e) {
         console.error("[Cierre] getClaseVigente:", e);
       }
@@ -531,44 +479,37 @@ export default function CierreClase({ duracion = 10 }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Bandera simple para "ya tengo sesión lista"
   const [authed, setAuthed] = useState(false);
   useEffect(() => {
     if (!authReady) return;
-    // authReady viene de useAuthSafe, que ya intentó login anon
     if (authUser || localStorage.getItem("uid")) {
       setAuthed(true);
     }
   }, [authReady, authUser]);
 
-  /* ========================================================
-     Sesión de juego / carrera PRAGMA
-     ======================================================== */
+  /* ============================
+     Sesión de juego / carrera
+     ============================ */
   const [sessionId, setSessionId] = useState("");
 
   const joinURL = useMemo(() => {
     const base = window.location.origin.replace(/\/$/, "");
     return sessionId
-      ? `${base}/participa?session=${encodeURIComponent(
-          sessionId
-        )}`
+      ? `${base}/participa?session=${encodeURIComponent(sessionId)}`
       : `${base}/participa`;
   }, [sessionId]);
 
-  // Datos juego y panel profesor
   const [pregunta, setPregunta] = useState(null);
   const [participantes, setParticipantes] = useState([]);
   const [panelTexto, setPanelTexto] = useState("");
-  const [panelOpciones, setPanelOpciones] = useState([
-    "",
-    "",
-    "",
-    "",
-  ]);
+  const [panelOpciones, setPanelOpciones] = useState(["", "", "", ""]);
   const [panelCorrecta, setPanelCorrecta] = useState(0);
   const [publicando, setPublicando] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [ronda, setRonda] = useState(0);
+
+  const [iaLoading, setIaLoading] = useState(false);
+  const [iaError, setIaError] = useState(null);
 
   /* ========================================================
      Cargar datos base del profe / clase desde Firestore
@@ -578,20 +519,15 @@ export default function CierreClase({ duracion = 10 }) {
 
     const obtenerDatos = async () => {
       try {
-        const uid =
-          localStorage.getItem("uid") || auth.currentUser?.uid;
+        const uid = localStorage.getItem("uid") || auth.currentUser?.uid;
         if (!uid) return;
 
-        // usuarios/{uid}
         const uref = doc(db, "usuarios", uid);
         const usnap = await getDoc(uref);
         if (usnap.exists()) {
-          setNombreProfesor(
-            usnap.data()?.nombre || "Profesor"
-          );
+          setNombreProfesor(usnap.data()?.nombre || "Profesor");
         }
 
-        // profesores/{uid} (perfil docente más rico)
         const pref = doc(db, "profesores", uid);
         const psnap = await getDoc(pref);
         if (psnap.exists()) {
@@ -599,89 +535,50 @@ export default function CierreClase({ duracion = 10 }) {
           const unidadInicial = data.unidadInicial || "";
           setUnidad((u) => u || unidadInicial);
 
-          if (
-            data.asignatura &&
-            !isPlaceholder(data.asignatura)
-          ) {
-            setAsignatura((a) =>
-              isPlaceholder(a) ? data.asignatura : a
-            );
+          if (data.asignatura && !isPlaceholder(data.asignatura)) {
+            setAsignatura((a) => (isPlaceholder(a) ? data.asignatura : a));
           }
 
-          setCurso((c) =>
-            c === "(sin curso)"
-              ? data.curso || "(sin curso)"
-              : c
-          );
+          setCurso((c) => (c === "(sin curso)" ? data.curso || "(sin curso)" : c));
 
           if (data.objetivo) setObjetivo(data.objetivo);
-          else if (data.objetivoInicial)
-            setObjetivo(data.objetivoInicial);
+          else if (data.objetivoInicial) setObjetivo(data.objetivoInicial);
 
-          // OA dinámico desde proxy / fallback directo MINEDUC
           if (unidadInicial && !oaMinisterio) {
             try {
-              const asigSlug = asigToSlug(
-                data.asignatura ||
-                  asignatura ||
-                  "Matemática"
-              );
-              const nivelApi = nivelToApi(
-                data.curso || curso,
-                claseVigente?.nivel || ""
-              );
+              const asigSlug = asigToSlug(data.asignatura || asignatura || "Matemática");
+              const nivelApi = nivelToApi(data.curso || curso, claseVigente?.nivel || "");
               const proxyUrl = `${PROXY_BASE}/mineduc?asignatura=${encodeURIComponent(
                 asigSlug
-              )}&nivel=${encodeURIComponent(
-                nivelApi
-              )}&unidad=${encodeURIComponent(
-                unidadInicial
-              )}`;
+              )}&nivel=${encodeURIComponent(nivelApi)}&unidad=${encodeURIComponent(unidadInicial)}`;
               const rProxy = await axios.get(proxyUrl);
-              const firstProxy = Array.isArray(rProxy.data)
-                ? rProxy.data[0]
-                : null;
+              const firstProxy = Array.isArray(rProxy.data) ? rProxy.data[0] : null;
               if (firstProxy) {
                 setOaMinisterio(firstProxy);
               } else {
-                throw new Error(
-                  "Proxy sin resultados, intento directo"
-                );
+                throw new Error("Proxy sin resultados, intento directo");
               }
             } catch (e) {
               try {
-                const asigSlug = asigToSlug(
-                  data.asignatura ||
-                    asignatura ||
-                    "Matemática"
-                );
-                const nivelApi = nivelToApi(
-                  data.curso || curso,
-                  claseVigente?.nivel || ""
-                );
+                const asigSlug = asigToSlug(data.asignatura || asignatura || "Matemática");
+                const nivelApi = nivelToApi(data.curso || curso, claseVigente?.nivel || "");
                 const directUrl = `https://curriculumnacional.mineduc.cl/api/v1/oa/buscar?asignatura=${encodeURIComponent(
                   asigSlug
-                )}&nivel=${encodeURIComponent(
-                  nivelApi
-                )}&unidad=${encodeURIComponent(
+                )}&nivel=${encodeURIComponent(nivelApi)}&unidad=${encodeURIComponent(
                   unidadInicial
                 )}`;
-                const oaResponse = await axios.get(
-                  directUrl
-                );
+                const oaResponse = await axios.get(directUrl);
                 setOaMinisterio(
-                  Array.isArray(oaResponse.data)
-                    ? oaResponse.data[0]
-                    : null
+                  Array.isArray(oaResponse.data) ? oaResponse.data[0] : null
                 );
               } catch (e2) {
-                // fallback opcional (dejado comentado)
+                // sin OA, seguimos igual
               }
             }
           }
         }
 
-        // --- Intentar mapear bloque actual segun horarioConfig.marcas
+        // horarioConfig → clases_detalle
         try {
           if (usnap.exists()) {
             const cfg = usnap.data()?.horarioConfig || {};
@@ -690,74 +587,36 @@ export default function CierreClase({ duracion = 10 }) {
               const fila = filaDesdeMarcas(marcas);
               const col = colDeHoy();
               const slotId = `${fila}-${col}`;
-              const dref = doc(
-                db,
-                "clases_detalle",
-                uid,
-                "slots",
-                slotId
-              );
+              const dref = doc(db, "clases_detalle", uid, "slots", slotId);
               const dsnap = await getDoc(dref);
               if (dsnap.exists()) {
                 const det = dsnap.data() || {};
                 if (det.unidad && !unidad) setUnidad(det.unidad);
-                if (
-                  det.objetivo &&
-                  objetivo === "(sin objetivo)"
-                )
-                  setObjetivo(det.objetivo);
-                if (
-                  det.asignatura &&
-                  asignatura === "(sin asignatura)"
-                )
+                if (det.objetivo && objetivo === "(sin objetivo)") setObjetivo(det.objetivo);
+                if (det.asignatura && asignatura === "(sin asignatura)")
                   setAsignatura(det.asignatura);
-                if (
-                  det.curso &&
-                  curso === "(sin curso)"
-                )
-                  setCurso(det.curso);
+                if (det.curso && curso === "(sin curso)") setCurso(det.curso);
               }
             }
           }
         } catch (e) {
-          console.warn(
-            "[Cierre] horarioConfig → clases_detalle:",
-            e?.code || e?.message
-          );
+          console.warn("[Cierre] horarioConfig → clases_detalle:", e?.code || e?.message);
         }
 
-        // slot semilla "0-0" como fallback universal
+        // slot 0-0 como fallback
         try {
-          const slotRef = doc(
-            db,
-            "clases_detalle",
-            uid,
-            "slots",
-            "0-0"
-          );
+          const slotRef = doc(db, "clases_detalle", uid, "slots", "0-0");
           const slotSnap = await getDoc(slotRef);
           if (slotSnap.exists()) {
             const s = slotSnap.data() || {};
             if (!unidad && s.unidad) setUnidad(s.unidad);
-            if (
-              objetivo === "(sin objetivo)" &&
-              s.objetivo
-            )
-              setObjetivo(s.objetivo);
-            if (
-              asignatura === "(sin asignatura)" &&
-              s.asignatura
-            )
-              setAsignatura(s.asignatura);
-            if (curso === "(sin curso)" && s.curso)
-              setCurso(s.curso);
+            if (objetivo === "(sin objetivo)" && s.objetivo) setObjetivo(s.objetivo);
+            if (asignatura === "(sin asignatura)" && s.asignatura) setAsignatura(s.asignatura);
+            if (curso === "(sin curso)" && s.curso) setCurso(s.curso);
           }
         } catch (e) {}
       } catch (err) {
-        console.error(
-          "Error cargando datos de Cierre:",
-          err
-        );
+        console.error("Error cargando datos de Cierre:", err);
       }
     };
 
@@ -765,88 +624,59 @@ export default function CierreClase({ duracion = 10 }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
-  // fallback extra desde usuarios/{uid} para rellenar huecos
+  // fallback extra desde usuarios/{uid}
   useEffect(() => {
     if (!authed) return;
     (async () => {
       try {
-        const uid =
-          localStorage.getItem("uid") || auth.currentUser?.uid;
+        const uid = localStorage.getItem("uid") || auth.currentUser?.uid;
         if (!uid) return;
 
         const uref = doc(db, "usuarios", uid);
         const usnap = await getDoc(uref);
         if (usnap.exists()) {
           const u = usnap.data() || {};
-          if (!unidad || /^\(sin/i.test(unidad))
-            setUnidad(
-              u.unidadInicial || u.unidad || ""
-            );
-          if (
-            asignatura === "(sin asignatura)" &&
-            u.asignatura
-          )
-            setAsignatura(u.asignatura);
-          if (curso === "(sin curso)" && u.curso)
-            setCurso(u.curso);
-          if (
-            objetivo === "(sin objetivo)" &&
-            u.objetivo
-          )
-            setObjetivo(u.objetivo);
+          if (!unidad || /^\(sin/i.test(unidad)) setUnidad(u.unidadInicial || u.unidad || "");
+          if (asignatura === "(sin asignatura)" && u.asignatura) setAsignatura(u.asignatura);
+          if (curso === "(sin curso)" && u.curso) setCurso(u.curso);
+          if (objetivo === "(sin objetivo)" && u.objetivo) setObjetivo(u.objetivo);
         }
       } catch (e) {
-        console.warn(
-          "[Cierre] usuarios fallback:",
-          e?.code || e?.message
-        );
+        console.warn("[Cierre] usuarios fallback:", e?.code || e?.message);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
   /* ========================================================
-     Subs en tiempo real (profesor, clase actual, etc)
+     Subs en tiempo real
      ======================================================== */
   useEffect(() => {
     if (!authed) return;
-    const uid =
-      localStorage.getItem("uid") || auth.currentUser?.uid;
+    const uid = localStorage.getItem("uid") || auth.currentUser?.uid;
     if (!uid) return;
 
     const applyClase = (d) => {
       if (!d) return;
 
       if (d.nombre) {
-        setNombreProfesor((prev) =>
-          d.nombre && d.nombre !== prev ? d.nombre : prev
-        );
+        setNombreProfesor((prev) => (d.nombre && d.nombre !== prev ? d.nombre : prev));
       }
 
-      setUnidad((prev) =>
-        d.unidad && d.unidad !== prev ? d.unidad : prev
-      );
+      setUnidad((prev) => (d.unidad && d.unidad !== prev ? d.unidad : prev));
 
       setAsignatura((prev) =>
-        d.asignatura &&
-        !isPlaceholder(d.asignatura) &&
-        d.asignatura !== prev
+        d.asignatura && !isPlaceholder(d.asignatura) && d.asignatura !== prev
           ? d.asignatura
           : prev
       );
 
       setCurso((prev) =>
-        d.curso &&
-        !isPlaceholder(d.curso) &&
-        d.curso !== prev
-          ? d.curso
-          : prev
+        d.curso && !isPlaceholder(d.curso) && d.curso !== prev ? d.curso : prev
       );
 
       setObjetivo((prev) =>
-        d.objetivo &&
-        !isPlaceholder(d.objetivo) &&
-        d.objetivo !== prev
+        d.objetivo && !isPlaceholder(d.objetivo) && d.objetivo !== prev
           ? d.objetivo
           : prev
       );
@@ -855,42 +685,18 @@ export default function CierreClase({ duracion = 10 }) {
     const unsubs = [];
 
     try {
-      const r1 = doc(
-        db,
-        "clases_detalle",
-        uid,
-        "meta",
-        "actual"
-      );
-      unsubs.push(
-        onSnapshot(r1, (s) => s.exists() && applyClase(s.data()))
-      );
+      const r1 = doc(db, "clases_detalle", uid, "meta", "actual");
+      unsubs.push(onSnapshot(r1, (s) => s.exists() && applyClase(s.data())));
     } catch (e) {}
 
     try {
-      const r2 = doc(
-        db,
-        "clases_detalle",
-        uid,
-        "actual",
-        "info"
-      );
-      unsubs.push(
-        onSnapshot(r2, (s) => s.exists() && applyClase(s.data()))
-      );
+      const r2 = doc(db, "clases_detalle", uid, "actual", "info");
+      unsubs.push(onSnapshot(r2, (s) => s.exists() && applyClase(s.data())));
     } catch (e) {}
 
     try {
-      const r3 = doc(
-        db,
-        "clases_detalle",
-        uid,
-        "slots",
-        "0-0"
-      );
-      unsubs.push(
-        onSnapshot(r3, (s) => s.exists() && applyClase(s.data()))
-      );
+      const r3 = doc(db, "clases_detalle", uid, "slots", "0-0");
+      unsubs.push(onSnapshot(r3, (s) => s.exists() && applyClase(s.data())));
     } catch (e) {}
 
     try {
@@ -900,12 +706,8 @@ export default function CierreClase({ duracion = 10 }) {
           if (!s.exists()) return;
           applyClase({
             nombre: s.data()?.nombre,
-            unidad:
-              s.data()?.unidad ||
-              s.data()?.unidadInicial,
-            objetivo:
-              s.data()?.objetivo ||
-              s.data()?.objetivoInicial,
+            unidad: s.data()?.unidad || s.data()?.unidadInicial,
+            objetivo: s.data()?.objetivo || s.data()?.objetivoInicial,
             asignatura: s.data()?.asignatura,
             curso: s.data()?.curso,
           });
@@ -913,10 +715,7 @@ export default function CierreClase({ duracion = 10 }) {
       );
     } catch (e) {}
 
-    return () =>
-      unsubs.forEach(
-        (u) => typeof u === "function" && u()
-      );
+    return () => unsubs.forEach((u) => typeof u === "function" && u());
   }, [authed]);
 
   // SessionId de la carrera
@@ -924,21 +723,12 @@ export default function CierreClase({ duracion = 10 }) {
     if (!authed) return;
     const ensureSession = async () => {
       try {
-        const sref = doc(
-          db,
-          "carrera",
-          "actual",
-          "meta",
-          "session"
-        );
+        const sref = doc(db, "carrera", "actual", "meta", "session");
         const snap = await getDoc(sref);
         if (snap.exists() && snap.data()?.id) {
           setSessionId(String(snap.data().id));
         } else {
-          const newId = Math.random()
-            .toString(36)
-            .slice(2, 8)
-            .toUpperCase();
+          const newId = Math.random().toString(36).slice(2, 8).toUpperCase();
           await setDoc(
             sref,
             {
@@ -950,25 +740,16 @@ export default function CierreClase({ duracion = 10 }) {
           setSessionId(newId);
         }
       } catch (e) {
-        console.error(
-          "No se pudo crear/leer la sesión:",
-          e
-        );
+        console.error("No se pudo crear/leer la sesión:", e);
       }
     };
     ensureSession();
   }, [authed]);
 
-  // Pregunta activa de la ronda
+  // Pregunta activa
   useEffect(() => {
     if (!authed) return;
-    const ref = doc(
-      db,
-      "carrera",
-      "actual",
-      "meta",
-      "pregunta"
-    );
+    const ref = doc(db, "carrera", "actual", "meta", "pregunta");
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) setPregunta(snap.data());
       else setPregunta(null);
@@ -976,27 +757,20 @@ export default function CierreClase({ duracion = 10 }) {
     return () => unsub();
   }, [authed]);
 
-  // Participantes (ranking en vivo)
+  // Participantes
   useEffect(() => {
     if (!authed) return;
     let qRef;
     if (sessionId) {
       qRef = query(
         collection(db, "carrera", "actual", "participantes"),
-        where("session", "==", sessionId),
-        orderBy("progreso", "desc")
+        where("session", "==", sessionId)
       );
     } else {
-      qRef = query(
-        collection(db, "carrera", "actual", "participantes"),
-        orderBy("progreso", "desc")
-      );
+      qRef = collection(db, "carrera", "actual", "participantes");
     }
     const unsub = onSnapshot(qRef, (snap) => {
-      const list = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setParticipantes(list);
     });
     return () => unsub();
@@ -1026,27 +800,14 @@ export default function CierreClase({ duracion = 10 }) {
       setProcesando(true);
 
       const toProcess = [];
-      const startMs = pregunta?.startAt?.toMillis
-        ? pregunta.startAt.toMillis()
-        : null;
+      const startMs = pregunta?.startAt?.toMillis ? pregunta.startAt.toMillis() : null;
 
       snap.docChanges().forEach((chg) => {
-        if (
-          chg.type === "added" ||
-          chg.type === "modified"
-        ) {
+        if (chg.type === "added" || chg.type === "modified") {
           const data = chg.doc.data();
-          if (
-            startMs &&
-            data.createdAt?.toMillis &&
-            data.createdAt.toMillis() < startMs
-          )
-            return;
+          if (startMs && data.createdAt?.toMillis && data.createdAt.toMillis() < startMs) return;
           if (data.scored === true) return;
-          toProcess.push({
-            id: chg.doc.id,
-            data,
-          });
+          toProcess.push({ id: chg.doc.id, data });
         }
       });
 
@@ -1062,95 +823,51 @@ export default function CierreClase({ duracion = 10 }) {
 
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    pregunta?.activa,
-    pregunta?.startAt,
-    ronda,
-    sessionId,
-    authed,
-  ]);
+  }, [pregunta?.activa, pregunta?.startAt, ronda, sessionId, authed]);
 
   async function scoreAnswer(respId, respData) {
     const { pid, answer, latencyMs } = respData;
     if (!pid) {
       await updateDoc(
-        doc(
-          db,
-          "carrera",
-          "actual",
-          "respuestas",
-          respId
-        ),
+        doc(db, "carrera", "actual", "respuestas", respId),
         { scored: true, points: 0 }
       );
       return;
     }
 
-    // puntaje base
     let points = 0;
 
-    // caso con alternativas
     if (
       Array.isArray(pregunta?.opciones) &&
       pregunta.opciones.length > 0 &&
       typeof pregunta?.correcta === "number"
     ) {
-      const correcta =
-        pregunta.opciones[pregunta.correcta];
-      const esCorrecta =
-        String(answer).trim() ===
-        String(correcta).trim();
+      const correcta = pregunta.opciones[pregunta.correcta];
+      const esCorrecta = String(answer).trim() === String(correcta).trim();
       if (esCorrecta) {
-        const latS =
-          typeof latencyMs === "number"
-            ? latencyMs / 1000
-            : 8;
-        const bonus = Math.max(
-          0,
-          8 - Math.floor(latS)
-        );
+        const latS = typeof latencyMs === "number" ? latencyMs / 1000 : 8;
+        const bonus = Math.max(0, 8 - Math.floor(latS));
         points = 5 + bonus;
       } else {
         points = 0;
       }
     } else {
-      // pregunta abierta
-      const latS =
-        typeof latencyMs === "number"
-          ? latencyMs / 1000
-          : 8;
-      const bonus = Math.max(
-        0,
-        5 - Math.floor(latS)
-      );
+      const latS = typeof latencyMs === "number" ? latencyMs / 1000 : 8;
+      const bonus = Math.max(0, 5 - Math.floor(latS));
       points = 2 + bonus;
     }
 
     try {
-      // sumar puntos al participante
       await updateDoc(
-        doc(
-          db,
-          "carrera",
-          "actual",
-          "participantes",
-          pid
-        ),
+        doc(db, "carrera", "actual", "participantes", pid),
         {
           puntos: increment(points),
           progreso: increment(points),
         }
       );
     } catch (e) {
-      // crear si no existía
       await setDoc(
-        doc(
-          db,
-          "carrera",
-          "actual",
-          "participantes",
-          pid
-        ),
+        doc(db, "carrera", "actual", "participantes", pid),
         {
           nombre: respData.nombre || "Jugador",
           avatar: "🟢",
@@ -1163,15 +880,8 @@ export default function CierreClase({ duracion = 10 }) {
       );
     }
 
-    // marcar respuesta como "scored"
     await updateDoc(
-      doc(
-        db,
-        "carrera",
-        "actual",
-        "respuestas",
-        respId
-      ),
+      doc(db, "carrera", "actual", "respuestas", respId),
       {
         scored: true,
         points,
@@ -1179,52 +889,29 @@ export default function CierreClase({ duracion = 10 }) {
     );
   }
 
-  // Ranking ordenado
-  const ranking = useMemo(() => {
-    return [...participantes].sort(
-      (a, b) => (b.progreso || 0) - (a.progreso || 0)
-    );
-  }, [participantes]);
+  const ranking = useMemo(
+    () => [...participantes].sort((a, b) => (b.progreso || 0) - (a.progreso || 0)),
+    [participantes]
+  );
 
-  // Publicar nueva pregunta/ronda
   const publicarPregunta = async () => {
     if (!panelTexto.trim()) return;
 
-    const opcionesLimpias = panelOpciones
-      .map((x) => x.trim())
-      .filter((x) => x.length > 0);
+    const opcionesLimpias = panelOpciones.map((x) => x.trim()).filter((x) => x.length > 0);
 
-    if (
-      opcionesLimpias.length > 0 &&
-      (panelCorrecta < 0 ||
-        panelCorrecta >= opcionesLimpias.length)
-    ) {
-      alert(
-        "Selecciona el índice de la respuesta correcta válido."
-      );
+    if (opcionesLimpias.length > 0 && (panelCorrecta < 0 || panelCorrecta >= opcionesLimpias.length)) {
+      alert("Selecciona el índice de la respuesta correcta válido.");
       return;
     }
 
     setPublicando(true);
     try {
       await setDoc(
-        doc(
-          db,
-          "carrera",
-          "actual",
-          "meta",
-          "pregunta"
-        ),
+        doc(db, "carrera", "actual", "meta", "pregunta"),
         {
           texto: panelTexto.trim(),
-          opciones:
-            opcionesLimpias.length > 0
-              ? opcionesLimpias
-              : [],
-          correcta:
-            opcionesLimpias.length > 0
-              ? panelCorrecta
-              : null,
+          opciones: opcionesLimpias.length > 0 ? opcionesLimpias : [],
+          correcta: opcionesLimpias.length > 0 ? panelCorrecta : null,
           startAt: serverTimestamp(),
           activa: true,
           session: sessionId || null,
@@ -1240,23 +927,60 @@ export default function CierreClase({ duracion = 10 }) {
     }
   };
 
-  // Cerrar la ronda actual
+  const generarPreguntaIA = async () => {
+    try {
+      setIaError(null);
+      setIaLoading(true);
+
+      const contextoBase = `Hoy trabajamos ${
+        asignaturaStable || "la asignatura"
+      } en el curso ${curso || ""}. Unidad: ${unidad || ""}. Objetivo: ${objetivo || ""}.`;
+
+      const resp = await fetch(IA_CARRERA_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contexto: contextoBase,
+          idioma: "es",
+        }),
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok || !data || !data.pregunta) {
+        throw new Error(data?.message || data?.error || "Respuesta de IA inválida.");
+      }
+
+      const opcionesIA = Array.isArray(data.opciones)
+        ? data.opciones.map((s) => String(s || ""))
+        : [];
+
+      const opciones4 = [...opcionesIA, "", "", "", ""].slice(0, 4);
+
+      setPanelTexto(data.pregunta);
+      setPanelOpciones(opciones4);
+
+      const idx =
+        typeof data.correctIndex === "number" && data.correctIndex >= 0 && data.correctIndex < 4
+          ? data.correctIndex
+          : 0;
+      setPanelCorrecta(idx);
+    } catch (e) {
+      console.error("ERROR IA CARRERA:", e);
+      setIaError(
+        e?.message || "No se pudo generar la pregunta con IA (usa fallback o escribe manual)."
+      );
+    } finally {
+      setIaLoading(false);
+    }
+  };
+
   const cerrarRonda = async () => {
     try {
-      await updateDoc(
-        doc(
-          db,
-          "carrera",
-          "actual",
-          "meta",
-          "pregunta"
-        ),
-        { activa: false }
-      );
+      await updateDoc(doc(db, "carrera", "actual", "meta", "pregunta"), { activa: false });
     } catch (e) {}
   };
 
-  // Reset de toda la carrera
   const resetCarrera = async () => {
     const ok = window.confirm(
       "¿Resetear carrera? Se borrarán participantes y respuestas, y se reiniciará la pregunta."
@@ -1264,40 +988,22 @@ export default function CierreClase({ duracion = 10 }) {
     if (!ok) return;
 
     try {
-      // borrar participantes activos
-      let pQ = collection(
-        db,
-        "carrera",
-        "actual",
-        "participantes"
-      );
-      let pSnap = sessionId
-        ? await getDocs(
-            query(
-              pQ,
-              where("session", "==", sessionId)
-            )
-          )
+      const uidSession = sessionId || null;
+
+      // participantes
+      let pQ = collection(db, "carrera", "actual", "participantes");
+      let pSnap = uidSession
+        ? await getDocs(query(pQ, where("session", "==", uidSession)))
         : await getDocs(pQ);
 
       const batch1 = writeBatch(db);
       pSnap.forEach((d) => batch1.delete(d.ref));
       await batch1.commit();
 
-      // borrar respuestas activas
-      let rQ = collection(
-        db,
-        "carrera",
-        "actual",
-        "respuestas"
-      );
-      let rSnap = sessionId
-        ? await getDocs(
-            query(
-              rQ,
-              where("session", "==", sessionId)
-            )
-          )
+      // respuestas
+      let rQ = collection(db, "carrera", "actual", "respuestas");
+      let rSnap = uidSession
+        ? await getDocs(query(rQ, where("session", "==", uidSession)))
         : await getDocs(rQ);
 
       const batch2 = writeBatch(db);
@@ -1306,25 +1012,18 @@ export default function CierreClase({ duracion = 10 }) {
 
       // reiniciar pregunta
       await setDoc(
-        doc(
-          db,
-          "carrera",
-          "actual",
-          "meta",
-          "pregunta"
-        ),
+        doc(db, "carrera", "actual", "meta", "pregunta"),
         {
           texto: "",
           opciones: [],
           correcta: null,
           activa: false,
           startAt: serverTimestamp(),
-          session: sessionId || null,
+          session: uidSession,
         },
         { merge: true }
       );
 
-      // resetear UI local
       setPanelTexto("");
       setPanelOpciones(["", "", "", ""]);
       setPanelCorrecta(0);
@@ -1335,7 +1034,6 @@ export default function CierreClase({ duracion = 10 }) {
     }
   };
 
-  // Abrir juegos externos en nueva pestaña con tracking simple
   const openExternal = (baseUrl) => {
     try {
       const url = new URL(baseUrl);
@@ -1344,25 +1042,15 @@ export default function CierreClase({ duracion = 10 }) {
       url.searchParams.set("utm_campaign", "cierre");
       const sala = localStorage.getItem("salaCode") || "";
       if (sala) url.searchParams.set("code", sala);
-      window.open(
-        url.toString(),
-        "_blank",
-        "noopener,noreferrer"
-      );
+      window.open(url.toString(), "_blank", "noopener,noreferrer");
     } catch (e) {
-      window.open(
-        baseUrl,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      window.open(baseUrl, "_blank", "noopener,noreferrer");
     }
   };
 
-  // Scroll suave al panel de carrera
   const goToCarrera = () => {
     try {
-      const el =
-        document.getElementById("carreraPanel");
+      const el = document.getElementById("carreraPanel");
       if (el?.scrollIntoView)
         el.scrollIntoView({
           behavior: "smooth",
@@ -1371,16 +1059,12 @@ export default function CierreClase({ duracion = 10 }) {
     } catch (e) {}
   };
 
-  // Cronómetro de cierre
   const cronometroPropsCierre = {
     duracion,
     storageKey: CIERRE_TIMER_KEY,
     instanceId: "cierre",
   };
 
-  /* ========================================================
-     Puente hacia DesarrolloClase (guardamos info en localStorage)
-     ======================================================== */
   function persistClaseForDesarrollo() {
     try {
       const bridge = {
@@ -1391,10 +1075,7 @@ export default function CierreClase({ duracion = 10 }) {
         ts: Date.now(),
         from: "cierre",
       };
-      localStorage.setItem(
-        "bridge:desarrolloClase",
-        JSON.stringify(bridge)
-      );
+      localStorage.setItem("bridge:desarrolloClase", JSON.stringify(bridge));
     } catch (_) {}
   }
 
@@ -1403,10 +1084,6 @@ export default function CierreClase({ duracion = 10 }) {
     navigate("/desarrollo");
   }
 
-  /* ========================================================
-     Fin de Cierre → volver a InicioClase
-     (ajustado: /InicioClase sí existe en App.jsx)
-     ======================================================== */
   function handleEndCierre() {
     try {
       persistClaseForDesarrollo();
@@ -1422,18 +1099,14 @@ export default function CierreClase({ duracion = 10 }) {
     });
   }
 
-  // ✅ capa extra de seguridad: jamás pasamos algo que no sea función a onEnd
   const safeOnEndCierre =
-    typeof handleEndCierre === "function"
-      ? handleEndCierre
-      : () => {};
+    typeof handleEndCierre === "function" ? handleEndCierre : () => {};
 
   /* ========================================================
      Render
      ======================================================== */
   return (
     <div style={page} className="no-scroll-jump">
-      {/* Banner plan/clase vigente */}
       {claseVigente && (
         <div
           style={{
@@ -1455,15 +1128,12 @@ export default function CierreClase({ duracion = 10 }) {
           {claseVigente.unidad && (
             <div>
               <b>Unidad:</b> {claseVigente.unidad}
-              {claseVigente.evaluacion
-                ? " · (Evaluación)"
-                : ""}
+              {claseVigente.evaluacion ? " · (Evaluación)" : ""}
             </div>
           )}
           {claseVigente?.objetivo && (
             <div>
-              <b>Objetivo:</b>{" "}
-              {claseVigente.objetivo}
+              <b>Objetivo:</b> {claseVigente.objetivo}
             </div>
           )}
         </div>
@@ -1501,23 +1171,17 @@ export default function CierreClase({ duracion = 10 }) {
             ⏰ <HoraActualText />
           </div>
 
-          {/* Cronómetro (cuando termina → handleEndCierre) */}
           <div
             className="tnum clock-w layer-accel"
             style={{
-              fontVariantNumeric:
-                "tabular-nums lining-nums",
-              fontFeatureSettings:
-                "'tnum' 1, 'lnum' 1",
+              fontVariantNumeric: "tabular-nums lining-nums",
+              fontFeatureSettings: "'tnum' 1, 'lnum' 1",
               transform: "translateZ(0)",
               willChange: "transform",
               backfaceVisibility: "hidden",
             }}
           >
-            <CronometroGlobal
-              {...cronometroPropsCierre}
-              onEnd={safeOnEndCierre}
-            />
+            <CronometroGlobal {...cronometroPropsCierre} onEnd={safeOnEndCierre} />
           </div>
         </div>
 
@@ -1542,10 +1206,7 @@ export default function CierreClase({ duracion = 10 }) {
           marginBottom: "1rem",
         }}
       >
-        <h3 style={{ marginTop: 0 }}>
-          🧠 Nube de palabras final
-        </h3>
-        {/* 🚀 Enviamos preset “showtime” + banderas de contraste/rotación */}
+        <h3 style={{ marginTop: 0 }}>🧠 Nube de palabras final</h3>
         <NubeDePalabras
           modo="cierre"
           preset="showtime"
@@ -1571,9 +1232,7 @@ export default function CierreClase({ duracion = 10 }) {
           marginBottom: "1rem",
         }}
       >
-        <h3 style={{ marginTop: 0 }}>
-          🔗 Únete a la carrera
-        </h3>
+        <h3 style={{ marginTop: 0 }}>🔗 Únete a la carrera</h3>
         <div
           style={{
             display: "flex",
@@ -1609,8 +1268,7 @@ export default function CierreClase({ duracion = 10 }) {
                 marginTop: 6,
               }}
             >
-              Abre <code>/participa</code> o
-              escanea el QR. Link directo:
+              Pide a tus estudiantes abrir <code>/participa</code> o escanear el QR. Link directo:
             </div>
             <code
               style={{
@@ -1631,14 +1289,37 @@ export default function CierreClase({ duracion = 10 }) {
           marginBottom: "1rem",
         }}
       >
-        <h3
+        {/* 🔥 HEADER CON IMAGEN DEL JUEGO */}
+        <div
           style={{
-            marginTop: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
             marginBottom: 8,
           }}
         >
-          🎮 Centro de Juegos
-        </h3>
+          <h3
+            style={{
+              marginTop: 0,
+              marginBottom: 0,
+            }}
+          >
+            🎮 Centro de Juegos PRAGMA
+          </h3>
+
+          <img
+            src={portadaCarreraPragma}
+            alt="Juegos PRAGMA - Cierre de clase"
+            style={{
+              height: 80,
+              borderRadius: 12,
+              objectFit: "cover",
+              boxShadow: "0 8px 20px rgba(15,23,42,.35)",
+            }}
+          />
+        </div>
+
         <div
           style={{
             color: COLORS.textMuted,
@@ -1646,45 +1327,58 @@ export default function CierreClase({ duracion = 10 }) {
             marginBottom: 8,
           }}
         >
-          Los juegos externos se abren en pestaña
-          nueva y requieren tu propia cuenta.
+          Aquí tienes los juegos propios de la plataforma PRAGMA para cerrar la clase con un momento
+          épico y participativo.
         </div>
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit,minmax(260px,1fr))",
+            gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
             gap: 10,
           }}
         >
-          {GAMES.map((g) => (
+          {GAMES.map((g, idx) => (
             <div
               key={g.key}
               style={{
                 border: `1px solid ${COLORS.border}`,
                 borderRadius: 10,
                 padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
               }}
             >
-              <div style={{ fontWeight: 800 }}>
-                {g.name}{" "}
-                {g.premium ? (
-                  <span
+              {/* 📌 Imagen grande SOLO en la última casilla (Carrera PRAGMA ahora) */}
+              {idx === GAMES.length - 1 && (
+                <div
+                  style={{
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    boxShadow:
+                      "0 12px 28px rgba(15,23,42,0.28), 0 6px 14px rgba(15,23,42,0.18)",
+                    marginBottom: 4,
+                  }}
+                >
+                  <img
+                    src={portadaCarreraPragma}
+                    alt={g.name}
                     style={{
-                      fontSize: 12,
-                      color: "#9333ea",
+                      width: "100%",
+                      height: 180,
+                      objectFit: "cover",
+                      display: "block",
                     }}
-                  >
-                    · Premium
-                  </span>
-                ) : null}
-              </div>
+                  />
+                </div>
+              )}
+
+              <div style={{ fontWeight: 800 }}>{g.name}</div>
               <div
                 style={{
                   color: COLORS.textMuted,
                   fontSize: 14,
-                  marginTop: 4,
                 }}
               >
                 {g.desc}
@@ -1693,28 +1387,33 @@ export default function CierreClase({ duracion = 10 }) {
                 style={{
                   display: "flex",
                   gap: 8,
-                  marginTop: 10,
+                  marginTop: 6,
                   flexWrap: "wrap",
                 }}
               >
-                {g.type === "internal" ? (
-                  <button
-                    style={btnWhite}
-                    onClick={goToCarrera}
-                  >
-                    🏁 Ir a Carrera
+                {g.type === "internal" && (
+                  <button style={btnWhite} onClick={goToCarrera}>
+                    🏁 Ir a Carrera PRAGMA
                   </button>
-                ) : (
-                  <>
-                    <button
-                      style={btnWhite}
-                      onClick={() =>
-                        openExternal(g.url)
-                      }
-                    >
-                      🔗 Abrir
-                    </button>
-                  </>
+                )}
+
+                {g.type === "external" && (
+                  <button style={btnWhite} onClick={() => openExternal(g.url)}>
+                    🔗 Abrir
+                  </button>
+                )}
+
+                {g.type === "comingSoon" && (
+                  <button
+                    style={{
+                      ...btnWhite,
+                      opacity: 0.6,
+                      cursor: "not-allowed",
+                    }}
+                    disabled
+                  >
+                    🔧 En desarrollo
+                  </button>
                 )}
               </div>
             </div>
@@ -1733,42 +1432,32 @@ export default function CierreClase({ duracion = 10 }) {
         }}
       >
         <div style={card}>
-          <h3 style={{ marginTop: 0 }}>
-            🎮 Mini panel del profesor
-          </h3>
+          <h3 style={{ marginTop: 0 }}>🎮 Mini panel del profesor</h3>
           <div
             style={{
               ...smallMuted,
               marginBottom: 8,
             }}
           >
-            Publica una pregunta (texto + 0–4
-            opciones). Si agregas opciones,
-            selecciona cuál es la correcta.
+            Publica una pregunta (texto + 0–4 opciones). Si agregas opciones, selecciona cuál es la
+            correcta.
           </div>
 
-          <label style={{ fontWeight: 700 }}>
-            Pregunta
-          </label>
+          <label style={{ fontWeight: 700 }}>Pregunta</label>
           <input
             style={{ ...input, marginBottom: 8 }}
             value={panelTexto}
-            onChange={(e) =>
-              setPanelTexto(e.target.value)
-            }
+            onChange={(e) => setPanelTexto(e.target.value)}
             placeholder="Escribe la pregunta…"
           />
 
-          <label style={{ fontWeight: 700 }}>
-            Opciones (opcional)
-          </label>
+          <label style={{ fontWeight: 700 }}>Opciones (opcional)</label>
           {panelOpciones.map((op, i) => (
             <div
               key={i}
               style={{
                 display: "grid",
-                gridTemplateColumns:
-                  "auto 1fr",
+                gridTemplateColumns: "auto 1fr",
                 gap: 8,
                 alignItems: "center",
                 marginBottom: 6,
@@ -1778,9 +1467,7 @@ export default function CierreClase({ duracion = 10 }) {
                 type="radio"
                 name="correcta"
                 checked={panelCorrecta === i}
-                onChange={() =>
-                  setPanelCorrecta(i)
-                }
+                onChange={() => setPanelCorrecta(i)}
                 title="Marcar correcta"
               />
               <input
@@ -1791,9 +1478,7 @@ export default function CierreClase({ duracion = 10 }) {
                   arr[i] = e.target.value;
                   setPanelOpciones(arr);
                 }}
-                placeholder={`Opción ${
-                  i + 1
-                }`}
+                placeholder={`Opción ${i + 1}`}
               />
             </div>
           ))}
@@ -1803,6 +1488,7 @@ export default function CierreClase({ duracion = 10 }) {
               display: "flex",
               gap: 8,
               marginTop: 8,
+              flexWrap: "wrap",
             }}
           >
             <button
@@ -1820,6 +1506,14 @@ export default function CierreClase({ duracion = 10 }) {
             >
               ⛔ Cerrar ronda
             </button>
+            <button
+              style={btnWhite}
+              onClick={generarPreguntaIA}
+              disabled={iaLoading}
+              title="Generar texto y alternativas con IA"
+            >
+              {iaLoading ? "⏳ Generando…" : "✨ IA Carrera"}
+            </button>
           </div>
 
           <div
@@ -1828,28 +1522,31 @@ export default function CierreClase({ duracion = 10 }) {
               marginTop: 8,
             }}
           >
-            {pregunta?.activa
-              ? "Ronda ACTIVA"
-              : "Ronda INACTIVA"}{" "}
-            {pregunta?.texto
-              ? `• "${pregunta.texto}"`
-              : ""}
+            {pregunta?.activa ? "Ronda ACTIVA" : "Ronda INACTIVA"}{" "}
+            {pregunta?.texto ? `• "${pregunta.texto}"` : ""}
           </div>
+          {iaError && (
+            <div
+              style={{
+                ...smallMuted,
+                marginTop: 4,
+                color: "#b91c1c",
+              }}
+            >
+              {iaError}
+            </div>
+          )}
         </div>
 
         <div style={card}>
-          <h3 style={{ marginTop: 0 }}>
-            🏁 Carrera en vivo
-          </h3>
+          <h3 style={{ marginTop: 0 }}>🏁 Carrera en vivo</h3>
           <div
             style={{
               ...smallMuted,
               marginBottom: 8,
             }}
           >
-            Avance = acierto (5 pts) + bonus
-            por rapidez (hasta +8).
-            Participación abierta: pequeño
+            Avance = acierto (5 pts) + bonus por rapidez (hasta +8). Participación abierta: pequeño
             avance.
           </div>
 
@@ -1860,48 +1557,35 @@ export default function CierreClase({ duracion = 10 }) {
                   color: COLORS.textMuted,
                 }}
               >
-                Aún no hay participantes.
-                Pide a tus estudiantes abrir{" "}
-                <code>/participa</code>.
+                Aún no hay participantes. Pide a tus estudiantes abrir <code>/participa</code>.
               </div>
             )}
 
             {ranking.map((p) => {
-              const prog = Math.min(
-                100,
-                Math.round(
-                  p.progreso || 0
-                )
-              );
+              const prog = Math.min(100, Math.round(p.progreso || 0));
               return (
                 <div
                   key={p.id}
                   style={{
                     display: "grid",
-                    gridTemplateColumns:
-                      "40px 1fr 60px",
+                    gridTemplateColumns: "40px 1fr 60px",
                     gap: 8,
-                    alignItems:
-                      "center",
+                    alignItems: "center",
                   }}
                 >
                   <div
                     style={{
-                      textAlign:
-                        "center",
+                      textAlign: "center",
                       fontSize: 20,
                     }}
                   >
-                    {p.avatar ||
-                      "🟢"}
+                    {p.avatar || "🟢"}
                   </div>
                   <div
                     style={{
-                      background:
-                        "#eef2f7",
+                      background: "#eef2f7",
                       borderRadius: 999,
-                      overflow:
-                        "hidden",
+                      overflow: "hidden",
                       border: `1px solid ${COLORS.border}`,
                     }}
                   >
@@ -1909,14 +1593,10 @@ export default function CierreClase({ duracion = 10 }) {
                       style={{
                         width: `${prog}%`,
                         background: `linear-gradient(90deg, ${COLORS.brandA}, ${COLORS.brandB})`,
-                        color:
-                          "#fff",
-                        padding:
-                          "6px 10px",
-                        whiteSpace:
-                          "nowrap",
-                        textOverflow:
-                          "ellipsis",
+                        color: "#fff",
+                        padding: "6px 10px",
+                        whiteSpace: "nowrap",
+                        textOverflow: "ellipsis",
                       }}
                       title={`${p.nombre} (${prog} pts)`}
                     >
@@ -1925,20 +1605,17 @@ export default function CierreClase({ duracion = 10 }) {
                           fontSize: 12,
                         }}
                       >
-                        {p.nombre ||
-                          "Jugador"}
+                        {p.nombre || "Jugador"}
                       </strong>
                     </div>
                   </div>
                   <div
                     style={{
-                      textAlign:
-                        "right",
+                      textAlign: "right",
                       fontWeight: 800,
                     }}
                   >
-                    {p.progreso ||
-                      0}
+                    {p.progreso || 0}
                   </div>
                 </div>
               );
@@ -1965,7 +1642,6 @@ export default function CierreClase({ duracion = 10 }) {
           🧹 Reset carrera
         </button>
 
-        {/* Ir a Desarrollo */}
         <button
           onClick={goToDesarrollo}
           style={btnWhite}
@@ -1974,7 +1650,6 @@ export default function CierreClase({ duracion = 10 }) {
           ➡️ Ir a Desarrollo
         </button>
 
-        {/* Volver al inicio de clase */}
         <button
           onClick={() => {
             clearAllCountdowns();
@@ -1994,10 +1669,3 @@ export default function CierreClase({ duracion = 10 }) {
     </div>
   );
 }
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-// App.jsx
+// App.jsx   
 import React, { Suspense, lazy } from "react";
 import {
   Routes,
@@ -161,7 +161,9 @@ class ErrorBoundary extends React.Component {
                 marginBottom: ".5rem",
               }}
             >
-              <span role="img" aria-label="warning">⚠️</span>
+              <span role="img" aria-label="warning">
+                ⚠️
+              </span>
               <span>Ocurrió un error renderizando la página</span>
             </div>
             <div
@@ -263,9 +265,9 @@ function RequireAuthAllowAnon({ children }) {
     try {
       if (!localStorage.getItem("uid")) {
         const gen =
-          (typeof crypto !== "undefined" && crypto.randomUUID
+          typeof crypto !== "undefined" && crypto.randomUUID
             ? crypto.randomUUID()
-            : String(Date.now()));
+            : String(Date.now());
         localStorage.setItem("uid", `anon-offline-${gen}`);
       }
     } catch {}
@@ -277,7 +279,11 @@ function RequireAuthAllowAnon({ children }) {
 function AllowAnonWithPlan({ children }) {
   const { ready, user } = useAuthReady();
   if (!ready)
-    return <div style={{ padding: 16, fontFamily: "sans-serif" }}>Cargando tu sesión docente…</div>;
+    return (
+      <div style={{ padding: 16, fontFamily: "sans-serif" }}>
+        Cargando tu sesión docente…
+      </div>
+    );
   if (!user) return <Navigate to="/home" replace />;
   return <PlanGuard allowDuringTrial={true}>{children}</PlanGuard>;
 }
@@ -317,7 +323,10 @@ function SalaWrapper() {
       changed = true;
     }
     if (changed) {
-      nav({ pathname: loc.pathname, search: `?${sp.toString()}`, hash: loc.hash }, { replace: true });
+      nav(
+        { pathname: loc.pathname, search: `?${sp.toString()}`, hash: loc.hash },
+        { replace: true }
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, loc.pathname, loc.search, loc.hash]);
@@ -346,7 +355,10 @@ function AsistenciaWrapper() {
       changed = true;
     }
     if (changed) {
-      nav({ pathname: loc.pathname, search: `?${sp.toString()}`, hash: loc.hash }, { replace: true });
+      nav(
+        { pathname: loc.pathname, search: `?${sp.toString()}`, hash: loc.hash },
+        { replace: true }
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, loc.pathname, loc.search, loc.hash]);
@@ -360,19 +372,28 @@ function AsistenciaWrapper() {
 /* ========================================================================= */
 
 /* ─────────────────────────────────────────
-   HashRedirector (soporte #/ruta)
+   HashRedirector (soporte #/ruta SOLO DESDE "/")
    ───────────────────────────────────────── */
 function HashRedirector() {
   const loc = useLocation();
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    const full = (loc.pathname || "") + (loc.hash || "");
-    if (full.includes("#/")) {
-      const target = full.substring(full.indexOf("#") + 1);
-      if (target && target !== loc.pathname) {
-        navigate(target, { replace: true });
-      }
+    // solo actuamos si estamos en la raíz (/, /index.html)
+    const atRoot =
+      loc.pathname === "/" ||
+      loc.pathname === "/index.html" ||
+      loc.pathname === "" ||
+      loc.pathname === undefined;
+
+    if (!atRoot) return;
+
+    const hash = loc.hash || "";
+    if (!hash.startsWith("#/")) return;
+
+    const target = hash.slice(1); // quita "#"
+    if (target && target !== loc.pathname) {
+      navigate(target, { replace: true });
     }
   }, [loc.pathname, loc.hash, navigate]);
 
@@ -425,7 +446,20 @@ export default function App() {
               </RedirectIfAuthed>
             }
           />
+
+          {/* ✅ Participa base: /participa?session=3WL8UX */}
           <Route path="/participa" element={<Participa />} />
+
+          {/* ✅ Alias: /participa/3WL8UX */}
+          <Route
+            path="/participa/:code"
+            element={
+              <RequireAuthAllowAnon>
+                <Participa />
+              </RequireAuthAllowAnon>
+            }
+          />
+
           <Route
             path="/test-nube"
             element={
@@ -465,6 +499,7 @@ export default function App() {
             }
           />
 
+          {/* Ruta original en minúsculas */}
           <Route
             path="/cierre"
             element={
@@ -472,6 +507,24 @@ export default function App() {
                 <CierreClase duracion={10} />
               </RequireAuthAllowAnon>
             }
+          />
+
+          {/* ✅ NUEVAS ALIAS: permiten usar /CierreClase y variantes desde el navegador o hash */}
+          <Route
+            path="/CierreClase"
+            element={
+              <RequireAuthAllowAnon>
+                <CierreClase duracion={10} />
+              </RequireAuthAllowAnon>
+            }
+          />
+          <Route
+            path="/cierreclase"
+            element={<Navigate to="/CierreClase" replace />}
+          />
+          <Route
+            path="/Cierreclase"
+            element={<Navigate to="/CierreClase" replace />}
           />
 
           <Route path="/demo" element={<InicioClase />} />
@@ -517,9 +570,9 @@ export default function App() {
           <Route
             path="*"
             element={
-              (typeof window !== "undefined" &&
-                window.location.hash &&
-                window.location.hash.startsWith("#/"))
+              typeof window !== "undefined" &&
+              window.location.hash &&
+              window.location.hash.startsWith("#/")
                 ? null
                 : <Navigate to="/home" replace />
             }
@@ -529,43 +582,6 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

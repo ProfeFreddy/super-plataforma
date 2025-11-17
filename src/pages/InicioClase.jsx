@@ -1058,7 +1058,7 @@ function InicioClase() {
     }
   };
 
-  // NUEVO: objetivo sugerido desde la nube de palabras
+  // ⚙️ MODIFICADO: objetivo sugerido desde la nube de palabras
   const objetivoDesdeNube = () => {
     try {
       const words = (Array.isArray(cloudMentData) && cloudMentData.length
@@ -1068,7 +1068,7 @@ function InicioClase() {
 
       if (!words.length) {
         setObjetivoIA("");
-        setSaveError("Aún no hay suficientes palabras en la nube para sugerir un objetivo.");
+        setSaveError("Aún no hay suficientes palabras en la nube para sugerir una idea de enlace.");
         return;
       }
 
@@ -1079,27 +1079,22 @@ function InicioClase() {
         claseActual?.asignatura ||
         asignaturaProfe ||
         "la asignatura";
-      const unidadTxt =
-        claseActual?.unidad ||
-        claseVigente?.unidad ||
-        "la unidad";
 
+      // 🔴 Este texto YA NO es el "objetivo general" de la unidad.
+      // Es solo una frase puente para enlazar lo vivido con lo que viene.
       const obj =
-        `Al finalizar la clase, las y los estudiantes serán capaces de explicar y aplicar los conceptos de ${lista} ` +
-        `en el contexto de ${unidadTxt} de ${asig}.`;
+        `Durante el inicio de la clase, las y los estudiantes compartirán ideas relacionadas con ${lista} ` +
+        `para conectar lo trabajado anteriormente con lo que explorarán hoy en ${asig}.`;
 
-      setClaseActual((prev) => ({
-        ...(prev || {}),
-        objetivo: obj,
-      }));
+      // No tocamos claseActual.objetivo (se mantiene el OA de la unidad).
       setObjetivoIA(obj);
       setSaveError("");
 
-      // Persistimos en el slot actual (no esperamos el resultado)
-      saveCurrentSlot({ objetivo: obj });
+      // Guardamos esta frase como objetivo puente, en un campo separado
+      saveCurrentSlot({ objetivoPuenteNube: obj });
     } catch (e) {
       console.warn("[objetivoDesdeNube]", e?.message);
-      setSaveError("No se pudo generar el objetivo sugerido.");
+      setSaveError("No se pudo generar la idea de enlace desde la nube de palabras.");
     }
   };
 
@@ -2322,7 +2317,8 @@ function InicioClase() {
               </div>
               <div style={{ color: "#64748b", marginBottom: 8 }}>
                 Usa las palabras más frecuentes que están enviando tus estudiantes
-                para construir un objetivo de aprendizaje base.
+                para construir una <b>idea de enlace</b> entre lo vivido y lo que viene,
+                sin modificar el objetivo general de la unidad.
               </div>
               <button
                 type="button"
@@ -2335,7 +2331,7 @@ function InicioClase() {
                   gap: 4,
                 }}
               >
-                ✨ Generar objetivo con la nube
+                ✨ Generar idea de enlace con la nube
               </button>
               {savingSlot && (
                 <span
@@ -2366,7 +2362,7 @@ function InicioClase() {
                       fontSize: 13,
                     }}
                   >
-                    Objetivo sugerido:
+                    Idea de enlace sugerida:
                   </div>
                   <div style={{ fontSize: 14 }}>
                     {objetivoIA}

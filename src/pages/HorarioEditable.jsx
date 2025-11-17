@@ -3,15 +3,25 @@
 // Render seguro para debug (evita "Objects are not valid as a React child")
 const safeText = (v) => {
   if (v === null || v === undefined) return "";
-  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
-  try { return JSON.stringify(v); } catch { return "[obj]"; }
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean")
+    return String(v);
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return "[obj]";
+  }
 };
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import {
-  doc, getDoc, setDoc, serverTimestamp, collection, getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  getDocs,
 } from "firebase/firestore";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 
@@ -152,14 +162,31 @@ const NIVELES = [
 
 const SECCIONES = ["A", "B", "C", "D", "E"];
 const ASIGNATURAS_BASE = [
-  "Matemática","Lenguaje","Ciencias","Historia","Física","Química","Biología","Inglés","Tecnología",
+  "Matemática",
+  "Lenguaje",
+  "Ciencias",
+  "Historia",
+  "Física",
+  "Química",
+  "Biología",
+  "Inglés",
+  "Tecnología",
 ];
 
 function celdaVacia() {
-  return { asignatura: "", nivel: "", seccion: "", unidad: "", objetivo: "", habilidades: "" };
+  return {
+    asignatura: "",
+    nivel: "",
+    seccion: "",
+    unidad: "",
+    objetivo: "",
+    habilidades: "",
+  };
 }
 function construirMatriz(rows, cols) {
-  return Array.from({ length: rows }, () => Array.from({ length: cols }, () => celdaVacia()));
+  return Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => celdaVacia())
+  );
 }
 function esBloqueNoLectivo(idx) {
   return /\(Recreo\)|\(Almuerzo\)/i.test(BLOQUES[idx] || "");
@@ -167,13 +194,16 @@ function esBloqueNoLectivo(idx) {
 
 /** ====== Normalizadores ====== */
 const toId = (s = "") =>
-  String(s).toLowerCase()
-    .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+  String(s)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
     .replace(/[^a-z0-9]+/g, "")
     .trim();
 
 const toNivelId = (raw = "") => {
-  const s = String(raw).toLowerCase()
+  const s = String(raw)
+    .toLowerCase()
     .replace(/\s+/g, " ")
     .replace(/[°º]/g, "")
     .replace("básico", "basico")
@@ -197,7 +227,12 @@ function flattenHorario(matriz = []) {
 function rebuildFromFlat(flat = [], rows, cols) {
   const M = construirMatriz(rows, cols);
   for (const c of flat) {
-    if (Number.isInteger(c.row) && Number.isInteger(c.col) && c.row < rows && c.col < cols) {
+    if (
+      Number.isInteger(c.row) &&
+      Number.isInteger(c.col) &&
+      c.row < rows &&
+      c.col < cols
+    ) {
       const { row, col, ...rest } = c;
       M[row][col] = { ...celdaVacia(), ...rest };
     }
@@ -232,24 +267,36 @@ async function writeSlotDetalle(uid, row, col, cell, profesorNombre = "") {
   const habilidadesArr = Array.isArray(cell.habilidades)
     ? cell.habilidades
     : String(cell.habilidades || "").trim()
-      ? String(cell.habilidades).split(" • ").map(s => s.trim()).filter(Boolean)
-      : [];
-  const habilidadesTexto = habilidadesArr.length ? habilidadesArr.join(", ") : String(cell.habilidades || "");
+    ? String(cell.habilidades)
+        .split(" • ")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  const habilidadesTexto = habilidadesArr.length
+    ? habilidadesArr.join(", ")
+    : String(cell.habilidades || "");
 
   const payload = {
     asignatura: cell.asignatura || "",
     unidad: cell.unidad || "",
     objetivo: cell.objetivo || "",
-    habilidades: habilidadesArr,           // array para quien lo requiera
-    habilidadesTexto,                      // y texto para mostrar rápido
+    habilidades: habilidadesArr, // array para quien lo requiera
+    habilidadesTexto, // y texto para mostrar rápido
     nivel: cell.nivel || "",
     seccion: cell.seccion || "",
-    curso: (cell.curso || ((cell.nivel || "") + (cell.seccion ? ` ${cell.seccion}` : ""))).trim(),
+    curso: (
+      cell.curso ||
+      ((cell.nivel || "") + (cell.seccion ? ` ${cell.seccion}` : ""))
+    ).trim(),
     profesor: profesorNombre || "",
     updatedAt: serverTimestamp(),
   };
-  await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), payload, { merge: true });
-  await setDoc(doc(db, "usuarios", uid, "slots", slotId), payload, { merge: true }); // legacy
+  await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), payload, {
+    merge: true,
+  });
+  await setDoc(doc(db, "usuarios", uid, "slots", slotId), payload, {
+    merge: true,
+  }); // legacy
 }
 
 /** — resuelve unidad/objetivos/habilidades desde Planificaciones — */
@@ -259,12 +306,32 @@ async function pickUnidadDesdePlan(uid, asignatura, nivelLegible) {
     const nivelId = toNivelId(nivelLegible || "");
     if (!asignaturaId || !nivelId) return null;
 
-    const pref = await getDoc(doc(db, "usuarios", uid, "planificacion_usuario", `${asignaturaId}_${nivelId}`));
-    const unidades = pref.exists() ? (pref.data()?.unidades || {}) : {};
-    const unidadId = Object.keys(unidades).find((k) => unidades[k] === "seleccionada") || Object.keys(unidades)[0];
+    const pref = await getDoc(
+      doc(
+        db,
+        "usuarios",
+        uid,
+        "planificacion_usuario",
+        `${asignaturaId}_${nivelId}`
+      )
+    );
+    const unidades = pref.exists() ? pref.data()?.unidades || {} : {};
+    const unidadId =
+      Object.keys(unidades).find((k) => unidades[k] === "seleccionada") ||
+      Object.keys(unidades)[0];
     if (!unidadId) return null;
 
-    const uDoc = await getDoc(doc(db, "catalogo_curricular", asignaturaId, "niveles", nivelId, "unidades", unidadId));
+    const uDoc = await getDoc(
+      doc(
+        db,
+        "catalogo_curricular",
+        asignaturaId,
+        "niveles",
+        nivelId,
+        "unidades",
+        unidadId
+      )
+    );
     if (!uDoc.exists()) return null;
 
     const u = uDoc.data() || {};
@@ -289,7 +356,9 @@ export default function HorarioEditable() {
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState(false);
   const [tab, setTab] = useState("horario");
-  const [matriz, setMatriz] = useState(() => construirMatriz(BLOQUES.length, DIAS.length));
+  const [matriz, setMatriz] = useState(() =>
+    construirMatriz(BLOQUES.length, DIAS.length)
+  );
 
   // materias permitidas
   const [permitidas, setPermitidas] = useState([]);
@@ -306,7 +375,9 @@ export default function HorarioEditable() {
           const cred = await signInAnonymously(auth);
           if (!alive) return;
           setUid(cred.user?.uid || null);
-          setProfesorNombre(cred.user?.displayName || cred.user?.email || "");
+          setProfesorNombre(
+            cred.user?.displayName || cred.user?.email || ""
+          );
         } else {
           setUid(u.uid);
           setProfesorNombre(u.displayName || u.email || "");
@@ -316,7 +387,10 @@ export default function HorarioEditable() {
         setProfesorNombre("");
       }
     });
-    return () => { alive = false; unsub && unsub(); };
+    return () => {
+      alive = false;
+      unsub && unsub();
+    };
   }, []);
 
   useEffect(() => {
@@ -328,22 +402,33 @@ export default function HorarioEditable() {
         const snap = await getDoc(uref);
         if (snap.exists()) {
           const data = snap.data() || {};
-          const rows = BLOQUES.length, cols = DIAS.length;
+          const rows = BLOQUES.length,
+            cols = DIAS.length;
 
-          if (data.nombre && !profesorNombre) setProfesorNombre(String(data.nombre));
+          if (data.nombre && !profesorNombre)
+            setProfesorNombre(String(data.nombre));
 
           if (Array.isArray(data.horario_flat) && data.horario_flat.length) {
             setMatriz(rebuildFromFlat(data.horario_flat, rows, cols));
           } else if (Array.isArray(data.horario) && data.horario.length) {
             const base = construirMatriz(rows, cols);
-            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
-              base[r][c] = { ...celdaVacia(), ...(data.horario?.[r]?.[c] || {}) };
+            for (let r = 0; r < rows; r++)
+              for (let c = 0; c < cols; c++)
+                base[r][c] = {
+                  ...celdaVacia(),
+                  ...(data.horario?.[r]?.[c] || {}),
+                };
             setMatriz(base);
           }
 
-          if (Array.isArray(data.asignaturasPermitidas) && data.asignaturasPermitidas.length) {
+          if (
+            Array.isArray(data.asignaturasPermitidas) &&
+            data.asignaturasPermitidas.length
+          ) {
             setPermitidas(
-              data.asignaturasPermitidas.map((s) => String(s || "").trim()).filter(Boolean)
+              data.asignaturasPermitidas
+                .map((s) => String(s || "").trim())
+                .filter(Boolean)
             );
           } else {
             setPermitidas([]);
@@ -353,18 +438,29 @@ export default function HorarioEditable() {
         }
       } catch (e) {
         console.warn("[HorarioEditable] load:", e?.code || e?.message);
-      } finally { setLoading(false); }
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [uid]); // eslint-disable-line
 
   async function guardarHorario() {
     if (!uid) return alert("No hay usuario autenticado.");
-    if (!permitidas.length) return alert("Primero configura tus Planificaciones (materias permitidas).");
+    if (!permitidas.length)
+      return alert(
+        "Primero configura tus Planificaciones (materias permitidas)."
+      );
 
     try {
       const marcas = marcasFromBloques(BLOQUES);
-      const marcasStr = marcas.map(([h, m]) => `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`);
-      const horarioConfig = normalizeConfigForFS({ bloquesGenerados: BLOQUES, marcas, marcasStr });
+      const marcasStr = marcas.map(
+        ([h, m]) => `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+      );
+      const horarioConfig = normalizeConfigForFS({
+        bloquesGenerados: BLOQUES,
+        marcas,
+        marcasStr,
+      });
 
       const plano = flattenHorario(matriz);
 
@@ -374,12 +470,18 @@ export default function HorarioEditable() {
         if (!c.asignatura) continue;
 
         if (!permitidas.includes(c.asignatura)) {
-          return alert(`La asignatura "${c.asignatura}" no está en tus materias permitidas. Ajusta Planificaciones.`);
+          return alert(
+            `La asignatura "${c.asignatura}" no está en tus materias permitidas. Ajusta Planificaciones.`
+          );
         }
 
         const faltan = !(c.unidad && c.objetivo && c.habilidades);
         if (faltan) {
-          const meta = await pickUnidadDesdePlan(uid, c.asignatura, c.nivel || "");
+          const meta = await pickUnidadDesdePlan(
+            uid,
+            c.asignatura,
+            c.nivel || ""
+          );
           if (meta) {
             c.unidad = c.unidad || meta.unidad || "";
             c.objetivo = c.objetivo || meta.objetivo || "";
@@ -388,7 +490,9 @@ export default function HorarioEditable() {
           }
         }
 
-        c.curso = c.curso || ((c.nivel || "") + (c.seccion ? ` ${c.seccion}` : ""));
+        c.curso =
+          c.curso ||
+          ((c.nivel || "") + (c.seccion ? ` ${c.seccion}` : ""));
       }
 
       await setDoc(
@@ -428,7 +532,8 @@ export default function HorarioEditable() {
   }
 
   function limpiarHorario() {
-    const rows = BLOQUES.length, cols = DIAS.length;
+    const rows = BLOQUES.length,
+      cols = DIAS.length;
     setMatriz(construirMatriz(rows, cols));
   }
 
@@ -441,7 +546,10 @@ export default function HorarioEditable() {
   };
 
   const lectivoCols = useMemo(() => DIAS.length, []);
-  const materiasOpciones = useMemo(() => (permitidas.length ? permitidas : ASIGNATURAS_BASE), [permitidas]);
+  const materiasOpciones = useMemo(
+    () => (permitidas.length ? permitidas : ASIGNATURAS_BASE),
+    [permitidas]
+  );
 
   function goPlanificador(r, c) {
     const cell = matriz?.[r]?.[c] || {};
@@ -469,10 +577,16 @@ export default function HorarioEditable() {
           <div>
             <h1 style={h1}>Horario Editable</h1>
             <div style={tabsBar}>
-              <button style={tabBtn(tab === "horario")} onClick={() => setTab("horario")}>
+              <button
+                style={tabBtn(tab === "horario")}
+                onClick={() => setTab("horario")}
+              >
                 Horario
               </button>
-              <button style={tabBtn(tab === "plan")} onClick={() => setTab("plan")}>
+              <button
+                style={tabBtn(tab === "plan")}
+                onClick={() => setTab("plan")}
+              >
                 Seleccione o realice su Planificación
               </button>
             </div>
@@ -480,38 +594,81 @@ export default function HorarioEditable() {
 
           <div style={{ display: "flex", gap: 8 }}>
             {!edit && tab === "horario" && (
-              <button style={btn} onClick={() => setEdit(true)} title="Habilitar edición del horario">✏️ Editar</button>
+              <button
+                style={btn}
+                onClick={() => setEdit(true)}
+                title="Habilitar edición del horario"
+              >
+                ✏️ Editar
+              </button>
             )}
             {edit && tab === "horario" && (
               <>
                 <button
                   style={planReady ? btn : btnDisabled}
                   onClick={planReady ? guardarHorario : undefined}
-                  title={planReady ? "Guardar horario" : "Configura tus planificaciones primero"}
+                  title={
+                    planReady
+                      ? "Guardar horario"
+                      : "Configura tus planificaciones primero"
+                  }
                 >
                   💾 Guardar horario
                 </button>
-                <button style={btnDanger} onClick={() => { if (confirm("¿Limpiar todas las celdas (excepto recreos/almuerzo)?")) limpiarHorario(); }}>
+                <button
+                  style={btnDanger}
+                  onClick={() => {
+                    if (
+                      confirm(
+                        "¿Limpiar todas las celdas (excepto recreos/almuerzo)?"
+                      )
+                    )
+                      limpiarHorario();
+                  }}
+                >
                   🧹 Limpiar
                 </button>
-                <button style={btn} onClick={() => setEdit(false)}>❌ Cancelar</button>
+                <button style={btn} onClick={() => setEdit(false)}>
+                  ❌ Cancelar
+                </button>
               </>
             )}
             {tab === "plan" && (
               <>
-                <button style={btn} onClick={goPlanificaciones}>📚 Abrir Planificaciones</button>
+                <button style={btn} onClick={goPlanificaciones}>
+                  📚 Abrir Planificaciones
+                </button>
               </>
             )}
           </div>
         </div>
 
-        {(!planReady) && (
-          <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: COLORS.warn, border: `1px solid ${COLORS.warnBorder}` }}>
-            <b>Primero configura tus Planificaciones.</b> Define tus materias en el panel de <em>Planificaciones</em>.
-            Luego volverás aquí y solo verás esas materias en el Horario.
-            <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-              <button style={btn} onClick={() => setTab("plan")}>Ir a pestaña Planificaciones</button>
-              <button style={btn} onClick={goPlanificaciones}>Abrir Planificaciones 📚</button>
+        {!planReady && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 12,
+              borderRadius: 10,
+              background: COLORS.warn,
+              border: `1px solid ${COLORS.warnBorder}`,
+            }}
+          >
+            <b>Primero configura tus Planificaciones.</b> Define tus materias en
+            el panel de <em>Planificaciones</em>. Luego volverás aquí y solo
+            verás esas materias en el Horario.
+            <div
+              style={{
+                marginTop: 8,
+                display: "flex",
+                gap: 8,
+              }}
+            >
+              <button style={btn} onClick={() => setTab("plan")}>
+                Ir a pestaña Planificaciones
+              </button>
+              <button style={btn} onClick={goPlanificaciones}>
+                Abrir Planificaciones 📚
+              </button>
             </div>
           </div>
         )}
@@ -519,8 +676,9 @@ export default function HorarioEditable() {
         {tab === "horario" && (
           <>
             <div style={small}>
-              * El botón <b>Guardar horario</b> solo aparece en modo edición. Tras guardar, el horario
-              queda congelado para evitar cambios accidentales.
+              * El botón <b>Guardar horario</b> solo aparece en modo edición.
+              Tras guardar, el horario queda congelado para evitar cambios
+              accidentales.
             </div>
 
             <div style={{ marginTop: 12, overflowX: "auto" }}>
@@ -528,7 +686,11 @@ export default function HorarioEditable() {
                 <thead>
                   <tr>
                     <th style={{ ...th, width: 160 }}>Bloque</th>
-                    {DIAS.map((d) => (<th key={d} style={th}>{d}</th>))}
+                    {DIAS.map((d) => (
+                      <th key={d} style={th}>
+                        {d}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -536,7 +698,15 @@ export default function HorarioEditable() {
                     const locked = esBloqueNoLectivo(r);
                     return (
                       <tr key={r}>
-                        <td style={{ ...td, background: "#f8fafc", fontWeight: 700 }}>{b}</td>
+                        <td
+                          style={{
+                            ...td,
+                            background: "#f8fafc",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {b}
+                        </td>
                         {Array.from({ length: lectivoCols }).map((_, c) => {
                           const cell = matriz?.[r]?.[c] || celdaVacia();
                           if (locked) {
@@ -552,37 +722,109 @@ export default function HorarioEditable() {
                                 <select
                                   style={selectStyle}
                                   value={cell.asignatura || ""}
-                                  onChange={(e) => onChangeCelda(r, c, "asignatura", e.target.value)}
+                                  onChange={(e) =>
+                                    onChangeCelda(
+                                      r,
+                                      c,
+                                      "asignatura",
+                                      e.target.value
+                                    )
+                                  }
                                   disabled={!planReady}
-                                  title={planReady ? "" : "Configura Planificaciones para habilitar materias"}
+                                  title={
+                                    planReady
+                                      ? ""
+                                      : "Configura Planificaciones para habilitar materias"
+                                  }
                                 >
                                   <option value="">(asignatura)</option>
-                                  {materiasOpciones.map((a) => (<option key={a} value={a}>{a}</option>))}
+                                  {materiasOpciones.map((a) => (
+                                    <option key={a} value={a}>
+                                      {a}
+                                    </option>
+                                  ))}
                                 </select>
                               ) : (
                                 <div style={{ fontWeight: 700 }}>
-                                  {cell.asignatura || <span style={{ color: COLORS.muted }}>(—)</span>}
+                                  {cell.asignatura || (
+                                    <span style={{ color: COLORS.muted }}>
+                                      (—)
+                                    </span>
+                                  )}
                                 </div>
                               )}
 
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 6 }}>
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: 6,
+                                  marginTop: 6,
+                                }}
+                              >
                                 {edit ? (
                                   <>
-                                    <select style={selectStyle} value={cell.nivel || ""} onChange={(e) => onChangeCelda(r, c, "nivel", e.target.value)}>
+                                    <select
+                                      style={selectStyle}
+                                      value={cell.nivel || ""}
+                                      onChange={(e) =>
+                                        onChangeCelda(
+                                          r,
+                                          c,
+                                          "nivel",
+                                          e.target.value
+                                        )
+                                      }
+                                    >
                                       <option value="">(nivel)</option>
-                                      {NIVELES.map((n) => (<option key={n} value={n}>{n}</option>))}
+                                      {NIVELES.map((n) => (
+                                        <option key={n} value={n}>
+                                          {n}
+                                        </option>
+                                      ))}
                                     </select>
-                                    <select style={selectStyle} value={cell.seccion || ""} onChange={(e) => onChangeCelda(r, c, "seccion", e.target.value)}>
+                                    <select
+                                      style={selectStyle}
+                                      value={cell.seccion || ""}
+                                      onChange={(e) =>
+                                        onChangeCelda(
+                                          r,
+                                          c,
+                                          "seccion",
+                                          e.target.value
+                                        )
+                                      }
+                                    >
                                       <option value="">(sección)</option>
-                                      {SECCIONES.map((s) => (<option key={s} value={s}>{s}</option>))}
+                                      {SECCIONES.map((s) => (
+                                        <option key={s} value={s}>
+                                          {s}
+                                        </option>
+                                      ))}
                                     </select>
                                   </>
                                 ) : (
                                   <>
-                                    <div style={{ background: COLORS.chip, borderRadius: 999, padding: "2px 8px", textAlign: "center", fontSize: 12 }}>
+                                    <div
+                                      style={{
+                                        background: COLORS.chip,
+                                        borderRadius: 999,
+                                        padding: "2px 8px",
+                                        textAlign: "center",
+                                        fontSize: 12,
+                                      }}
+                                    >
                                       {cell.nivel || "—"}
                                     </div>
-                                    <div style={{ background: COLORS.chip, borderRadius: 999, padding: "2px 8px", textAlign: "center", fontSize: 12 }}>
+                                    <div
+                                      style={{
+                                        background: COLORS.chip,
+                                        borderRadius: 999,
+                                        padding: "2px 8px",
+                                        textAlign: "center",
+                                        fontSize: 12,
+                                      }}
+                                    >
                                       {cell.seccion || "—"}
                                     </div>
                                   </>
@@ -592,19 +834,77 @@ export default function HorarioEditable() {
                               <div style={{ marginTop: 6 }}>
                                 {edit ? (
                                   <>
-                                    <input style={inputStyle} placeholder="Unidad (opcional)" value={cell.unidad || ""} onChange={(e) => onChangeCelda(r, c, "unidad", e.target.value)} />
-                                    <input style={{ ...inputStyle, marginTop: 6 }} placeholder="Objetivo (opcional)" value={cell.objetivo || ""} onChange={(e) => onChangeCelda(r, c, "objetivo", e.target.value)} />
-                                    <input style={{ ...inputStyle, marginTop: 6 }} placeholder="Habilidades (opcional)" value={cell.habilidades || ""} onChange={(e) => onChangeCelda(r, c, "habilidades", e.target.value)} />
+                                    <input
+                                      style={inputStyle}
+                                      placeholder="Unidad (opcional)"
+                                      value={cell.unidad || ""}
+                                      onChange={(e) =>
+                                        onChangeCelda(
+                                          r,
+                                          c,
+                                          "unidad",
+                                          e.target.value
+                                        )
+                                      }
+                                    />
+                                    <input
+                                      style={{ ...inputStyle, marginTop: 6 }}
+                                      placeholder="Objetivo (opcional)"
+                                      value={cell.objetivo || ""}
+                                      onChange={(e) =>
+                                        onChangeCelda(
+                                          r,
+                                          c,
+                                          "objetivo",
+                                          e.target.value
+                                        )
+                                      }
+                                    />
+                                    <input
+                                      style={{ ...inputStyle, marginTop: 6 }}
+                                      placeholder="Habilidades (opcional)"
+                                      value={cell.habilidades || ""}
+                                      onChange={(e) =>
+                                        onChangeCelda(
+                                          r,
+                                          c,
+                                          "habilidades",
+                                          e.target.value
+                                        )
+                                      }
+                                    />
                                   </>
                                 ) : (
-                                  <div style={{ fontSize: 12, color: COLORS.muted }}>
-                                    {cell.unidad || cell.objetivo || cell.habilidades ? (
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      color: COLORS.muted,
+                                    }}
+                                  >
+                                    {cell.unidad ||
+                                    cell.objetivo ||
+                                    cell.habilidades ? (
                                       <>
-                                        {cell.unidad && <div><b>Unidad:</b> {cell.unidad}</div>}
-                                        {cell.objetivo && <div><b>Objetivo:</b> {cell.objetivo}</div>}
-                                        {cell.habilidades && <div><b>Habilidades:</b> {cell.habilidades}</div>}
+                                        {cell.unidad && (
+                                          <div>
+                                            <b>Unidad:</b> {cell.unidad}
+                                          </div>
+                                        )}
+                                        {cell.objetivo && (
+                                          <div>
+                                            <b>Objetivo:</b> {cell.objetivo}
+                                          </div>
+                                        )}
+                                        {cell.habilidades && (
+                                          <div>
+                                            <b>Habilidades:</b>{" "}
+                                            {cell.habilidades}
+                                          </div>
+                                        )}
                                       </>
-                                    ) : (<em>(sin detalles)</em>)}
+                                    ) : (
+                                      <em>(sin detalles)</em>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -630,9 +930,29 @@ export default function HorarioEditable() {
               </table>
             </div>
 
-            <div style={{ marginTop: 12, fontSize: 12, color: COLORS.muted }}>
-              • Se guardan en <code>{`usuarios/${safeText(uid) || "{uid}"}`}</code>: <code>horario_flat</code>, <code>horarioMeta</code> y <code>horarioConfig</code>.<br />
-              • Además se actualiza <code>{`clases_detalle/${safeText(uid) || "{uid}"}/slots/{row}-{col}`}</code> y <code>{`usuarios/${safeText(uid) || "{uid}"}/slots/{row}-{col}`}</code> para que Inicio/Desarrollo/Cierre lean la unidad, objetivo, habilidades, curso y profesor.<br />
+            <div
+              style={{
+                marginTop: 12,
+                fontSize: 12,
+                color: COLORS.muted,
+              }}
+            >
+              • Se guardan en{" "}
+              <code>{`usuarios/${safeText(uid) || "{uid}"}`}</code>:{" "}
+              <code>horario_flat</code>, <code>horarioMeta</code> y{" "}
+              <code>horarioConfig</code>.
+              <br />
+              • Además se actualiza{" "}
+              <code>{`clases_detalle/${
+                safeText(uid) || "{uid}"
+              }/slots/{row}-{col}`}</code>{" "}
+              y{" "}
+              <code>{`usuarios/${
+                safeText(uid) || "{uid}"
+              }/slots/{row}-{col}`}</code>{" "}
+              para que Inicio/Desarrollo/Cierre lean la unidad, objetivo,
+              habilidades, curso y profesor.
+              <br />
               • Los recreos y el almuerzo no son editables.
             </div>
           </>
@@ -640,21 +960,55 @@ export default function HorarioEditable() {
 
         {tab === "plan" && (
           <div style={{ marginTop: 12 }}>
-            <div style={{ ...card, borderStyle: "dashed", borderWidth: 1, borderColor: COLORS.border }}>
-              <h3 style={{ marginTop: 0 }}>Seleccione o realice su Planificación</h3>
+            <div
+              style={{
+                ...card,
+                borderStyle: "dashed",
+                borderWidth: 1,
+                borderColor: COLORS.border,
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>
+                Seleccione o realice su Planificación
+              </h3>
               <p style={{ color: COLORS.muted }}>
-                Elija un bloque en la tabla de Horario y pulse <b>“Planificar”</b>, o abra el panel de
-                planificaciones para crear/editar unidades y objetivos que luego verás automáticamente en
-                <b> InicioClase</b>, <b>Desarrollo</b> y <b>Cierre</b>.
+                Elija un bloque en la tabla de Horario y pulse{" "}
+                <b>“Planificar”</b>, o abra el panel de planificaciones para
+                crear/editar unidades y objetivos que luego verás
+                automáticamente en<b> InicioClase</b>, <b>Desarrollo</b> y{" "}
+                <b>Cierre</b>.
               </p>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button style={btn} onClick={goPlanificaciones}>📚 Abrir Planificaciones</button>
-                <button style={btn} onClick={() => navigate("/planificador")}>🆕 Nuevo plan en blanco</button>
-                <button style={btn} onClick={() => setTab("horario")}>⬅️ Volver al Horario</button>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button style={btn} onClick={goPlanificaciones}>
+                  📚 Abrir Planificaciones
+                </button>
+                <button
+                  style={btn}
+                  onClick={() => navigate("/planificador")}
+                >
+                  🆕 Nuevo plan en blanco
+                </button>
+                <button style={btn} onClick={() => setTab("horario")}>
+                  ⬅️ Volver al Horario
+                </button>
               </div>
-              <div style={{ marginTop: 10, fontSize: 12, color: COLORS.muted }}>
+              <div
+                style={{
+                  marginTop: 10,
+                  fontSize: 12,
+                  color: COLORS.muted,
+                }}
+              >
                 <b>Materias permitidas actuales:</b>{" "}
-                {permitidas.length ? permitidas.join(", ") : "(aún sin definir)"}
+                {permitidas.length
+                  ? permitidas.join(", ")
+                  : "(aún sin definir)"}
               </div>
             </div>
           </div>
@@ -663,6 +1017,7 @@ export default function HorarioEditable() {
     </div>
   );
 }
+
 
 
 
