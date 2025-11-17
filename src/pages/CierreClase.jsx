@@ -1,4 +1,4 @@
-﻿// src/pages/CierreClase.jsx 
+﻿// src/pages/CierreClase.jsx
 import React, {
   useEffect,
   useState,
@@ -31,12 +31,8 @@ import FichaClaseSticky from "../components/FichaClaseSticky";
 // 🔥 NUEVO: portada del juego PRAGMA (Remy corriendo)
 import portadaCarreraPragma from "../assets/pragmaprofe-carrera.png";
 
-// ===== Compat de PlanContext (soporta export default o named) =====
-import * as PlanCtxAll from "../context/PlanContext";
-const PlanContext =
-  PlanCtxAll.PlanContext || PlanCtxAll.default || React.createContext({});
-const PlanProvider = PlanCtxAll.PlanProvider || (({ children }) => children);
-const usePlan = PlanCtxAll.usePlan || (() => useContext(PlanContext));
+// ✅ Import directo, sin compat rara
+import { PlanContext } from "../context/PlanContext";
 
 import { PLAN_CAPS } from "../lib/planCaps";
 import { getClaseVigente } from "../services/PlanificadorService";
@@ -91,6 +87,11 @@ function useAuthSafe() {
 /* ============================================================
    Base del proxy para OA MINEDUC
    ============================================================ */
+const PROXY_BASE =
+  (typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    import.meta.env.VITE_PROXY_BASE) ||
+  "";
 
 /* ============================================================
    Endpoint IA Carrera
@@ -322,7 +323,6 @@ const GAMES = [
   },
 ];
 
-
 /* ============================================================
    utilidades varias
    ============================================================ */
@@ -375,7 +375,7 @@ const DatosClaseCard = React.memo(
           Unidad
         </div>
         <div style={{ marginBottom: 6, ...layerFix }}>
-          <strong>{unidad || "(sin unidad)"}</strong>
+          <strong>{unidad || "(sin unidad)"} </strong>
         </div>
         <div
           style={{
@@ -441,10 +441,7 @@ export default function CierreClase({ duracion = 10 }) {
   const navigate = useNavigate();
 
   const planCtx = useContext(PlanContext) || {};
-  const {
-    plan = "FREE",
-    caps = PLAN_CAPS.FREE,
-  } = planCtx;
+  const { plan = "FREE", caps = PLAN_CAPS.FREE } = planCtx; // caps reservado por si acaso
 
   const { ready: authReady, user: authUser } = useAuthSafe();
 
@@ -544,6 +541,7 @@ export default function CierreClase({ duracion = 10 }) {
           if (data.objetivo) setObjetivo(data.objetivo);
           else if (data.objetivoInicial) setObjetivo(data.objetivoInicial);
 
+          // OA MINEDUC vía proxy / directo
           if (unidadInicial && !oaMinisterio) {
             try {
               const asigSlug = asigToSlug(data.asignatura || asignatura || "Matemática");
@@ -1289,7 +1287,7 @@ export default function CierreClase({ duracion = 10 }) {
           marginBottom: "1rem",
         }}
       >
-        {/* 🔥 HEADER CON IMAGEN DEL JUEGO */}
+        {/* HEADER CON IMAGEN DEL JUEGO */}
         <div
           style={{
             display: "flex",
@@ -1350,7 +1348,7 @@ export default function CierreClase({ duracion = 10 }) {
                 gap: 8,
               }}
             >
-              {/* 📌 Imagen grande SOLO en la última casilla (Carrera PRAGMA ahora) */}
+              {/* Imagen grande SOLO en la última casilla (Carrera PRAGMA) */}
               {idx === GAMES.length - 1 && (
                 <div
                   style={{
@@ -1391,29 +1389,19 @@ export default function CierreClase({ duracion = 10 }) {
                   flexWrap: "wrap",
                 }}
               >
-                {g.type === "internal" && (
+                {g.type === "internal" ? (
                   <button style={btnWhite} onClick={goToCarrera}>
                     🏁 Ir a Carrera PRAGMA
                   </button>
-                )}
-
-                {g.type === "external" && (
-                  <button style={btnWhite} onClick={() => openExternal(g.url)}>
-                    🔗 Abrir
-                  </button>
-                )}
-
-                {g.type === "comingSoon" && (
-                  <button
-                    style={{
-                      ...btnWhite,
-                      opacity: 0.6,
-                      cursor: "not-allowed",
-                    }}
-                    disabled
-                  >
-                    🔧 En desarrollo
-                  </button>
+                ) : (
+                  <>
+                    <button
+                      style={btnWhite}
+                      onClick={() => openExternal(g.url || "https://pragmaprofe.com")}
+                    >
+                      🔗 Abrir
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1669,3 +1657,4 @@ export default function CierreClase({ duracion = 10 }) {
     </div>
   );
 }
+
