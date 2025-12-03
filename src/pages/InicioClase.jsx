@@ -1613,7 +1613,26 @@ function InicioClase() {
   }, [authed, asignaturaProfe]);
 
   // escuchar palabras SOLO de la sala
+  const [resetAtMs, setResetAtMs] = useState(0);
+  const [clearingCloud, setClearingCloud] = useState(false);
+  const [clearError, setClearError] = useState("");
   const [palabrasAgg, setPalabrasAgg] = useState([]); // [{text, value}]
+  useEffect(() => {
+    if (!salaCode) return;
+    const salaRef = doc(db, "salas", salaCode);
+    const unsub = onSnapshot(
+      salaRef,
+      (snap) => {
+        const d = snap.data() || {};
+        const ts = d.resetAt;
+        const ms = ts?.toMillis?.() || 0;
+        setResetAtMs(ms);
+      },
+      (e) => console.warn("[salas/resetAt] onSnapshot:", e?.code || e?.message)
+    );
+    return () => unsub();
+  }, [salaCode]);
+
   useEffect(() => {
     if (!salaCode) return; // aún no montó sala
     const colRef = collection(db, "salas", salaCode, "palabras");
@@ -1624,17 +1643,29 @@ function InicioClase() {
     const unsub = onSnapshot(
       qRef,
       (snap) => {
-        const rows = snap
-          .docs
+        const rows = snap.docs
           .map((d) => d.data())
-          .filter((x) => (x.texto || "").trim().length > 0);
+          .filter((x) => {
+            const txt = (x.texto || "").trim();
+            if (!txt) return false;
+            const tsMs =
+              x.timestamp?.toMillis?.() ||
+              x.ts?.toMillis?.() ||
+              0;
+            // si hay reset, solo mostramos palabras posteriores
+            if (resetAtMs && tsMs && tsMs <= resetAtMs) return false;
+            return true;
+          });
 
         // últimos envíos (los 5 más recientes)
         const last = snap.docs
           .map((d) => ({
             id: d.id,
             ...d.data(),
-            ts: d.data()?.timestamp?.toMillis?.() || 0,
+            ts:
+              d.data()?.timestamp?.toMillis?.() ||
+              d.data()?.ts?.toMillis?.() ||
+              0,
           }))
           .sort((a, b) => b.ts - a.ts)
           .slice(0, 5);
@@ -1668,7 +1699,7 @@ function InicioClase() {
       (e) => console.warn("[salas/palabras] onSnapshot:", e?.code || e?.message)
     );
     return () => unsub();
-  }, [salaCode]);
+  }, [salaCode, resetAtMs]);
 
   // ✅ ASISTENCIA: escuchar presentes
   useEffect(() => {
@@ -1697,6 +1728,24 @@ function InicioClase() {
     );
     return () => unsub();
   }, [salaCode]);
+
+  const handleClearCloud = async () => {
+    if (!salaCode) return;
+    setClearError("");
+    try {
+      setClearingCloud(true);
+      await setDoc(
+        doc(db, "salas", salaCode),
+        { resetAt: serverTimestamp() },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn("[clearCloud]", e?.code || e?.message);
+      setClearError("No se pudo reiniciar la nube. Intenta nuevamente.");
+    } finally {
+      setClearingCloud(false);
+    }
+  };
 
   // guarda pregunta (debounce)
   const debounceRef = useRef(null);
@@ -2401,7 +2450,43 @@ function InicioClase() {
           }}
         >
           <div style={card} ref={cloudWrapRef}>
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>Nube de palabras</h3>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <h3 style={{ margin: 0 }}>Nube de palabras</h3>
+              <button
+                type="button"
+                onClick={handleClearCloud}
+                style={{
+                  ...btnTiny,
+                  fontSize: 11,
+                  padding: ".25rem .5rem",
+                  opacity: clearingCloud ? 0.6 : 1,
+                  cursor: clearingCloud ? "default" : "pointer",
+                }}
+                disabled={clearingCloud || !salaCode}
+                title="Borra solo las palabras visibles de esta clase. No elimina el historial por curso."
+              >
+                🧹 {clearingCloud ? "Reiniciando..." : "Reiniciar nube"}
+              </button>
+            </div>
+            {clearError && (
+              <div
+                style={{
+                  marginBottom: 6,
+                  fontSize: 12,
+                  color: "#b91c1c",
+                }}
+              >
+                {clearError}
+              </div>
+            )}
 
             {DISABLE_CLOUD ? (
               <div style={{ color: COLORS.textMuted, padding: "1rem 0" }}>
@@ -2669,4 +2754,3 @@ function InicioClase() {
 
 export default InicioClase;
 export { InicioClase };
-

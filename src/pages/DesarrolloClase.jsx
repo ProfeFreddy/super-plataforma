@@ -1,4 +1,4 @@
-﻿// src/pages/DesarrolloClase.jsx  
+﻿// src/pages/DesarrolloClase.jsx
 import React, {
   useEffect,
   useState,
@@ -735,7 +735,6 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
     if (yes) startScreenShare();
     else handleSelectFile();
   };
-
   useEffect(() => {
     return () => {
       if (presentBlobUrl)
@@ -776,7 +775,6 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   const handleOpenSlides = () => trySetMain(readerWrap("https://slides.new"));
   const handleOpenDocs = () => trySetMain(readerWrap("https://docs.new"));
   const handleOpenSheets = () => trySetMain(readerWrap("https://sheets.new"));
-
   const handleOpenYouTubeIcon = () => handleOpenYouTube();
 
   // Wikipedia DIRECTA
@@ -813,13 +811,32 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   }, []);
 
   /* NUEVO: suscripción live a Clase de Emergencia (cuando ya hay sesión) */
-  useEffect(() => {
-    if (!authed) return;
-    const uid = auth.currentUser?.uid || localStorage.getItem("uid");
-    if (!uid) return;
-    const off = subscribeEmergency(uid, setEmergency);
-    return () => off && off();
-  }, [authed]);
+  /* NUEVO: suscripción live a Clase de Emergencia (cuando ya hay sesión) */
+useEffect(() => {
+  if (!authed) return;
+  const uid = auth.currentUser?.uid || localStorage.getItem("uid");
+  if (!uid) return;
+
+  let cleanup;
+
+  try {
+    const maybeOff = subscribeEmergency(uid, setEmergency);
+    // Solo usamos cleanup si realmente es una función
+    if (typeof maybeOff === "function") {
+      cleanup = maybeOff;
+    }
+  } catch (e) {
+    console.warn("[Desarrollo] subscribeEmergency error:", e);
+  }
+
+  // Si cleanup no es función, React no hace nada al desmontar
+  return () => {
+    if (typeof cleanup === "function") {
+      cleanup();
+    }
+  };
+}, [authed]);
+
 
   /* preferir lo que venga desde Inicio (state) */
   useEffect(() => {
@@ -956,8 +973,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             const data = psnap.data() || {};
             const nombreP =
               data.nombre || data.nombreCompleto || data.profesorNombre || null;
-            if (nombreP) setNombreProfesor(nombreP);
-          }
+            if (nombreP) setNombreProfesor(nombreP);          }
         } catch (e) {
           if (e?.code !== "permission-denied")
             console.warn("[Desarrollo] profesores read:", e?.code || e);
@@ -1215,79 +1231,33 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
     obtenerDatos();
   }, [authed]); // solo cuando ya hay sesión
 
-  /* marcas → clases_detalle */
-  useEffect(() => {
-    if (!authed) return;
-    (async () => {
-      try {
-        const uid = localStorage.getItem("uid") || auth.currentUser?.uid;
-        if (!uid) return;
+/* NUEVO: suscripción live a Clase de Emergencia (cuando ya hay sesión) */
+useEffect(() => {
+  if (!authed) return;
+  const uid = auth.currentUser?.uid || localStorage.getItem("uid");
+  if (!uid) return;
 
-        const stSlot = location?.state?.slotId || slotFromQuery() || null;
-        if (stSlot) {
-          const dref0 = doc(db, "clases_detalle", uid, "slots", stSlot);
-          const ds0 = await getDoc(dref0);
-          if (ds0.exists()) {
-            const det = ds0.data() || {};
-            setUnidad((prev) => prev || det.unidad || "");
-            setObjetivo((prev) => prev || det.objetivo || "");
-            setHabilidades((prev) =>
-              prev ||
-              (Array.isArray(det.habilidades)
-                ? det.habilidades.join(", ")
-                : det.habilidades || "")
-            );
-            if (det.asignatura && asignatura === "(sin asignatura)")
-              setAsignatura(det.asignatura);
-            if (curso === "(sin curso)") {
-              setCurso(
-                det.curso ||
-                  cursoFromNivelSeccion(det.nivel, det.seccion) ||
-                  "(sin curso)"
-              );
-            }
-            return;
-          }
-        }
+  let cleanup;
 
-        const uref = doc(db, "usuarios", uid);
-        const usnap = await getDoc(uref);
-        const cfg = usnap.exists() ? usnap.data()?.horarioConfig || {} : {};
+  try {
+    const maybeOff = subscribeEmergency(uid, setEmergency);
 
-        const marcasArr = getMarcasFromConfig(cfg);
-        if (Array.isArray(marcasArr) && marcasArr.length > 1) {
-          const fila = filaDesdeMarcas(marcasArr);
-          const col = colDeHoy();
-          const slotId = `${fila}-${col}`;
+    // Solo usamos cleanup si de verdad es UNA FUNCIÓN
+    if (typeof maybeOff === "function") {
+      cleanup = maybeOff;
+    }
+  } catch (e) {
+    console.warn("[Desarrollo] subscribeEmergency error:", e);
+  }
 
-          const dref = doc(db, "clases_detalle", uid, "slots", slotId);
-          const dsnap = await getDoc(dref);
-          if (dsnap.exists()) {
-            const det = dsnap.data() || {};
-            setUnidad((prev) => prev || det.unidad || "");
-            setObjetivo((prev) => prev || det.objetivo || "");
-            setHabilidades((prev) =>
-              prev ||
-              (Array.isArray(det.habilidades)
-                ? det.habilidades.join(", ")
-                : det.habilidades || "")
-            );
-            if (det.asignatura && asignatura === "(sin asignatura)")
-              setAsignatura(det.asignatura);
-            if (curso === "(sin curso)") {
-              setCurso(
-                det.curso ||
-                  cursoFromNivelSeccion(det.nivel, det.seccion) ||
-                  "(sin curso)"
-              );
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("[Desarrollo] marcas–clases_detalle:", e?.code || e?.message);
-      }
-    })();
-  }, [authed]); // eslint-disable-line
+  // Si cleanup no es función, React no hará nada al desmontar
+  return () => {
+    if (typeof cleanup === "function") {
+      cleanup();
+    }
+  };
+}, [authed]);
+
 
   // === NUEVO: Wikipedia inmediata cuando se identifica/cambia el OBJETIVO ===
   useEffect(() => {
@@ -1366,6 +1336,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
 
   // Carga script de <model-viewer> si no existe
   useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
     if (!window.customElements || !window.customElements.get?.("model-viewer")) {
       const s = document.createElement("script");
       s.type = "module";
@@ -1396,6 +1367,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   };
 
   const handlePickGLB = () => modelFileInputRef.current?.click();
+
   const handleGLBChosen = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -1496,7 +1468,6 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
     const m = String(curso || "").match(/(\d+)\s*[°º]?\s*(b[aá]sico|medio)/i);
     return m ? `${m[1]}° ${m[2].toLowerCase().replace("basico", "básico")}` : "";
   })();
-
   // Busca en mineduc_pdfs si no hay URL manual
   useEffect(() => {
     let cancelled = false;
