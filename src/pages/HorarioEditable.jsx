@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
-import BannerTrial from "../components/Bannertrial";
+import BannerTrial from "../components/BannerTrial";
 
 const COLORS = {
   brandA: "#2193b0", brandB: "#6dd5ed", white: "#ffffff",

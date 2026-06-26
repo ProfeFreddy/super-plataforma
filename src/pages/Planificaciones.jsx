@@ -7,7 +7,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
-import BannerTrial from "../components/Bannertrial";
+import BannerTrial from "../components/BannerTrial";
 
 const toId = (s = "") =>
   s.toString().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "").trim();
