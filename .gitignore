@@ -1,4 +1,4 @@
-############################################################################### 
+###############################################################################
 # 1. Secretos / credenciales privadas (NUNCA subir)
 ###############################################################################
 
@@ -94,13 +94,13 @@ Desktop.ini
 !.vscode/tasks.json
 !.vscode/launch.json
 
-# JetBrains (WebStorm / IntelliJ)
+# JetBrains
 .idea/
 
 # TypeScript caches
 *.tsbuildinfo
 
-# Coverage (tests)
+# Coverage
 coverage/
 .nyc_output/
 
@@ -117,17 +117,52 @@ coverage/
 *.7z
 *.rar
 
-# Carpetas que parecen dumps o seeds locales
+# Carpetas de respaldo
 site-dump/
 backup*/
-.vscode/*
+_backup*/
+_backups/
+old/
+old*/
+nuevo/
+new/
+new2/
+temp*/
+tmp*/
+
 backup-src-before-utf8.zip
-firestore-debug.log
-firebase-debug.log
 
 ###############################################################################
-# 7. Rutas específicas con llaves que GitHub está bloqueando
-#    (estas fueron detectadas como credenciales en tus commits)
+# 7. Unity / WebGL
+###############################################################################
+
+*.apk
+*.aab
+*.unitypackage
+
+Build/
+Builds/
+WebGLBuild/
+StreamingAssets/aa/
+
+###############################################################################
+# 8. Python
+###############################################################################
+
+__pycache__/
+*.pyc
+.pytest_cache/
+
+###############################################################################
+# 9. Archivos de prueba locales
+###############################################################################
+
+test.py
+test2.py
+test*.py
+
+###############################################################################
+# 10. Rutas específicas con llaves que GitHub está bloqueando
 ###############################################################################
 
 import-curriculo/serviceAccount.json
