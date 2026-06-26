@@ -46,6 +46,41 @@ function makeSegKey(slotId = "0-0", idx = 0) {
   return `ic_countdown_end:${uid}:${yw}:${slotId}:seg:${idx}`;
 }
 
+  const location = useLocation();
+
+  // ¿Entramos por Clase especial?
+  const searchParams = useMemo(
+    () => new URLSearchParams(location.search || ""),
+    [location.search]
+  );
+
+  const isSpecialClass =
+    searchParams.get("special") === "1" ||
+    location.state?.special === true ||
+    location.state?.modoEspecial === true ||
+    searchParams.get("mode") === "special";
+
+  // Meta guardada en Home (teacherName, subject, unit, objective, skills, language)
+  const [specialMeta, setSpecialMeta] = useState(null);
+
+  useEffect(() => {
+    if (!isSpecialClass) return;
+
+    try {
+      const raw = localStorage.getItem("pragma:specialClassMeta");
+      if (raw) {
+        const meta = JSON.parse(raw);
+        setSpecialMeta(meta);
+        console.log("[InicioClase] specialMeta cargada:", meta);
+      } else {
+        console.log("[InicioClase] no hay specialMeta en storage");
+      }
+    } catch (e) {
+      console.warn("[InicioClase] error leyendo specialMeta:", e);
+    }
+  }, [isSpecialClass]);
+
+
 // === DEBUG DE TIEMPO (solo PRUEBA) ===============================
 const FORCE_TEST_TIME = false; // ✅ usa hora real
 const TEST_DATETIME_ISO = "2025-08-11T08:10:00"; // Lunes 11-08-2025 08:10
@@ -593,7 +628,6 @@ function ICDebugBadge({ show, data }) {
 
 function InicioClase() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const { ready: authReady, user: authUser, isAnon: isAnonLight } = useAuthReadyLight();
 React.useEffect(() => {
@@ -608,11 +642,12 @@ React.useEffect(() => {
 
   // ... (el resto de tus useState/useEffect existentes)
 
-  // 🧪 NUEVO: flags por query para pruebas
-  const __qs = new URLSearchParams(window.location.search || "");
-  const SAFE_MODE = __qs.get("safe") === "1";
-  const DISABLE_CLOUD = __qs.get("nocloud") === "1";
-  const DEBUG_ON = __qs.get("debug") === "1";
+  const SAFE_MODE = search.get("safe") === "1";
+const DISABLE_CLOUD = search.get("nocloud") === "1";
+const DEBUG_ON = search.get("debug") === "1";
+const BYPASS_NAV = search.get("bypass") === "1";
+const LEGACY_CLOUD = search.get("legacycloud") === "1";
+
 
   // 🎛️ PRESET (incluye "showtime" para más contraste/rotación agresiva)
   const PRESET =
@@ -672,6 +707,90 @@ React.useEffect(() => {
       window.location.assign("/horario");
     }
   };
+
+    const location = useLocation(); 
+   const plan = (planCtx && planCtx.plan) || {};
+
+  // 🔹 Estado para idioma y meta de la clase especial
+  const [language, setLanguage] = useState("es");
+  const [specialMeta, setSpecialMeta] = useState(null);
+
+  useEffect(() => {
+    try {
+      const state = location.state || {};
+      const search = location.search || window.location.search || "";
+      const qp = new URLSearchParams(search);
+
+      const langFromState = state.language;
+      const langFromUrl = qp.get("lang");
+      const storedLang = localStorage.getItem("pragma_lang") || "es";
+
+      let lang =
+        langFromState ||
+        langFromUrl ||
+        storedLang ||
+        (navigator.language || "es").slice(0, 2);
+
+      lang = lang.toLowerCase().startsWith("en") ? "en" : "es";
+      setLanguage(lang);
+
+      // 1) data pasada por state al navegar desde Home
+      let meta =
+        state.specialMeta ||
+        state.specialClassMeta ||
+        null;
+
+      // 2) si no viene por state, probamos en localStorage
+      if (!meta) {
+        const raw = localStorage.getItem(SPECIAL_CLASS_META_KEY);
+        if (raw) {
+          meta = JSON.parse(raw);
+        }
+      }
+
+      if (meta && meta.modoEspecial) {
+        setSpecialMeta(meta);
+      } else {
+        setSpecialMeta(null);
+      }
+    } catch (e) {
+      console.warn("[InicioClase] error leyendo Clase especial:", e);
+      setSpecialMeta(null);
+      setLanguage("es");
+    }
+
+      // 🔹 Construimos los datos que realmente se mostrarán
+  const unitToShow =
+    (specialMeta && specialMeta.unit) ||
+    plan.unidad ||
+    "";
+
+  const objectiveToShow =
+    (specialMeta && specialMeta.objective) ||
+    plan.objetivo ||
+    "";
+
+  let skillsArray = [];
+  if (specialMeta && specialMeta.skills) {
+    skillsArray = specialMeta.skills
+      .split(/[;,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } else if (Array.isArray(plan.habilidades)) {
+    skillsArray = plan.habilidades;
+  }
+
+  const subjectToShow =
+    (specialMeta && specialMeta.subject) ||
+    plan.asignatura ||
+    "";
+
+  const teacherNameToShow =
+    (specialMeta && specialMeta.teacherName) ||
+    plan.profesor ||
+    "Profesor";
+
+  }, [location.key]);
 
   // ✅ tomar slot forzado o recordado apenas monta
   useEffect(() => {
@@ -2118,47 +2237,59 @@ if (!authReady) {
           </div>
 
           <div style={{ ...card }}>
-            <div style={{ fontWeight: 800, fontSize: "1.2rem", marginBottom: 6 }}>
-              Desarrollo de la clase
-            </div>
-            <div style={{ marginBottom: 6 }}>
-              <strong>Unidad:</strong> {claseActual?.unidad ?? "(sin unidad)"}
-            </div>
-            <div style={{ marginBottom: 6 }}>
-              <strong>Objetivo:</strong> {claseActual?.objetivo ?? "(sin objetivo)"}
-            </div>
-            <div>
-              <strong>Habilidades:</strong>{" "}
-              {claseActual?.habilidades ?? "(sin habilidades)"}
-            </div>
+  <div style={{ ...card }}>
+  <div style={{ fontWeight: 800, fontSize: "1.2rem", marginBottom: 6 }}>
+    {effectivePlan?.language === "en" ? "Lesson flow" : "Desarrollo de la clase"}
+  </div>
 
-            {habilidadesList.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                  marginTop: 6,
-                }}
-              >
-                {habilidadesList.map((h, i) => (
-                  <span
-                    key={`${h}_${i}`}
-                    style={{
-                      border: "1px solid #cbd5e1",
-                      background: "#f8fafc",
-                      borderRadius: 999,
-                      padding: "4px 10px",
-                      fontSize: 12,
-                    }}
-                  >
-                    {h}
-                  </span>
-                ))}
-              </div>
-            )}
+  <div style={{ marginBottom: 6 }}>
+    <strong>{effectivePlan?.language === "en" ? "Unit:" : "Unidad:"}</strong>{" "}
+    {effectivePlan?.unidad ||
+      (effectivePlan?.language === "en" ? "(no unit)" : "(sin unidad)")}
+  </div>
 
-            {Array.isArray(oaPlan) && oaPlan.length > 0 && (
+  <div style={{ marginBottom: 6 }}>
+    <strong>{effectivePlan?.language === "en" ? "Objective:" : "Objetivo:"}</strong>{" "}
+    {effectivePlan?.objetivo ||
+      (effectivePlan?.language === "en" ? "(no objective)" : "(sin objetivo)")}
+  </div>
+
+  <div style={{ marginBottom: 6 }}>
+    <strong>{effectivePlan?.language === "en" ? "Skills:" : "Habilidades:"}</strong>{" "}
+    {effectivePlan?.habilidades?.length
+      ? effectivePlan.habilidades.join(", ")
+      : effectivePlan?.language === "en"
+      ? "(no skills)"
+      : "(sin habilidades)"}
+  </div>
+
+  {effectivePlan?.habilidades?.length > 0 && (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 6,
+      }}
+    >
+      {effectivePlan.habilidades.map((h, i) => (
+        <span
+          key={`${h}_${i}`}
+          style={{
+            border: "1px solid #cbd5e1",
+            background: "#f8fafc",
+            borderRadius: 999,
+            padding: "4px 10px",
+            fontSize: 12,
+          }}
+        >
+          {h}
+        </span>
+      ))}
+    </div>
+  )}
+</div>
+           {Array.isArray(oaPlan) && oaPlan.length > 0 && (
               <div
                 style={{
                   marginTop: 12,

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Profesor — PitagorasRunner</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #fff; min-height: 100vh; }
+
+  header {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 2px solid #00d4ff33;
+  }
+  header h1 { font-size: 1.6rem; color: #00d4ff; letter-spacing: 1px; }
+  header span { font-size: 0.9rem; color: #aaa; }
+
+  .setup { display: flex; gap: 12px; padding: 24px 32px; align-items: center; flex-wrap: wrap; }
+  .setup input {
+    padding: 10px 16px; border-radius: 8px; border: 2px solid #00d4ff55;
+    background: #1a1a2e; color: #fff; font-size: 1rem; width: 200px;
+  }
+  .setup input:focus { outline: none; border-color: #00d4ff; }
+  .btn {
+    padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 1rem; font-weight: 700; transition: all 0.2s;
+  }
+  .btn-primary { background: #00d4ff; color: #0f0f1a; }
+  .btn-primary:hover { background: #00b8d9; transform: scale(1.03); }
+  .btn-danger { background: #ff4757; color: #fff; }
+  .btn-danger:hover { background: #e03e4e; }
+
+  .status { padding: 0 32px 8px; font-size: 0.85rem; color: #aaa; }
+  .status span { color: #00d4ff; font-weight: 700; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0 32px 32px; }
+  @media(max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: #1a1a2e; border-radius: 14px; padding: 20px;
+    border: 1px solid #00d4ff22;
+  }
+  .card h2 { font-size: 1rem; color: #00d4ff; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* RANKING */
+  .ranking-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 8px; margin-bottom: 8px;
+    background: #0f0f1a; transition: background 0.3s;
+  }
+  .ranking-item:first-child { background: linear-gradient(90deg, #ffd70022, #0f0f1a); }
+  .ranking-item:nth-child(2) { background: linear-gradient(90deg, #c0c0c022, #0f0f1a); }
+  .ranking-item:nth-child(3) { background: linear-gradient(90deg, #cd7f3222, #0f0f1a); }
+  .rank-pos { font-size: 1.3rem; width: 32px; text-align: center; }
+  .rank-name { flex: 1; font-weight: 600; }
+  .rank-pts { font-size: 1.1rem; color: #00d4ff; font-weight: 700; }
+  .rank-bar { height: 6px; background: #00d4ff33; border-radius: 3px; margin-top: 4px; }
+  .rank-bar-fill { height: 100%; background: #00d4ff; border-radius: 3px; transition: width 0.5s; }
+
+  /* ESTACIONES */
+  .station-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .station-label { width: 80px; font-size: 0.85rem; color: #aaa; }
+  .station-bar-bg { flex: 1; height: 22px; background: #0f0f1a; border-radius: 6px; overflow: hidden; }
+  .station-bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s; display: flex; align-items: center; padding-left: 8px; font-size: 0.75rem; font-weight: 700; }
+  .station-pct { width: 44px; text-align: right; font-size: 0.9rem; font-weight: 700; }
+
+  /* TABLA */
+  .table-wrap { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { background: #0f0f1a; color: #00d4ff; padding: 8px 10px; text-align: left; position: sticky; top: 0; }
+  td { padding: 7px 10px; border-bottom: 1px solid #ffffff0a; }
+  tr:hover td { background: #ffffff08; }
+  .badge { padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; }
+  .badge-ok { background: #00c85322; color: #00c853; }
+  .badge-fail { background: #ff475722; color: #ff4757; }
+
+  /* PREGUNTAS QUE MÁS FALLAN */
+  .fail-item { padding: 10px 12px; background: #0f0f1a; border-radius: 8px; margin-bottom: 8px; }
+  .fail-station { font-size: 0.75rem; color: #aaa; margin-bottom: 3px; }
+  .fail-bar-bg { height: 8px; background: #ff475722; border-radius: 4px; margin-top: 6px; }
+  .fail-bar-fill { height: 100%; background: #ff4757; border-radius: 4px; transition: width 0.5s; }
+  .fail-pct { font-size: 0.85rem; color: #ff4757; font-weight: 700; float: right; }
+
+  .empty { color: #555; font-size: 0.9rem; text-align: center; padding: 20px; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; background: #00c853; border-radius: 50%; margin-right: 6px; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎮 PitagorasRunner — Panel Profesor</h1>
+  <span><span class="live-dot"></span>EN VIVO</span>
+</header>
+
+<div class="setup">
+  <input type="text" id="roomInput" placeholder="Código de sala (ej: ABC)" />
+  <button class="btn btn-primary" onclick="conectar()">Conectar</button>
+  <button class="btn btn-danger" onclick="limpiar()" style="display:none" id="btnLimpiar">Desconectar</button>
+</div>
+<div class="status" id="statusTxt">Ingresa el código de sala y conecta.</div>
+
+<div class="grid" id="mainGrid" style="display:none">
+  <!-- RANKING -->
+  <div class="card">
+    <h2>🏆 Ranking en tiempo real</h2>
+    <div id="rankingList"><div class="empty">Sin datos aún</div></div>
+  </div>
+
+  <!-- ACIERTOS POR ESTACIÓN -->
+  <div class="card">
+    <h2>📊 % Aciertos por estación</h2>
+    <div id="stationBars"><div class="empty">Sin datos aún</div></div>
+  </div>
+
+  <!-- TABLA ALUMNOS -->
+  <div class="card" style="grid-column: span 2">
+    <h2>📋 Respuestas por alumno</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Alumno</th><th>Estación</th><th>Resultado</th><th>Puntos</th><th>Hora</th></tr></thead>
+        <tbody id="respuestasTbody"><tr><td colspan="5" class="empty">Sin datos aún</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PREGUNTAS QUE MÁS FALLAN -->
+  <div class="card" style="grid-column: span 2">
+    <h2>⚠️ Estaciones con más fallos</h2>
+    <div id="failList"><div class="empty">Sin datos aún</div></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// CONFIGURA TU FIREBASE AQUÍ
+// ══════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyAXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  authDomain: "brainrush-arena.firebaseapp.com",
+  databaseURL: "https://brainrush-arena-default-rtdb.firebaseio.com",
+  projectId: "brainrush-arena",
+  storageBucket: "brainrush-arena.appspot.com",
+  messagingSenderId: "XXXXXXXXXXXX",
+  appId: "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+};
+// ══════════════════════════════════════════
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+let listener = null;
+let allData = [];
+
+function conectar() {
+  const room = document.getElementById('roomInput').value.trim().toUpperCase();
+  if (!room) { alert('Ingresa un código de sala'); return; }
+
+  if (listener) listener.off();
+
+  document.getElementById('statusTxt').innerHTML = `Conectado a sala: <span>${room}</span> — escuchando cambios en tiempo real`;
+  document.getElementById('mainGrid').style.display = 'grid';
+  document.getElementById('btnLimpiar').style.display = 'inline-block';
+
+  const ref = db.ref(`rooms/${room}/resultados`);
+  listener = ref;
+
+  ref.on('value', snap => {
+    allData = [];
+    snap.forEach(child => {
+      allData.push({ key: child.key, ...child.val() });
+    });
+    renderAll();
+  });
+}
+
+function limpiar() {
+  if (listener) listener.off();
+  listener = null;
+  allData = [];
+  document.getElementById('mainGrid').style.display = 'none';
+  document.getElementById('btnLimpiar').style.display = 'none';
+  document.getElementById('statusTxt').innerHTML = 'Desconectado.';
+}
+
+function renderAll() {
+  renderRanking();
+  renderStations();
+  renderTabla();
+  renderFails();
+}
+
+function renderRanking() {
+  // Suma puntos por alumno
+  const pts = {};
+  allData.forEach(r => {
+    pts[r.nombre] = (pts[r.nombre] || 0) + (r.puntos || 0);
+  });
+  const sorted = Object.entries(pts).sort((a,b) => b[1]-a[1]);
+  const max = sorted.length ? sorted[0][1] : 1;
+  const medals = ['🥇','🥈','🥉'];
+
+  if (!sorted.length) {
+    document.getElementById('rankingList').innerHTML = '<div class="empty">Sin datos aún</div>';
+    return;
+  }
+
+  document.getElementById('rankingList').innerHTML = sorted.map(([name, p], i) => `
+    <div class="ranking-item">
+      <span class="rank-pos">${medals[i] || (i+1)}</span>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between">
+          <span class="rank-name">${name}</span>
+          <span class="rank-pts">${p} pts</span>
+        </div>
+        <div class="rank-bar"><div class="rank-bar-fill" style="width:${Math.round(p/max*100)}%"></div></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderStations() {
+  const stats = {}; // {estacion: {ok, total}}
+  allData.forEach(r => {
+    const e = r.estacion || 0;
+    if (!stats[e]) stats[e] = { ok: 0, total: 0 };
+    stats[e].total++;
+    if (r.correcto) stats[e].ok++;
+  });
+
+  const keys = Object.keys(stats).map(Number).sort((a,b)=>a-b);
+  if (!keys.length) {
+    document.getElementById('stationBars').innerHTML = '<div class="empty">Sin datos aún</div>';
+    return;
+  }
+
+  document.getElementById('stationBars').innerHTML = keys.map(e => {
+    const pct = Math.round(stats[e].ok / stats[e].total * 100);
+    const color = pct >= 70 ? '#00c853' : pct >= 40 ? '#ffab00' : '#ff4757';
+    return `
+      <div class="station-row">
+        <span class="station-label">Est. ${e}</span>
+        <div class="station-bar-bg">
+          <div class="station-bar-fill" style="width:${pct}%;background:${color}">
+            ${pct > 15 ? stats[e].ok+'/'+stats[e].total : ''}
+          </div>
+        </div>
+        <span class="station-pct" style="color:${color}">${pct}%</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTabla() {
+  if (!allData.length) {
+    document.getElementById('respuestasTbody').innerHTML = '<tr><td colspan="5" class="empty">Sin datos aún</td></tr>';
+    return;
+  }
+  const sorted = [...allData].sort((a,b) => (b.timestamp||'').localeCompare(a.timestamp||''));
+  document.getElementById('respuestasTbody').innerHTML = sorted.map(r => `
+    <tr>
+      <td><b>${r.nombre || '?'}</b></td>
+      <td>Estación ${r.estacion || '?'}</td>
+      <td><span class="badge ${r.correcto ? 'badge-ok' : 'badge-fail'}">${r.correcto ? '✓ Correcto' : '✗ Incorrecto'}</span></td>
+      <td>${r.puntos || 0} pts</td>
+      <td style="color:#aaa;font-size:0.8rem">${(r.timestamp||'').slice(11,19)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderFails() {
+  const fails = {};
+  allData.forEach(r => {
+    const e = r.estacion || 0;
+    if (!fails[e]) fails[e] = { fail: 0, total: 0 };
+    fails[e].total++;
+    if (!r.correcto) fails[e].fail++;
+  });
+
+  const keys = Object.keys(fails).map(Number)
+    .filter(e => fails[e].fail > 0)
+    .sort((a,b) => (fails[b].fail/fails[b].total) - (fails[a].fail/fails[a].total));
+
+  if (!keys.length) {
+    document.getElementById('failList').innerHTML = '<div class="empty">Sin fallos registrados 🎉</div>';
+    return;
+  }
+
+  document.getElementById('failList').innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">` +
+    keys.map(e => {
+      const pct = Math.round(fails[e].fail / fails[e].total * 100);
+      return `
+        <div class="fail-item">
+          <div class="fail-station">Estación ${e}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:700">${fails[e].fail} fallos de ${fails[e].total}</span>
+            <span class="fail-pct">${pct}%</span>
+          </div>
+          <div class="fail-bar-bg"><div class="fail-bar-fill" style="width:${pct}%"></div></div>
+        </div>
+      `;
+    }).join('') + '</div>';
+}
+</script>
+</body>
+</html>

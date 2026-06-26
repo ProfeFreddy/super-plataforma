@@ -1,1031 +1,421 @@
 // src/pages/HorarioEditable.jsx
-
-// Render seguro para debug (evita "Objects are not valid as a React child")
 const safeText = (v) => {
   if (v === null || v === undefined) return "";
-  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean")
-    return String(v);
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return "[obj]";
-  }
+  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+  try { return JSON.stringify(v); } catch { return "[obj]"; }
 };
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  collection,
-  getDocs,
-} from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import BannerTrial from "../components/BannerTrial"; // ✅ AGREGADO
 
-/** ====== Estilos base ====== */
 const COLORS = {
-  brandA: "#2193b0",
-  brandB: "#6dd5ed",
-  white: "#ffffff",
-  textDark: "#0f172a",
-  text: "#1f2937",
-  muted: "#64748b",
-  border: "#e5e7eb",
-  chip: "#f1f5f9",
-  warn: "#fff7ed",
-  warnBorder: "#fdba74",
+  brandA: "#2193b0", brandB: "#6dd5ed", white: "#ffffff",
+  textDark: "#0f172a", text: "#1f2937", muted: "#64748b",
+  border: "#e5e7eb", chip: "#f1f5f9", warn: "#fff7ed", warnBorder: "#fdba74",
+  green: "#10b981", greenLight: "#ecfdf5",
 };
 const wrap = {
   minHeight: "100vh",
   background: `linear-gradient(to right, ${COLORS.brandA}, ${COLORS.brandB})`,
-  padding: "24px",
-  boxSizing: "border-box",
+  padding: "24px", boxSizing: "border-box",
   fontFamily: "Segoe UI, system-ui, sans-serif",
-  color: COLORS.white,
 };
 const card = {
-  background: COLORS.white,
-  color: COLORS.text,
-  borderRadius: 12,
-  padding: 16,
+  background: COLORS.white, color: COLORS.text, borderRadius: 12, padding: 20,
   border: `1px solid ${COLORS.border}`,
-  boxShadow: "0 6px 18px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.03)",
+  boxShadow: "0 6px 18px rgba(16,24,40,.08)",
 };
-const h1 = { margin: 0, fontSize: 22, fontWeight: 900 };
-const row = {
-  display: "grid",
-  gridTemplateColumns: "1fr auto",
-  alignItems: "center",
-  gap: 12,
-  marginBottom: 12,
-};
-const tabsBar = {
-  display: "flex",
-  gap: 8,
-  background: "#eef6fb",
-  borderRadius: 10,
-  padding: 4,
-  marginTop: 8,
-};
-const tabBtn = (active) => ({
-  background: active ? "#ffffff" : "transparent",
-  color: active ? COLORS.textDark : "#0ea5e9",
-  border: "1px solid " + (active ? COLORS.border : "transparent"),
-  borderRadius: 8,
-  padding: "8px 12px",
-  fontWeight: 800,
-  cursor: "pointer",
-});
 const btn = {
-  background: COLORS.white,
-  color: "#0ea5e9",
-  border: "1px solid " + COLORS.border,
-  borderRadius: 10,
-  padding: "8px 12px",
-  fontWeight: 700,
-  cursor: "pointer",
+  background: COLORS.white, color: "#0ea5e9", border: "1px solid " + COLORS.border,
+  borderRadius: 10, padding: "9px 14px", fontWeight: 700, cursor: "pointer", fontSize: 14,
 };
-const btnDisabled = { ...btn, opacity: 0.6, cursor: "not-allowed" };
+const btnPrimary = { ...btn, background: "#0ea5e9", color: "#fff", border: "none" };
+const btnGreen = { ...btn, background: COLORS.green, color: "#fff", border: "none" };
 const btnDanger = { ...btn, color: "#ef4444" };
-const grid = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" };
-const th = {
-  background: "#f8fafc",
-  color: COLORS.textDark,
-  borderBottom: `1px solid ${COLORS.border}`,
-  padding: 10,
-  fontWeight: 800,
-  position: "sticky",
-  top: 0,
-  zIndex: 1,
-};
-const td = {
-  borderBottom: `1px solid ${COLORS.border}`,
-  borderRight: `1px solid ${COLORS.border}`,
-  padding: 8,
-  verticalAlign: "top",
-  background: "#ffffff",
-};
-const tdLocked = { ...td, background: "#f1f5f9", color: COLORS.muted };
 const selectStyle = {
-  width: "100%",
-  padding: "6px 8px",
-  borderRadius: 8,
-  border: `1px solid ${COLORS.border}`,
-  background: COLORS.white,
+  padding: "7px 10px", borderRadius: 8, border: `1px solid ${COLORS.border}`,
+  background: COLORS.white, fontSize: 14, cursor: "pointer",
 };
-const inputStyle = { ...selectStyle };
-const small = { color: COLORS.muted, fontSize: 12, marginTop: 6 };
+const inputStyle = { ...selectStyle, width: "100%" };
+const labelStyle = { fontSize: 13, fontWeight: 700, color: COLORS.muted, marginBottom: 4, display: "block" };
 
-/** ====== Config básica: bloques + recreos ====== */
-const BLOQUES = [
-  "08:00 - 08:45",
-  "08:45 - 09:30",
-  "09:30 - 09:50 (Recreo)",
-  "09:50 - 10:35",
-  "10:35 - 11:20",
-  "11:20 - 11:30 (Recreo)",
-  "11:30 - 12:15",
-  "12:15 - 13:00",
-  "13:00 - 13:45 (Almuerzo)",
-  "13:45 - 14:30",
-  "14:30 - 15:15",
-  "15:15 - 15:30 (Recreo)",
-  "15:30 - 16:15",
-  "16:15 - 17:00",
-  "17:00 - 17:45",
-  "17:45 - 18:30",
-];
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
-function marcasFromBloques(bloques) {
-  const HHMM = (s) => {
-    const [h, m] = s.split(":").map((n) => Number(n));
-    return [isFinite(h) ? h : 0, isFinite(m) ? m : 0];
-  };
-  const starts = bloques.map((b) => String(b).split(" - ")[0]);
-  const lastEnd = String(bloques.at(-1)).split(" - ")[1].split(" ")[0];
-  const all = [...starts, lastEnd];
-  return all.map((s) => HHMM(s));
-}
+const NIVELES = ["7º Básico","8º Básico","1º Medio","2º Medio","3º Medio","4º Medio"];
+const SECCIONES = ["A","B","C","D","E"];
+const DURACIONES = [20, 30, 40, 45, 60, 90];
 
-/* ——— NIVELES (Chile): de 7º Básico a 4º Medio ——— */
-const NIVELES = [
-  "7º Básico",
-  "8º Básico",
-  "1º Medio",
-  "2º Medio",
-  "3º Medio",
-  "4º Medio",
-];
-
-const SECCIONES = ["A", "B", "C", "D", "E"];
-const ASIGNATURAS_BASE = [
-  "Matemática",
-  "Lenguaje",
-  "Ciencias",
-  "Historia",
-  "Física",
-  "Química",
-  "Biología",
-  "Inglés",
-  "Tecnología",
-];
-
-function celdaVacia() {
-  return {
-    asignatura: "",
-    nivel: "",
-    seccion: "",
-    unidad: "",
-    objetivo: "",
-    habilidades: "",
-  };
-}
-function construirMatriz(rows, cols) {
-  return Array.from({ length: rows }, () =>
-    Array.from({ length: cols }, () => celdaVacia())
-  );
-}
-function esBloqueNoLectivo(idx) {
-  return /\(Recreo\)|\(Almuerzo\)/i.test(BLOQUES[idx] || "");
-}
-
-/** ====== Normalizadores ====== */
-const toId = (s = "") =>
-  String(s)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9]+/g, "")
-    .trim();
-
-const toNivelId = (raw = "") => {
-  const s = String(raw)
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[°º]/g, "")
-    .replace("básico", "basico")
-    .replace("medio", "medio")
-    .trim();
-  return toId(s);
+const ASIG_TO_ID = {
+  "Matemática": "matematica", "Lenguaje": "lenguaje", "Historia": "historia",
+  "Ciencias": "ciencias", "Física": "fisica", "Química": "quimica",
+  "Biología": "biologia", "Inglés": "ingles", "Tecnología": "tecnologia",
+  "Lengua y Literatura": "lenguaje", "Límites, Derivadas e Integrales": "matematica",
+  "Probabilidades y Estadística": "matematica", "Biología Celular y Molecular": "biologia",
+  "Biología de los Ecosistemas": "biologia", "Física (Electivo)": "fisica",
+  "Química (Electivo)": "quimica",
 };
 
-/** ====== Firestore helpers ====== */
-function flattenHorario(matriz = []) {
+function getAsigId(asig = "") {
+  return ASIG_TO_ID[asig] || asig.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "").trim();
+}
+
+function getNivelRaw(nivel = "") {
+  return nivel.replace(/º/g, "°").replace(/Básico/g, "básico").replace(/Medio/g, "medio").toLowerCase().trim();
+}
+
+function normNivel(n = "") {
+  return n.replace(/[°º]/g, "").replace(/\s+/g, " ").toLowerCase().trim();
+}
+
+const ASIGNATURAS_BASE = [
+  "Matemática", "Lenguaje", "Historia", "Ciencias", "Física", "Química", "Biología",
+  "Inglés", "Ed. Física", "Artes", "Música", "Orientación", "Tecnología", "Religión",
+  "Filosofía", "Psicología", "Lengua y Literatura", "Educación Ciudadana",
+  "Matemática (Plan Común)", "Ciencias para la Ciudadanía",
+  "Historia, Geografía y Ciencias Sociales", "Artes (Plan Electivo)",
+  "Ed. Física y Salud (Plan Electivo)", "Taller de Literatura",
+  "Lectura y Escritura Especializadas", "Participación y Argumentación en Democracia",
+  "Límites, Derivadas e Integrales", "Probabilidades y Estadística",
+  "Pensamiento Computacional y Programación", "Geometría 3D",
+  "Biología de los Ecosistemas", "Biología Celular y Molecular", "Ciencias de la Salud",
+  "Física (Electivo)", "Química (Electivo)",
+  "Artes Visuales, Audiovisuales y Multimediales", "Creación y Composición Musical",
+  "Diseño y Arquitectura", "Interpretación y Creación en Danza",
+  "Interpretación y Creación en Teatro", "Interpretación Musical",
+  "Promoción de Estilos de Vida Activos y Saludables",
+  "Ciencias del Ejercicio Físico y Deportivo", "Expresión Corporal",
+  "Libre Disposición", "Consejo de Curso", "Tutoría", "Reforzamiento", "Taller", "Otro",
+];
+
+const _unidadesCache = {};
+
+async function fetchUnidades(asignatura, nivel) {
+  if (!asignatura || !nivel) return [];
+  const key = `${asignatura}||${nivel}`;
+  if (_unidadesCache[key]) return _unidadesCache[key];
+  try {
+    const asigId = getAsigId(asignatura);
+    const nivelRaw = getNivelRaw(nivel);
+    const q1 = query(collection(db, "curriculo"), where("asignaturaId", "==", asigId), where("nivel", "==", nivelRaw));
+    const snap1 = await getDocs(q1);
+    if (!snap1.empty) {
+      const unidades = snap1.docs.map((d) => ({ id: d.id, titulo: d.data().titulo || d.id, codUnidad: d.data().codUnidad || d.id, objetivo: Array.isArray(d.data().objetivos) ? d.data().objetivos[0] || "" : "", habilidades: Array.isArray(d.data().habilidades) ? d.data().habilidades : [] })).sort((a, b) => a.codUnidad.localeCompare(b.codUnidad));
+      _unidadesCache[key] = unidades; return unidades;
+    }
+    const q2 = query(collection(db, "curriculo"), where("asignaturaId", "==", asigId));
+    const snap2 = await getDocs(q2);
+    const nivelBase = normNivel(nivel);
+    const filtered = snap2.docs.filter((d) => { const nFS = normNivel(String(d.data().nivel || "")); return nFS === nivelBase || nFS.includes(nivelBase) || nivelBase.includes(nFS); }).map((d) => ({ id: d.id, titulo: d.data().titulo || d.id, codUnidad: d.data().codUnidad || d.id, objetivo: Array.isArray(d.data().objetivos) ? d.data().objetivos[0] || "" : "", habilidades: Array.isArray(d.data().habilidades) ? d.data().habilidades : [] })).sort((a, b) => a.codUnidad.localeCompare(b.codUnidad));
+    _unidadesCache[key] = filtered; return filtered;
+  } catch (e) { console.warn("[fetchUnidades]", e?.message); return []; }
+}
+
+function generarBloques(config) {
+  const { horaInicio, duracionMin, pausas } = config;
+  const [hIni, mIni] = horaInicio.split(":").map(Number);
+  let minActual = hIni * 60 + mIni;
+  const bloques = []; let numBloque = 1;
+  const totalBloques = config.totalBloques || 10;
+  const pausasOrdenadas = [...(pausas || [])].sort((a, b) => a.despuesDeBloque - b.despuesDeBloque);
+  for (let i = 0; i < totalBloques; i++) {
+    const inicio = minToHHMM(minActual); minActual += duracionMin; const fin = minToHHMM(minActual);
+    bloques.push({ id: `B${numBloque}`, tipo: "clase", label: `Bloque ${numBloque}`, inicio, fin }); numBloque++;
+    const pausa = pausasOrdenadas.find((p) => p.despuesDeBloque === i + 1);
+    if (pausa) { const pInicio = minToHHMM(minActual); minActual += pausa.duracion; const pFin = minToHHMM(minActual); bloques.push({ id: `P${i}`, tipo: pausa.tipo, label: pausa.tipo === "almuerzo" ? "Almuerzo" : "Recreo", inicio: pInicio, fin: pFin }); }
+  }
+  return bloques;
+}
+
+function minToHHMM(min) { const h = Math.floor(min / 60); const m = min % 60; return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`; }
+function celdaVacia() { return { asignatura: "", nivel: "", seccion: "", unidad: "", unidadTitulo: "", objetivo: "", habilidades: [] }; }
+function construirMatrizDesde(bloques) { return bloques.filter((b) => b.tipo === "clase").map(() => Array.from({ length: 5 }, () => celdaVacia())); }
+function normalizarConfigParaFS(config) { return { horaInicio: config.horaInicio, duracionMin: config.duracionMin, totalBloques: config.totalBloques, pausas: config.pausas || [] }; }
+
+function rebuildMatriz(flat, clasesBloques) {
+  const m = construirMatrizDesde(clasesBloques);
+  for (const c of flat || []) {
+    if (Number.isInteger(c.row) && Number.isInteger(c.col) && c.row < m.length && c.col < 5) {
+      m[c.row][c.col] = { asignatura: c.asignatura || "", nivel: c.nivel || "", seccion: c.seccion || "", unidad: c.unidad || "", unidadTitulo: c.unidadTitulo || c.unidad || "", objetivo: c.objetivo || "", habilidades: Array.isArray(c.habilidades) ? c.habilidades : [] };
+    }
+  }
+  return m;
+}
+
+function flattenMatriz(matriz, bloqueClases) {
   const out = [];
   for (let row = 0; row < matriz.length; row++) {
-    const fila = matriz[row] || [];
-    for (let col = 0; col < (fila.length || 0); col++) {
-      const cell = fila[col] || {};
-      out.push({ row, col, ...cell });
+    for (let col = 0; col < 5; col++) {
+      const cell = matriz[row]?.[col] || celdaVacia();
+      out.push({ row, col, ...cell, bloqueId: bloqueClases[row]?.id || "" });
     }
   }
   return out;
 }
-function rebuildFromFlat(flat = [], rows, cols) {
-  const M = construirMatriz(rows, cols);
-  for (const c of flat) {
-    if (
-      Number.isInteger(c.row) &&
-      Number.isInteger(c.col) &&
-      c.row < rows &&
-      c.col < cols
-    ) {
-      const { row, col, ...rest } = c;
-      M[row][col] = { ...celdaVacia(), ...rest };
+
+async function writeSlots(uid, matriz, bloqueClases, profesorNombre) {
+  for (let row = 0; row < matriz.length; row++) {
+    for (let col = 0; col < 5; col++) {
+      const cell = matriz[row]?.[col] || celdaVacia();
+      if (!cell.asignatura) continue;
+      const slotId = `${row}-${col}`;
+      const payload = { asignatura: cell.asignatura, nivel: cell.nivel || "", seccion: cell.seccion || "", curso: ((cell.nivel || "") + (cell.seccion ? ` ${cell.seccion}` : "")).trim(), bloque: bloqueClases[row]?.label || "", bloqueInicio: bloqueClases[row]?.inicio || "", dia: DIAS[col] || "", profesor: profesorNombre || "", unidad: cell.unidadTitulo || cell.unidad || "", objetivo: cell.objetivo || "", habilidades: Array.isArray(cell.habilidades) ? cell.habilidades : [], updatedAt: serverTimestamp() };
+      await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), payload, { merge: true });
     }
   }
-  return M;
 }
-function normalizeConfigForFS(cfg = {}) {
-  const out = { ...cfg };
-  if (Array.isArray(cfg.marcas)) {
-    out.marcas = cfg.marcas.map((par) => {
-      const [h, m] = Array.isArray(par) ? par : [0, 0];
-      return { h: Number(h) || 0, m: Number(m) || 0 };
-    });
-  }
-  return out;
-}
-function isEmptyCell(cell = {}) {
-  return !(
-    (cell.asignatura && String(cell.asignatura).trim()) ||
-    (cell.unidad && String(cell.unidad).trim()) ||
-    (cell.objetivo && String(cell.objetivo).trim()) ||
-    (cell.habilidades && String(cell.habilidades).trim()) ||
-    (cell.nivel && String(cell.nivel).trim()) ||
-    (cell.seccion && String(cell.seccion).trim())
+
+function ConfiguradorHorario({ onConfirmar, configInicial }) {
+  const [horaInicio, setHoraInicio] = useState(configInicial?.horaInicio || "08:00");
+  const [duracionMin, setDuracionMin] = useState(configInicial?.duracionMin || 45);
+  const [totalBloques, setTotalBloques] = useState(configInicial?.totalBloques || 10);
+  const [pausas, setPausas] = useState(configInicial?.pausas || [
+    { id: "p1", despuesDeBloque: 2, duracion: 15, tipo: "recreo" },
+    { id: "p2", despuesDeBloque: 4, duracion: 15, tipo: "recreo" },
+    { id: "p3", despuesDeBloque: 6, duracion: 45, tipo: "almuerzo" },
+    { id: "p4", despuesDeBloque: 8, duracion: 15, tipo: "recreo" },
+  ]);
+  const config = { horaInicio, duracionMin, totalBloques, pausas };
+  const bloques = useMemo(() => generarBloques(config), [horaInicio, duracionMin, totalBloques, pausas]);
+  function agregarPausa() { setPausas((prev) => [...prev, { id: `p${Date.now()}`, despuesDeBloque: Math.max(1, totalBloques - 1), duracion: 15, tipo: "recreo" }]); }
+  function actualizarPausa(id, field, value) { setPausas((prev) => prev.map((p) => p.id === id ? { ...p, [field]: field === "duracion" || field === "despuesDeBloque" ? Number(value) : value } : p)); }
+  function eliminarPausa(id) { setPausas((prev) => prev.filter((p) => p.id !== id)); }
+  const horaTermino = bloques.at(-1)?.fin || "—";
+  const nRecreos = pausas.filter((p) => p.tipo === "recreo").length;
+  const nAlmuerzos = pausas.filter((p) => p.tipo === "almuerzo").length;
+  return (
+    <div style={card}>
+      <h2 style={{ margin: "0 0 6px", fontSize: 20, color: COLORS.textDark }}>⚙️ Paso 1: Configura la estructura del día</h2>
+      <p style={{ margin: "0 0 20px", color: COLORS.muted, fontSize: 14 }}>Define cómo están organizados los bloques de tu colegio.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 20 }}>
+        <div><label style={labelStyle}>Hora de inicio</label><input type="time" style={inputStyle} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} /></div>
+        <div><label style={labelStyle}>Duración de cada bloque</label><select style={selectStyle} value={duracionMin} onChange={(e) => setDuracionMin(Number(e.target.value))}>{DURACIONES.map((d) => <option key={d} value={d}>{d} minutos</option>)}</select></div>
+        <div><label style={labelStyle}>Número de bloques lectivos</label><select style={selectStyle} value={totalBloques} onChange={(e) => setTotalBloques(Number(e.target.value))}>{[4,5,6,7,8,9,10,11,12].map((n) => <option key={n} value={n}>{n} bloques</option>)}</select></div>
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div><label style={{ ...labelStyle, marginBottom: 0 }}>Recreos y almuerzos</label><span style={{ fontSize: 12, color: COLORS.muted, marginLeft: 8 }}>{nRecreos} recreo{nRecreos !== 1 ? "s" : ""} · {nAlmuerzos} almuerzo{nAlmuerzos !== 1 ? "s" : ""}</span></div>
+          <button style={{ ...btnPrimary, fontSize: 12, padding: "6px 12px" }} onClick={agregarPausa}>+ Agregar pausa</button>
+        </div>
+        {pausas.length === 0 ? (
+          <div style={{ color: COLORS.muted, fontSize: 13, fontStyle: "italic", padding: "8px 12px", background: COLORS.chip, borderRadius: 8 }}>Sin pausas. Haz clic en "+ Agregar pausa" para añadir recreos o almuerzos.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {pausas.map((p) => (
+              <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "center", background: p.tipo === "almuerzo" ? "#fefce8" : "#fef2f2", borderRadius: 8, padding: "10px 12px", border: `1px solid ${p.tipo === "almuerzo" ? "#fde047" : "#fca5a5"}` }}>
+                <div><label style={{ ...labelStyle, fontSize: 11 }}>Tipo</label><select style={selectStyle} value={p.tipo} onChange={(e) => actualizarPausa(p.id, "tipo", e.target.value)}><option value="recreo">🔴 Recreo</option><option value="almuerzo">🟡 Almuerzo</option></select></div>
+                <div><label style={{ ...labelStyle, fontSize: 11 }}>Después del bloque</label><select style={selectStyle} value={p.despuesDeBloque} onChange={(e) => actualizarPausa(p.id, "despuesDeBloque", e.target.value)}>{Array.from({ length: totalBloques }, (_, i) => (<option key={i+1} value={i+1}>Bloque {i+1}</option>))}</select></div>
+                <div><label style={{ ...labelStyle, fontSize: 11 }}>Duración</label><select style={selectStyle} value={p.duracion} onChange={(e) => actualizarPausa(p.id, "duracion", e.target.value)}>{[5,10,15,20,30,45,60].map((d) => <option key={d} value={d}>{d} min</option>)}</select></div>
+                <button style={{ ...btnDanger, padding: "6px 10px", fontSize: 13, marginTop: 18 }} onClick={() => eliminarPausa(p.id)} title="Eliminar">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        <label style={labelStyle}>Vista previa · {bloques.filter(b => b.tipo === "clase").length} bloques lectivos · termina a las {horaTermino}</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {bloques.map((b) => (<div key={b.id} style={{ padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: b.tipo === "clase" ? "#e0f2fe" : b.tipo === "almuerzo" ? "#fef9c3" : "#fee2e2", color: b.tipo === "clase" ? "#0369a1" : b.tipo === "almuerzo" ? "#854d0e" : "#b91c1c", border: `1px solid ${b.tipo === "clase" ? "#bae6fd" : b.tipo === "almuerzo" ? "#fde047" : "#fca5a5"}` }}>{b.label} · {b.inicio}–{b.fin}</div>))}
+        </div>
+      </div>
+      <button style={{ ...btnPrimary, padding: "12px 28px", fontSize: 15 }} onClick={() => onConfirmar(config, bloques)}>Continuar a completar horario →</button>
+    </div>
   );
 }
 
-/** — payload para Inicio/Desarrollo/Cierre (dos rutas) — */
-async function writeSlotDetalle(uid, row, col, cell, profesorNombre = "") {
-  const slotId = `${row}-${col}`;
-  // habilidades puede venir como string; genero también arreglo y texto
-  const habilidadesArr = Array.isArray(cell.habilidades)
-    ? cell.habilidades
-    : String(cell.habilidades || "").trim()
-    ? String(cell.habilidades)
-        .split(" • ")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
-  const habilidadesTexto = habilidadesArr.length
-    ? habilidadesArr.join(", ")
-    : String(cell.habilidades || "");
-
-  const payload = {
-    asignatura: cell.asignatura || "",
-    unidad: cell.unidad || "",
-    objetivo: cell.objetivo || "",
-    habilidades: habilidadesArr, // array para quien lo requiera
-    habilidadesTexto, // y texto para mostrar rápido
-    nivel: cell.nivel || "",
-    seccion: cell.seccion || "",
-    curso: (
-      cell.curso ||
-      ((cell.nivel || "") + (cell.seccion ? ` ${cell.seccion}` : ""))
-    ).trim(),
-    profesor: profesorNombre || "",
-    updatedAt: serverTimestamp(),
-  };
-  await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), payload, {
-    merge: true,
-  });
-  await setDoc(doc(db, "usuarios", uid, "slots", slotId), payload, {
-    merge: true,
-  }); // legacy
+function CeldaHorario({ cell, rowIdx, col, onChange }) {
+  const [unidades, setUnidades] = useState([]);
+  const [loadingUnidades, setLoadingUnidades] = useState(false);
+  useEffect(() => {
+    if (!cell.asignatura || !cell.nivel) { setUnidades([]); return; }
+    setLoadingUnidades(true);
+    fetchUnidades(cell.asignatura, cell.nivel).then((u) => { setUnidades(u); setLoadingUnidades(false); });
+  }, [cell.asignatura, cell.nivel]);
+  function handleAsignatura(value) { onChange(rowIdx, col, "asignatura", value); onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "habilidades", []); }
+  function handleNivel(value) { onChange(rowIdx, col, "nivel", value); onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "habilidades", []); }
+  function handleUnidad(codUnidad) {
+    if (!codUnidad) { onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "habilidades", []); return; }
+    const u = unidades.find((x) => x.codUnidad === codUnidad);
+    if (u) { onChange(rowIdx, col, "unidad", u.codUnidad); onChange(rowIdx, col, "unidadTitulo", u.titulo); onChange(rowIdx, col, "objetivo", u.objetivo || ""); onChange(rowIdx, col, "habilidades", u.habilidades || []); }
+  }
+  const tieneUnidades = unidades.length > 0;
+  const unidadSeleccionada = cell.unidad || "";
+  return (
+    <td style={{ padding: 8, borderBottom: `1px solid ${COLORS.border}`, borderLeft: `1px solid ${COLORS.border}`, verticalAlign: "top", minWidth: 160 }}>
+      <select style={{ ...selectStyle, width: "100%", marginBottom: 5, fontSize: 13 }} value={cell.asignatura || ""} onChange={(e) => handleAsignatura(e.target.value)}><option value="">—</option>{ASIGNATURAS_BASE.map((a) => <option key={a} value={a}>{a}</option>)}</select>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 5 }}>
+        <select style={{ ...selectStyle, fontSize: 11 }} value={cell.nivel || ""} onChange={(e) => handleNivel(e.target.value)}><option value="">Nivel</option>{NIVELES.map((n) => <option key={n} value={n}>{n}</option>)}</select>
+        <select style={{ ...selectStyle, fontSize: 11 }} value={cell.seccion || ""} onChange={(e) => onChange(rowIdx, col, "seccion", e.target.value)}><option value="">Secc.</option>{SECCIONES.map((s) => <option key={s} value={s}>{s}</option>)}</select>
+      </div>
+      {cell.asignatura && cell.nivel && (
+        <div>
+          {loadingUnidades ? (<div style={{ fontSize: 10, color: COLORS.muted, fontStyle: "italic", padding: "3px 6px" }}>Cargando unidades…</div>
+          ) : tieneUnidades ? (
+            <select style={{ ...selectStyle, width: "100%", fontSize: 11, background: unidadSeleccionada ? "#eff6ff" : COLORS.white, borderColor: unidadSeleccionada ? "#93c5fd" : COLORS.border, fontWeight: unidadSeleccionada ? 700 : 400 }} value={unidadSeleccionada} onChange={(e) => handleUnidad(e.target.value)} title="Selecciona la unidad que estás trabajando actualmente">
+              <option value="">📚 ¿Qué unidad trabajas?</option>
+              {unidades.map((u) => (<option key={u.codUnidad} value={u.codUnidad}>{u.titulo}</option>))}
+            </select>
+          ) : (<div style={{ fontSize: 10, color: "#f59e0b", fontStyle: "italic", padding: "3px 6px", background: "#fefce8", borderRadius: 4 }}>Sin unidades en currículo</div>)}
+        </div>
+      )}
+      {cell.asignatura && cell.nivel && (
+        <div style={{ marginTop: 5, fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "2px 6px", textAlign: "center", background: cell.unidad ? "#eff6ff" : COLORS.greenLight, color: cell.unidad ? "#2563eb" : COLORS.green }}>
+          {cell.unidad ? `✓ ${cell.unidadTitulo || cell.unidad}` : `${cell.nivel}${cell.seccion ? ` ${cell.seccion}` : ""}`}
+        </div>
+      )}
+    </td>
+  );
 }
 
-/** — resuelve unidad/objetivos/habilidades desde Planificaciones — */
-async function pickUnidadDesdePlan(uid, asignatura, nivelLegible) {
-  try {
-    const asignaturaId = toId(asignatura);
-    const nivelId = toNivelId(nivelLegible || "");
-    if (!asignaturaId || !nivelId) return null;
-
-    const pref = await getDoc(
-      doc(
-        db,
-        "usuarios",
-        uid,
-        "planificacion_usuario",
-        `${asignaturaId}_${nivelId}`
-      )
-    );
-    const unidades = pref.exists() ? pref.data()?.unidades || {} : {};
-    const unidadId =
-      Object.keys(unidades).find((k) => unidades[k] === "seleccionada") ||
-      Object.keys(unidades)[0];
-    if (!unidadId) return null;
-
-    const uDoc = await getDoc(
-      doc(
-        db,
-        "catalogo_curricular",
-        asignaturaId,
-        "niveles",
-        nivelId,
-        "unidades",
-        unidadId
-      )
-    );
-    if (!uDoc.exists()) return null;
-
-    const u = uDoc.data() || {};
-    const nombre = u.nombre || unidadId;
-    const objetivos = Array.isArray(u.objetivos) ? u.objetivos : [];
-    const habilidades = Array.isArray(u.habilidades) ? u.habilidades : [];
-
-    return {
-      unidad: nombre,
-      objetivo: objetivos.length ? String(objetivos[0]) : "",
-      habilidadesTexto: habilidades.join(" • "),
-      habilidadesArr: habilidades,
-    };
-  } catch {
-    return null;
-  }
+function TablaHorario({ bloques, matriz, onChange, onGuardar, onEditarConfig, saving }) {
+  return (
+    <div style={card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 20, color: COLORS.textDark }}>📅 Paso 2: Completa tu horario</h2>
+          <p style={{ margin: "4px 0 0", color: COLORS.muted, fontSize: 13 }}>Indica asignatura, nivel, sección y <strong>qué unidad estás trabajando</strong>. InicioClase lo mostrará automáticamente.</p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={btn} onClick={onEditarConfig}>⬅️ Ajustar estructura</button>
+          <button style={{ ...btnGreen, opacity: saving ? 0.7 : 1 }} onClick={onGuardar} disabled={saving}>{saving ? "Guardando…" : "💾 Guardar horario"}</button>
+        </div>
+      </div>
+      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#1e40af" }}>
+        💡 <strong>Elige la unidad</strong> en cada bloque. Cuando cambies de unidad, vuelve aquí y actualízala — InicioClase siempre mostrará la correcta automáticamente.
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+        {bloques.map((b) => (<div key={b.id} style={{ padding: "3px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: b.tipo === "clase" ? "#e0f2fe" : b.tipo === "almuerzo" ? "#fef9c3" : "#fee2e2", color: b.tipo === "clase" ? "#0369a1" : b.tipo === "almuerzo" ? "#854d0e" : "#b91c1c" }}>{b.label} {b.inicio}–{b.fin}</div>))}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <thead>
+            <tr>
+              <th style={{ background: "#f8fafc", padding: "10px 12px", textAlign: "left", fontWeight: 800, fontSize: 13, borderBottom: `2px solid ${COLORS.border}`, width: 130 }}>Bloque</th>
+              {DIAS.map((d) => (<th key={d} style={{ background: "#f8fafc", padding: "10px 12px", fontWeight: 800, fontSize: 13, borderBottom: `2px solid ${COLORS.border}`, textAlign: "center" }}>{d}</th>))}
+            </tr>
+          </thead>
+          <tbody>
+            {bloques.map((bloque, bIdx) => {
+              if (bloque.tipo !== "clase") {
+                return (<tr key={bloque.id}><td colSpan={6} style={{ padding: "6px 12px", background: bloque.tipo === "almuerzo" ? "#fefce8" : "#fef2f2", color: bloque.tipo === "almuerzo" ? "#854d0e" : "#b91c1c", fontSize: 12, fontWeight: 700, textAlign: "center", borderBottom: `1px solid ${COLORS.border}` }}>{bloque.label} · {bloque.inicio} – {bloque.fin}</td></tr>);
+              }
+              const rowIdx = bloques.slice(0, bIdx + 1).filter((b) => b.tipo === "clase").length - 1;
+              return (
+                <tr key={bloque.id}>
+                  <td style={{ padding: "8px 12px", background: "#f8fafc", fontWeight: 700, fontSize: 12, borderBottom: `1px solid ${COLORS.border}`, verticalAlign: "middle" }}>
+                    <div style={{ fontWeight: 800 }}>{bloque.label}</div>
+                    <div style={{ color: COLORS.muted, fontWeight: 400, fontSize: 11 }}>{bloque.inicio} – {bloque.fin}</div>
+                  </td>
+                  {Array.from({ length: 5 }).map((_, col) => { const cell = matriz?.[rowIdx]?.[col] || celdaVacia(); return (<CeldaHorario key={col} cell={cell} rowIdx={rowIdx} col={col} onChange={onChange} />); })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 export default function HorarioEditable() {
   const navigate = useNavigate();
   const [uid, setUid] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [edit, setEdit] = useState(false);
-  const [tab, setTab] = useState("horario");
-  const [matriz, setMatriz] = useState(() =>
-    construirMatriz(BLOQUES.length, DIAS.length)
-  );
-
-  // materias permitidas
-  const [permitidas, setPermitidas] = useState([]);
-
-  // nombre del profesor (para tarjeta en InicioClase)
   const [profesorNombre, setProfesorNombre] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [paso, setPaso] = useState("config");
+  const [configEstructura, setConfigEstructura] = useState(null);
+  const [bloques, setBloques] = useState([]);
+  const [matriz, setMatriz] = useState([]);
 
   useEffect(() => {
     let alive = true;
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!alive) return;
       try {
-        if (!u) {
-          const cred = await signInAnonymously(auth);
-          if (!alive) return;
-          setUid(cred.user?.uid || null);
-          setProfesorNombre(
-            cred.user?.displayName || cred.user?.email || ""
-          );
-        } else {
-          setUid(u.uid);
-          setProfesorNombre(u.displayName || u.email || "");
-        }
-      } catch {
-        setUid(null);
-        setProfesorNombre("");
-      }
+        if (!u) { const cred = await signInAnonymously(auth); if (!alive) return; setUid(cred.user?.uid || null); }
+        else { setUid(u.uid); setProfesorNombre(u.displayName || u.email || ""); }
+      } catch { setUid(null); }
     });
-    return () => {
-      alive = false;
-      unsub && unsub();
-    };
+    return () => { alive = false; unsub && unsub(); };
   }, []);
 
   useEffect(() => {
     if (!uid) return;
     (async () => {
-      setLoading(true);
       try {
-        const uref = doc(db, "usuarios", uid);
-        const snap = await getDoc(uref);
-        if (snap.exists()) {
-          const data = snap.data() || {};
-          const rows = BLOQUES.length,
-            cols = DIAS.length;
-
-          if (data.nombre && !profesorNombre)
-            setProfesorNombre(String(data.nombre));
-
-          if (Array.isArray(data.horario_flat) && data.horario_flat.length) {
-            setMatriz(rebuildFromFlat(data.horario_flat, rows, cols));
-          } else if (Array.isArray(data.horario) && data.horario.length) {
-            const base = construirMatriz(rows, cols);
-            for (let r = 0; r < rows; r++)
-              for (let c = 0; c < cols; c++)
-                base[r][c] = {
-                  ...celdaVacia(),
-                  ...(data.horario?.[r]?.[c] || {}),
-                };
-            setMatriz(base);
-          }
-
-          if (
-            Array.isArray(data.asignaturasPermitidas) &&
-            data.asignaturasPermitidas.length
-          ) {
-            setPermitidas(
-              data.asignaturasPermitidas
-                .map((s) => String(s || "").trim())
-                .filter(Boolean)
-            );
-          } else {
-            setPermitidas([]);
-          }
-        } else {
-          setPermitidas([]);
+        const snap = await getDoc(doc(db, "usuarios", uid));
+        if (!snap.exists()) return;
+        const data = snap.data() || {};
+        if (data.nombre) setProfesorNombre(String(data.nombre));
+        if (data.horarioEstructura) {
+          const cfg = data.horarioEstructura;
+          setConfigEstructura(cfg);
+          const bqs = generarBloques(cfg);
+          setBloques(bqs);
+          setMatriz(Array.isArray(data.horario_flat) && data.horario_flat.length ? rebuildMatriz(data.horario_flat, bqs) : construirMatrizDesde(bqs));
+          setPaso("tabla");
         }
-      } catch (e) {
-        console.warn("[HorarioEditable] load:", e?.code || e?.message);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { console.warn("[HorarioEditable] load:", e?.message); }
     })();
-  }, [uid]); // eslint-disable-line
+  }, [uid]);
+
+  function handleConfirmarConfig(config, bloquesGenerados) {
+    setConfigEstructura(config); setBloques(bloquesGenerados);
+    const bloqueClases = bloquesGenerados.filter((b) => b.tipo === "clase");
+    if (matriz.length !== bloqueClases.length) setMatriz(construirMatrizDesde(bloquesGenerados));
+    setPaso("tabla");
+  }
+
+  const handleCambiarCelda = useCallback((row, col, field, value) => {
+    setMatriz((prev) => { const next = prev.map((r) => r.slice()); next[row] = [...(next[row] || [])]; next[row][col] = { ...(next[row][col] || celdaVacia()), [field]: value }; return next; });
+  }, []);
 
   async function guardarHorario() {
     if (!uid) return alert("No hay usuario autenticado.");
-    if (!permitidas.length)
-      return alert(
-        "Primero configura tus Planificaciones (materias permitidas)."
-      );
-
+    if (!configEstructura) return alert("Primero configura la estructura del horario.");
+    setSaving(true);
     try {
-      const marcas = marcasFromBloques(BLOQUES);
-      const marcasStr = marcas.map(
-        ([h, m]) => `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
-      );
-      const horarioConfig = normalizeConfigForFS({
-        bloquesGenerados: BLOQUES,
-        marcas,
-        marcasStr,
-      });
-
-      const plano = flattenHorario(matriz);
-
-      for (const c of plano) {
-        if (!Number.isInteger(c.row) || !Number.isInteger(c.col)) continue;
-        if (esBloqueNoLectivo(c.row)) continue;
-        if (!c.asignatura) continue;
-
-        if (!permitidas.includes(c.asignatura)) {
-          return alert(
-            `La asignatura "${c.asignatura}" no está en tus materias permitidas. Ajusta Planificaciones.`
-          );
-        }
-
-        const faltan = !(c.unidad && c.objetivo && c.habilidades);
-        if (faltan) {
-          const meta = await pickUnidadDesdePlan(
-            uid,
-            c.asignatura,
-            c.nivel || ""
-          );
-          if (meta) {
-            c.unidad = c.unidad || meta.unidad || "";
-            c.objetivo = c.objetivo || meta.objetivo || "";
-            // guardo texto para edición rápida; al escribir se enviará también como array/texto
-            c.habilidades = c.habilidades || meta.habilidadesTexto || "";
-          }
-        }
-
-        c.curso =
-          c.curso ||
-          ((c.nivel || "") + (c.seccion ? ` ${c.seccion}` : ""));
-      }
-
-      await setDoc(
-        doc(db, "usuarios", uid),
-        {
-          horario_flat: plano,
-          horarioMeta: { rows: BLOQUES.length, cols: DIAS.length },
-          horarioConfig,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      for (const c of plano) {
-        if (!Number.isInteger(c.row) || !Number.isInteger(c.col)) continue;
-        if (esBloqueNoLectivo(c.row)) continue;
-
-        const cell = {
-          asignatura: c.asignatura,
-          unidad: c.unidad,
-          objetivo: c.objetivo,
-          habilidades: c.habilidades, // texto (lo transformo a array/texto en writeSlotDetalle)
-          nivel: c.nivel,
-          seccion: c.seccion,
-          curso: c.curso,
-        };
-        if (isEmptyCell(cell)) continue;
-        await writeSlotDetalle(uid, c.row, c.col, cell, profesorNombre);
-      }
-
-      setEdit(false);
-      navigate("/InicioClase");
-    } catch (e) {
-      console.error("Guardar horario:", e);
-      alert("No se pudo guardar el horario.");
-    }
+      const bloqueClases = bloques.filter((b) => b.tipo === "clase");
+      const flat = flattenMatriz(matriz, bloqueClases);
+      const marcas = bloques.map((b) => { const [h, m] = b.inicio.split(":").map(Number); return { h, m }; });
+      const lastBloque = bloques.at(-1);
+      const [hFin, mFin] = lastBloque.fin.split(":").map(Number);
+      marcas.push({ h: hFin, m: mFin });
+      const horarioConfig = { bloquesGenerados: bloques.map((b) => `${b.inicio} - ${b.fin}${b.tipo !== "clase" ? ` (${b.label})` : ""}`), marcas, marcasStr: bloques.map((b) => b.inicio).concat([lastBloque.fin]), estructura: normalizarConfigParaFS(configEstructura) };
+      await setDoc(doc(db, "usuarios", uid), { horario_flat: flat, horarioMeta: { rows: bloqueClases.length, cols: 5 }, horarioConfig, horarioEstructura: normalizarConfigParaFS(configEstructura), updatedAt: serverTimestamp() }, { merge: true });
+      await writeSlots(uid, matriz, bloqueClases, profesorNombre);
+      const isOnboarding = localStorage.getItem("onboarding:fromRegistro") === "1" || localStorage.getItem("forceHorarioOnce") === "1";
+      try { localStorage.removeItem("forceHorarioOnce"); } catch {}
+      navigate(isOnboarding ? "/planificaciones" : "/InicioClase");
+    } catch (e) { console.error("Guardar horario:", e); alert("No se pudo guardar el horario."); }
+    finally { setSaving(false); }
   }
-
-  function limpiarHorario() {
-    const rows = BLOQUES.length,
-      cols = DIAS.length;
-    setMatriz(construirMatriz(rows, cols));
-  }
-
-  const onChangeCelda = (r, c, field, value) => {
-    setMatriz((prev) => {
-      const next = prev.map((fila) => fila.slice());
-      next[r][c] = { ...next[r][c], [field]: value };
-      return next;
-    });
-  };
-
-  const lectivoCols = useMemo(() => DIAS.length, []);
-  const materiasOpciones = useMemo(
-    () => (permitidas.length ? permitidas : ASIGNATURAS_BASE),
-    [permitidas]
-  );
-
-  function goPlanificador(r, c) {
-    const cell = matriz?.[r]?.[c] || {};
-    const params = new URLSearchParams({
-      dia: String(c),
-      bloque: String(r),
-      diaNombre: DIAS[c] || "",
-      bloqueHora: BLOQUES[r] || "",
-      asignatura: cell.asignatura || "",
-      nivel: cell.nivel || "",
-      seccion: cell.seccion || "",
-    }).toString();
-    navigate(`/planificador?${params}`, { replace: false });
-  }
-  function goPlanificaciones() {
-    navigate(`/planificaciones`, { replace: false });
-  }
-
-  const planReady = permitidas.length > 0;
 
   return (
     <div style={wrap}>
-      <div style={{ ...card, maxWidth: 1200, margin: "0 auto" }}>
-        <div style={row}>
-          <div>
-            <h1 style={h1}>Horario Editable</h1>
-            <div style={tabsBar}>
-              <button
-                style={tabBtn(tab === "horario")}
-                onClick={() => setTab("horario")}
-              >
-                Horario
-              </button>
-              <button
-                style={tabBtn(tab === "plan")}
-                onClick={() => setTab("plan")}
-              >
-                Seleccione o realice su Planificación
-              </button>
-            </div>
-          </div>
+      {/* ✅ BANNER TRIAL - bloquea si expiró, avisa si queda 1 día */}
+      <BannerTrial />
 
-          <div style={{ display: "flex", gap: 8 }}>
-            {!edit && tab === "horario" && (
-              <button
-                style={btn}
-                onClick={() => setEdit(true)}
-                title="Habilitar edición del horario"
-              >
-                ✏️ Editar
-              </button>
-            )}
-            {edit && tab === "horario" && (
-              <>
-                <button
-                  style={planReady ? btn : btnDisabled}
-                  onClick={planReady ? guardarHorario : undefined}
-                  title={
-                    planReady
-                      ? "Guardar horario"
-                      : "Configura tus planificaciones primero"
-                  }
-                >
-                  💾 Guardar horario
-                </button>
-                <button
-                  style={btnDanger}
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "¿Limpiar todas las celdas (excepto recreos/almuerzo)?"
-                      )
-                    )
-                      limpiarHorario();
-                  }}
-                >
-                  🧹 Limpiar
-                </button>
-                <button style={btn} onClick={() => setEdit(false)}>
-                  ❌ Cancelar
-                </button>
-              </>
-            )}
-            {tab === "plan" && (
-              <>
-                <button style={btn} onClick={goPlanificaciones}>
-                  📚 Abrir Planificaciones
-                </button>
-              </>
-            )}
-          </div>
+      <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ color: COLORS.white }}>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900 }}>🗓️ Horario Editable</h1>
+          <p style={{ margin: "4px 0 0", opacity: 0.85, fontSize: 14 }}>{paso === "config" ? "Configura la estructura de tu jornada escolar." : "Completa qué asignatura y unidad tienes en cada bloque."}</p>
         </div>
-
-        {!planReady && (
-          <div
-            style={{
-              marginBottom: 12,
-              padding: 12,
-              borderRadius: 10,
-              background: COLORS.warn,
-              border: `1px solid ${COLORS.warnBorder}`,
-            }}
-          >
-            <b>Primero configura tus Planificaciones.</b> Define tus materias en
-            el panel de <em>Planificaciones</em>. Luego volverás aquí y solo
-            verás esas materias en el Horario.
-            <div
-              style={{
-                marginTop: 8,
-                display: "flex",
-                gap: 8,
-              }}
-            >
-              <button style={btn} onClick={() => setTab("plan")}>
-                Ir a pestaña Planificaciones
-              </button>
-              <button style={btn} onClick={goPlanificaciones}>
-                Abrir Planificaciones 📚
-              </button>
-            </div>
-          </div>
-        )}
-
-        {tab === "horario" && (
-          <>
-            <div style={small}>
-              * El botón <b>Guardar horario</b> solo aparece en modo edición.
-              Tras guardar, el horario queda congelado para evitar cambios
-              accidentales.
-            </div>
-
-            <div style={{ marginTop: 12, overflowX: "auto" }}>
-              <table style={grid}>
-                <thead>
-                  <tr>
-                    <th style={{ ...th, width: 160 }}>Bloque</th>
-                    {DIAS.map((d) => (
-                      <th key={d} style={th}>
-                        {d}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {BLOQUES.map((b, r) => {
-                    const locked = esBloqueNoLectivo(r);
-                    return (
-                      <tr key={r}>
-                        <td
-                          style={{
-                            ...td,
-                            background: "#f8fafc",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {b}
-                        </td>
-                        {Array.from({ length: lectivoCols }).map((_, c) => {
-                          const cell = matriz?.[r]?.[c] || celdaVacia();
-                          if (locked) {
-                            return (
-                              <td key={`${r}-${c}`} style={tdLocked}>
-                                {/\(Recreo\)/i.test(b) ? "Recreo" : "Almuerzo"}
-                              </td>
-                            );
-                          }
-                          return (
-                            <td key={`${r}-${c}`} style={td}>
-                              {edit ? (
-                                <select
-                                  style={selectStyle}
-                                  value={cell.asignatura || ""}
-                                  onChange={(e) =>
-                                    onChangeCelda(
-                                      r,
-                                      c,
-                                      "asignatura",
-                                      e.target.value
-                                    )
-                                  }
-                                  disabled={!planReady}
-                                  title={
-                                    planReady
-                                      ? ""
-                                      : "Configura Planificaciones para habilitar materias"
-                                  }
-                                >
-                                  <option value="">(asignatura)</option>
-                                  {materiasOpciones.map((a) => (
-                                    <option key={a} value={a}>
-                                      {a}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <div style={{ fontWeight: 700 }}>
-                                  {cell.asignatura || (
-                                    <span style={{ color: COLORS.muted }}>
-                                      (—)
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "1fr 1fr",
-                                  gap: 6,
-                                  marginTop: 6,
-                                }}
-                              >
-                                {edit ? (
-                                  <>
-                                    <select
-                                      style={selectStyle}
-                                      value={cell.nivel || ""}
-                                      onChange={(e) =>
-                                        onChangeCelda(
-                                          r,
-                                          c,
-                                          "nivel",
-                                          e.target.value
-                                        )
-                                      }
-                                    >
-                                      <option value="">(nivel)</option>
-                                      {NIVELES.map((n) => (
-                                        <option key={n} value={n}>
-                                          {n}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <select
-                                      style={selectStyle}
-                                      value={cell.seccion || ""}
-                                      onChange={(e) =>
-                                        onChangeCelda(
-                                          r,
-                                          c,
-                                          "seccion",
-                                          e.target.value
-                                        )
-                                      }
-                                    >
-                                      <option value="">(sección)</option>
-                                      {SECCIONES.map((s) => (
-                                        <option key={s} value={s}>
-                                          {s}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div
-                                      style={{
-                                        background: COLORS.chip,
-                                        borderRadius: 999,
-                                        padding: "2px 8px",
-                                        textAlign: "center",
-                                        fontSize: 12,
-                                      }}
-                                    >
-                                      {cell.nivel || "—"}
-                                    </div>
-                                    <div
-                                      style={{
-                                        background: COLORS.chip,
-                                        borderRadius: 999,
-                                        padding: "2px 8px",
-                                        textAlign: "center",
-                                        fontSize: 12,
-                                      }}
-                                    >
-                                      {cell.seccion || "—"}
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-
-                              <div style={{ marginTop: 6 }}>
-                                {edit ? (
-                                  <>
-                                    <input
-                                      style={inputStyle}
-                                      placeholder="Unidad (opcional)"
-                                      value={cell.unidad || ""}
-                                      onChange={(e) =>
-                                        onChangeCelda(
-                                          r,
-                                          c,
-                                          "unidad",
-                                          e.target.value
-                                        )
-                                      }
-                                    />
-                                    <input
-                                      style={{ ...inputStyle, marginTop: 6 }}
-                                      placeholder="Objetivo (opcional)"
-                                      value={cell.objetivo || ""}
-                                      onChange={(e) =>
-                                        onChangeCelda(
-                                          r,
-                                          c,
-                                          "objetivo",
-                                          e.target.value
-                                        )
-                                      }
-                                    />
-                                    <input
-                                      style={{ ...inputStyle, marginTop: 6 }}
-                                      placeholder="Habilidades (opcional)"
-                                      value={cell.habilidades || ""}
-                                      onChange={(e) =>
-                                        onChangeCelda(
-                                          r,
-                                          c,
-                                          "habilidades",
-                                          e.target.value
-                                        )
-                                      }
-                                    />
-                                  </>
-                                ) : (
-                                  <div
-                                    style={{
-                                      fontSize: 12,
-                                      color: COLORS.muted,
-                                    }}
-                                  >
-                                    {cell.unidad ||
-                                    cell.objetivo ||
-                                    cell.habilidades ? (
-                                      <>
-                                        {cell.unidad && (
-                                          <div>
-                                            <b>Unidad:</b> {cell.unidad}
-                                          </div>
-                                        )}
-                                        {cell.objetivo && (
-                                          <div>
-                                            <b>Objetivo:</b> {cell.objetivo}
-                                          </div>
-                                        )}
-                                        {cell.habilidades && (
-                                          <div>
-                                            <b>Habilidades:</b>{" "}
-                                            {cell.habilidades}
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <em>(sin detalles)</em>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {!edit && !locked && (
-                                <div style={{ marginTop: 8 }}>
-                                  <button
-                                    style={{ ...btn, width: "100%" }}
-                                    onClick={() => goPlanificador(r, c)}
-                                    title="Planificar este bloque"
-                                  >
-                                    🧭 Planificar
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 12,
-                color: COLORS.muted,
-              }}
-            >
-              • Se guardan en{" "}
-              <code>{`usuarios/${safeText(uid) || "{uid}"}`}</code>:{" "}
-              <code>horario_flat</code>, <code>horarioMeta</code> y{" "}
-              <code>horarioConfig</code>.
-              <br />
-              • Además se actualiza{" "}
-              <code>{`clases_detalle/${
-                safeText(uid) || "{uid}"
-              }/slots/{row}-{col}`}</code>{" "}
-              y{" "}
-              <code>{`usuarios/${
-                safeText(uid) || "{uid}"
-              }/slots/{row}-{col}`}</code>{" "}
-              para que Inicio/Desarrollo/Cierre lean la unidad, objetivo,
-              habilidades, curso y profesor.
-              <br />
-              • Los recreos y el almuerzo no son editables.
-            </div>
-          </>
-        )}
-
-        {tab === "plan" && (
-          <div style={{ marginTop: 12 }}>
-            <div
-              style={{
-                ...card,
-                borderStyle: "dashed",
-                borderWidth: 1,
-                borderColor: COLORS.border,
-              }}
-            >
-              <h3 style={{ marginTop: 0 }}>
-                Seleccione o realice su Planificación
-              </h3>
-              <p style={{ color: COLORS.muted }}>
-                Elija un bloque en la tabla de Horario y pulse{" "}
-                <b>“Planificar”</b>, o abra el panel de planificaciones para
-                crear/editar unidades y objetivos que luego verás
-                automáticamente en<b> InicioClase</b>, <b>Desarrollo</b> y{" "}
-                <b>Cierre</b>.
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <button style={btn} onClick={goPlanificaciones}>
-                  📚 Abrir Planificaciones
-                </button>
-                <button
-                  style={btn}
-                  onClick={() => navigate("/planificador")}
-                >
-                  🆕 Nuevo plan en blanco
-                </button>
-                <button style={btn} onClick={() => setTab("horario")}>
-                  ⬅️ Volver al Horario
-                </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {["config","tabla"].map((p, i) => (
+            <React.Fragment key={p}>
+              <div style={{ padding: "6px 16px", borderRadius: 999, fontSize: 13, fontWeight: 800, background: paso === p ? COLORS.white : "rgba(255,255,255,0.25)", color: paso === p ? COLORS.brandA : COLORS.white, cursor: p === "config" ? "pointer" : "default" }} onClick={() => { if (p === "config") setPaso("config"); }}>
+                {i + 1}. {p === "config" ? "Estructura del día" : "Completar horario"}
               </div>
-              <div
-                style={{
-                  marginTop: 10,
-                  fontSize: 12,
-                  color: COLORS.muted,
-                }}
-              >
-                <b>Materias permitidas actuales:</b>{" "}
-                {permitidas.length
-                  ? permitidas.join(", ")
-                  : "(aún sin definir)"}
-              </div>
-            </div>
-          </div>
-        )}
+              {i < 1 && <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 18 }}>→</div>}
+            </React.Fragment>
+          ))}
+        </div>
+        {paso === "config" && <ConfiguradorHorario onConfirmar={handleConfirmarConfig} configInicial={configEstructura} />}
+        {paso === "tabla" && bloques.length > 0 && <TablaHorario bloques={bloques} matriz={matriz} onChange={handleCambiarCelda} onGuardar={guardarHorario} onEditarConfig={() => setPaso("config")} saving={saving} />}
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-

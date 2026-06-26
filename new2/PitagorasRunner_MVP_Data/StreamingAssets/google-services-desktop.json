@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "350438680441",
+    "firebase_url": "https://brainrush-arena-default-rtdb.firebaseio.com",
+    "project_id": "brainrush-arena",
+    "storage_bucket": "brainrush-arena.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:350438680441:android:694499a99ae19ab77eb1a8",
+        "android_client_info": {
+          "package_name": "com.brainrush.arena"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbhh7Jb7hnXHPnWN0w9lA-gyaEDsrQuwE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

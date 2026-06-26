@@ -1,0 +1,2809 @@
+{
+  "preguntas": [
+    {
+      "id": "MAT-2M-INT-0001",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 7x + 20 = 111",
+      "alternativas": [
+        "A) x = 12",
+        "B) x = 11",
+        "C) x = 6",
+        "D) x = 13"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 20: 7x = 91. Luego dividimos por 7: x = 13."
+    },
+    {
+      "id": "MAT-2M-INT-0002",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 6x + 25 = 67",
+      "alternativas": [
+        "A) x = 5",
+        "B) x = 6",
+        "C) x = 3",
+        "D) x = 7"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 25: 6x = 42. Luego dividimos por 6: x = 7."
+    },
+    {
+      "id": "MAT-2M-INT-0003",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 7x + 18 = 123",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 13",
+        "C) x = 7",
+        "D) x = 15"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 18: 7x = 105. Luego dividimos por 7: x = 15."
+    },
+    {
+      "id": "MAT-2M-INT-0004",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 2x + 19 = 41",
+      "alternativas": [
+        "A) x = 5",
+        "B) x = 11",
+        "C) x = 9",
+        "D) x = 10"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 19: 2x = 22. Luego dividimos por 2: x = 11."
+    },
+    {
+      "id": "MAT-2M-INT-0005",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 7x + 23 = 44",
+      "alternativas": [
+        "A) x = 3",
+        "B) x = 4",
+        "C) x = 2",
+        "D) x = 1"
+      ],
+      "correcta": 0,
+      "explicacion": "Restamos 23: 7x = 21. Luego dividimos por 7: x = 3."
+    },
+    {
+      "id": "MAT-2M-INT-0006",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 7x + 22 = 85",
+      "alternativas": [
+        "A) x = 4",
+        "B) x = 9",
+        "C) x = 7",
+        "D) x = 8"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 22: 7x = 63. Luego dividimos por 7: x = 9."
+    },
+    {
+      "id": "MAT-2M-INT-0007",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 7x + 2 = 23",
+      "alternativas": [
+        "A) x = 1",
+        "B) x = 2",
+        "C) x = 4",
+        "D) x = 3"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 2: 7x = 21. Luego dividimos por 7: x = 3."
+    },
+    {
+      "id": "MAT-2M-INT-0008",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 3x + 6 = 21",
+      "alternativas": [
+        "A) x = 5",
+        "B) x = 3",
+        "C) x = 2",
+        "D) x = 4"
+      ],
+      "correcta": 0,
+      "explicacion": "Restamos 6: 3x = 15. Luego dividimos por 3: x = 5."
+    },
+    {
+      "id": "MAT-2M-INT-0009",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 3x + 20 = 68",
+      "alternativas": [
+        "A) x = 8",
+        "B) x = 14",
+        "C) x = 16",
+        "D) x = 15"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 20: 3x = 48. Luego dividimos por 3: x = 16."
+    },
+    {
+      "id": "MAT-2M-INT-0010",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 2x + 24 = 30",
+      "alternativas": [
+        "A) x = 4",
+        "B) x = 3",
+        "C) x = 1",
+        "D) x = 2"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 24: 2x = 6. Luego dividimos por 2: x = 3."
+    },
+    {
+      "id": "MAT-2M-INT-0011",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 9x + 14 = 77",
+      "alternativas": [
+        "A) x = 6",
+        "B) x = 7",
+        "C) x = 5",
+        "D) x = 3"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 14: 9x = 63. Luego dividimos por 9: x = 7."
+    },
+    {
+      "id": "MAT-2M-INT-0012",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 7x + 19 = 117",
+      "alternativas": [
+        "A) x = 13",
+        "B) x = 14",
+        "C) x = 12",
+        "D) x = 7"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 19: 7x = 98. Luego dividimos por 7: x = 14."
+    },
+    {
+      "id": "MAT-2M-INT-0013",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 8x + 4 = 36",
+      "alternativas": [
+        "A) x = 3",
+        "B) x = 4",
+        "C) x = 5",
+        "D) x = 2"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 4: 8x = 32. Luego dividimos por 8: x = 4."
+    },
+    {
+      "id": "MAT-2M-INT-0014",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 5x + 9 = 69",
+      "alternativas": [
+        "A) x = 12",
+        "B) x = 11",
+        "C) x = 10",
+        "D) x = 6"
+      ],
+      "correcta": 0,
+      "explicacion": "Restamos 9: 5x = 60. Luego dividimos por 5: x = 12."
+    },
+    {
+      "id": "MAT-2M-INT-0015",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 9x + 16 = 34",
+      "alternativas": [
+        "A) x = 4",
+        "B) x = 1",
+        "C) x = 3",
+        "D) x = 2"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 16: 9x = 18. Luego dividimos por 9: x = 2."
+    },
+    {
+      "id": "MAT-2M-INT-0016",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 8x + 19 = 163",
+      "alternativas": [
+        "A) x = 9",
+        "B) x = 18",
+        "C) x = 16",
+        "D) x = 17"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 19: 8x = 144. Luego dividimos por 8: x = 18."
+    },
+    {
+      "id": "MAT-2M-INT-0017",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 3x + 22 = 76",
+      "alternativas": [
+        "A) x = 9",
+        "B) x = 16",
+        "C) x = 17",
+        "D) x = 18"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 22: 3x = 54. Luego dividimos por 3: x = 18."
+    },
+    {
+      "id": "MAT-2M-INT-0018",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 3x + 25 = 34",
+      "alternativas": [
+        "A) x = 4",
+        "B) x = 3",
+        "C) x = 2",
+        "D) x = 1"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 25: 3x = 9. Luego dividimos por 3: x = 3."
+    },
+    {
+      "id": "MAT-2M-INT-0019",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 6x + 14 = 62",
+      "alternativas": [
+        "A) x = 7",
+        "B) x = 8",
+        "C) x = 4",
+        "D) x = 6"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 14: 6x = 48. Luego dividimos por 6: x = 8."
+    },
+    {
+      "id": "MAT-2M-INT-0020",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 4x + 13 = 33",
+      "alternativas": [
+        "A) x = 5",
+        "B) x = 3",
+        "C) x = 2",
+        "D) x = 4"
+      ],
+      "correcta": 0,
+      "explicacion": "Restamos 13: 4x = 20. Luego dividimos por 4: x = 5."
+    },
+    {
+      "id": "MAT-2M-INT-0021",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 9x + 12 = 147",
+      "alternativas": [
+        "A) x = 7",
+        "B) x = 15",
+        "C) x = 13",
+        "D) x = 14"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 12: 9x = 135. Luego dividimos por 9: x = 15."
+    },
+    {
+      "id": "MAT-2M-INT-0022",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 2x + 23 = 45",
+      "alternativas": [
+        "A) x = 5",
+        "B) x = 9",
+        "C) x = 11",
+        "D) x = 10"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 23: 2x = 22. Luego dividimos por 2: x = 11."
+    },
+    {
+      "id": "MAT-2M-INT-0023",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 9x + 16 = 34",
+      "alternativas": [
+        "A) x = 4",
+        "B) x = 3",
+        "C) x = 2",
+        "D) x = 1"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 16: 9x = 18. Luego dividimos por 9: x = 2."
+    },
+    {
+      "id": "MAT-2M-INT-0024",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 2x + 11 = 43",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 8",
+        "C) x = 16",
+        "D) x = 15"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 11: 2x = 32. Luego dividimos por 2: x = 16."
+    },
+    {
+      "id": "MAT-2M-INT-0025",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 4x + 10 = 38",
+      "alternativas": [
+        "A) x = 3",
+        "B) x = 6",
+        "C) x = 7",
+        "D) x = 5"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 10: 4x = 28. Luego dividimos por 4: x = 7."
+    },
+    {
+      "id": "MAT-2M-INT-0026",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 8x + 23 = 95",
+      "alternativas": [
+        "A) x = 8",
+        "B) x = 7",
+        "C) x = 9",
+        "D) x = 4"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 23: 8x = 72. Luego dividimos por 8: x = 9."
+    },
+    {
+      "id": "MAT-2M-INT-0027",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 3x + 9 = 18",
+      "alternativas": [
+        "A) x = 4",
+        "B) x = 2",
+        "C) x = 3",
+        "D) x = 1"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 9: 3x = 9. Luego dividimos por 3: x = 3."
+    },
+    {
+      "id": "MAT-2M-INT-0028",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 6x + 25 = 67",
+      "alternativas": [
+        "A) x = 3",
+        "B) x = 5",
+        "C) x = 6",
+        "D) x = 7"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 25: 6x = 42. Luego dividimos por 6: x = 7."
+    },
+    {
+      "id": "MAT-2M-INT-0029",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 7x + 16 = 114",
+      "alternativas": [
+        "A) x = 12",
+        "B) x = 7",
+        "C) x = 13",
+        "D) x = 14"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 16: 7x = 98. Luego dividimos por 7: x = 14."
+    },
+    {
+      "id": "MAT-2M-INT-0030",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 7x + 13 = 118",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 13",
+        "C) x = 7",
+        "D) x = 15"
+      ],
+      "correcta": 3,
+      "explicacion": "Restamos 13: 7x = 105. Luego dividimos por 7: x = 15."
+    },
+    {
+      "id": "MAT-2M-INT-0031",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 8x + 15 = 95",
+      "alternativas": [
+        "A) x = 9",
+        "B) x = 5",
+        "C) x = 10",
+        "D) x = 8"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 15: 8x = 80. Luego dividimos por 8: x = 10."
+    },
+    {
+      "id": "MAT-2M-INT-0032",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 8x + 12 = 60",
+      "alternativas": [
+        "A) x = 4",
+        "B) x = 6",
+        "C) x = 3",
+        "D) x = 5"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 12: 8x = 48. Luego dividimos por 8: x = 6."
+    },
+    {
+      "id": "MAT-2M-INT-0033",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 8x + 8 = 120",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 12",
+        "C) x = 7",
+        "D) x = 13"
+      ],
+      "correcta": 0,
+      "explicacion": "Restamos 8: 8x = 112. Luego dividimos por 8: x = 14."
+    },
+    {
+      "id": "MAT-2M-INT-0034",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 4x + 17 = 81",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 16",
+        "C) x = 8",
+        "D) x = 15"
+      ],
+      "correcta": 1,
+      "explicacion": "Restamos 17: 4x = 64. Luego dividimos por 4: x = 16."
+    },
+    {
+      "id": "MAT-2M-INT-0035",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve la ecuacion: 6x + 2 = 92",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 7",
+        "C) x = 15",
+        "D) x = 13"
+      ],
+      "correcta": 2,
+      "explicacion": "Restamos 2: 6x = 90. Luego dividimos por 6: x = 15."
+    },
+    {
+      "id": "MAT-2M-INT-0036",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 5(x + 5) = 40",
+      "alternativas": [
+        "A) x = 3",
+        "B) x = 4",
+        "C) x = 2",
+        "D) x = 5"
+      ],
+      "correcta": 0,
+      "explicacion": "Dividimos por 5: x + 5 = 8. Restamos 5: x = 3."
+    },
+    {
+      "id": "MAT-2M-INT-0037",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 5(x + 7) = 105",
+      "alternativas": [
+        "A) x = 16",
+        "B) x = 13",
+        "C) x = 15",
+        "D) x = 14"
+      ],
+      "correcta": 3,
+      "explicacion": "Dividimos por 5: x + 7 = 21. Restamos 7: x = 14."
+    },
+    {
+      "id": "MAT-2M-INT-0038",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 6(x + 10) = 108",
+      "alternativas": [
+        "A) x = 7",
+        "B) x = 8",
+        "C) x = 9",
+        "D) x = 10"
+      ],
+      "correcta": 1,
+      "explicacion": "Dividimos por 6: x + 10 = 18. Restamos 10: x = 8."
+    },
+    {
+      "id": "MAT-2M-INT-0039",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 6(x + 3) = 96",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 13",
+        "C) x = 15",
+        "D) x = 12"
+      ],
+      "correcta": 1,
+      "explicacion": "Dividimos por 6: x + 3 = 16. Restamos 3: x = 13."
+    },
+    {
+      "id": "MAT-2M-INT-0040",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 4(x + 3) = 20",
+      "alternativas": [
+        "A) x = 3",
+        "B) x = 4",
+        "C) x = 1",
+        "D) x = 2"
+      ],
+      "correcta": 3,
+      "explicacion": "Dividimos por 4: x + 3 = 5. Restamos 3: x = 2."
+    },
+    {
+      "id": "MAT-2M-INT-0041",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 4(x + 10) = 64",
+      "alternativas": [
+        "A) x = 6",
+        "B) x = 5",
+        "C) x = 8",
+        "D) x = 7"
+      ],
+      "correcta": 0,
+      "explicacion": "Dividimos por 4: x + 10 = 16. Restamos 10: x = 6."
+    },
+    {
+      "id": "MAT-2M-INT-0042",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 3(x + 10) = 69",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 15",
+        "C) x = 12",
+        "D) x = 13"
+      ],
+      "correcta": 3,
+      "explicacion": "Dividimos por 3: x + 10 = 23. Restamos 10: x = 13."
+    },
+    {
+      "id": "MAT-2M-INT-0043",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 3(x + 6) = 63",
+      "alternativas": [
+        "A) x = 15",
+        "B) x = 16",
+        "C) x = 17",
+        "D) x = 14"
+      ],
+      "correcta": 0,
+      "explicacion": "Dividimos por 3: x + 6 = 21. Restamos 6: x = 15."
+    },
+    {
+      "id": "MAT-2M-INT-0044",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 3(x + 9) = 45",
+      "alternativas": [
+        "A) x = 8",
+        "B) x = 6",
+        "C) x = 7",
+        "D) x = 5"
+      ],
+      "correcta": 1,
+      "explicacion": "Dividimos por 3: x + 9 = 15. Restamos 9: x = 6."
+    },
+    {
+      "id": "MAT-2M-INT-0045",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 4(x + 9) = 56",
+      "alternativas": [
+        "A) x = 5",
+        "B) x = 7",
+        "C) x = 6",
+        "D) x = 4"
+      ],
+      "correcta": 0,
+      "explicacion": "Dividimos por 4: x + 9 = 14. Restamos 9: x = 5."
+    },
+    {
+      "id": "MAT-2M-INT-0046",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 3(x + 8) = 57",
+      "alternativas": [
+        "A) x = 13",
+        "B) x = 12",
+        "C) x = 11",
+        "D) x = 10"
+      ],
+      "correcta": 2,
+      "explicacion": "Dividimos por 3: x + 8 = 19. Restamos 8: x = 11."
+    },
+    {
+      "id": "MAT-2M-INT-0047",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 3(x + 3) = 33",
+      "alternativas": [
+        "A) x = 8",
+        "B) x = 10",
+        "C) x = 7",
+        "D) x = 9"
+      ],
+      "correcta": 0,
+      "explicacion": "Dividimos por 3: x + 3 = 11. Restamos 3: x = 8."
+    },
+    {
+      "id": "MAT-2M-INT-0048",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 4(x + 3) = 44",
+      "alternativas": [
+        "A) x = 7",
+        "B) x = 10",
+        "C) x = 9",
+        "D) x = 8"
+      ],
+      "correcta": 3,
+      "explicacion": "Dividimos por 4: x + 3 = 11. Restamos 3: x = 8."
+    },
+    {
+      "id": "MAT-2M-INT-0049",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 5(x + 7) = 50",
+      "alternativas": [
+        "A) x = 5",
+        "B) x = 4",
+        "C) x = 3",
+        "D) x = 2"
+      ],
+      "correcta": 2,
+      "explicacion": "Dividimos por 5: x + 7 = 10. Restamos 7: x = 3."
+    },
+    {
+      "id": "MAT-2M-INT-0050",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 3(x + 5) = 39",
+      "alternativas": [
+        "A) x = 8",
+        "B) x = 10",
+        "C) x = 7",
+        "D) x = 9"
+      ],
+      "correcta": 0,
+      "explicacion": "Dividimos por 3: x + 5 = 13. Restamos 5: x = 8."
+    },
+    {
+      "id": "MAT-2M-INT-0051",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 2(x + 4) = 32",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 11",
+        "C) x = 12",
+        "D) x = 13"
+      ],
+      "correcta": 2,
+      "explicacion": "Dividimos por 2: x + 4 = 16. Restamos 4: x = 12."
+    },
+    {
+      "id": "MAT-2M-INT-0052",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 6(x + 6) = 42",
+      "alternativas": [
+        "A) x = 1",
+        "B) x = 1",
+        "C) x = 2",
+        "D) x = 3"
+      ],
+      "correcta": 0,
+      "explicacion": "Dividimos por 6: x + 6 = 7. Restamos 6: x = 1."
+    },
+    {
+      "id": "MAT-2M-INT-0053",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 3(x + 9) = 63",
+      "alternativas": [
+        "A) x = 14",
+        "B) x = 11",
+        "C) x = 12",
+        "D) x = 13"
+      ],
+      "correcta": 2,
+      "explicacion": "Dividimos por 3: x + 9 = 21. Restamos 9: x = 12."
+    },
+    {
+      "id": "MAT-2M-INT-0054",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 4(x + 2) = 24",
+      "alternativas": [
+        "A) x = 5",
+        "B) x = 4",
+        "C) x = 6",
+        "D) x = 3"
+      ],
+      "correcta": 1,
+      "explicacion": "Dividimos por 4: x + 2 = 6. Restamos 2: x = 4."
+    },
+    {
+      "id": "MAT-2M-INT-0055",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 2(x + 7) = 26",
+      "alternativas": [
+        "A) x = 7",
+        "B) x = 6",
+        "C) x = 5",
+        "D) x = 8"
+      ],
+      "correcta": 1,
+      "explicacion": "Dividimos por 2: x + 7 = 13. Restamos 7: x = 6."
+    },
+    {
+      "id": "MAT-2M-INT-0056",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 5(x + 6) = 60",
+      "alternativas": [
+        "A) x = 8",
+        "B) x = 5",
+        "C) x = 7",
+        "D) x = 6"
+      ],
+      "correcta": 3,
+      "explicacion": "Dividimos por 5: x + 6 = 12. Restamos 6: x = 6."
+    },
+    {
+      "id": "MAT-2M-INT-0057",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 5(x + 6) = 50",
+      "alternativas": [
+        "A) x = 4",
+        "B) x = 3",
+        "C) x = 6",
+        "D) x = 5"
+      ],
+      "correcta": 0,
+      "explicacion": "Dividimos por 5: x + 6 = 10. Restamos 6: x = 4."
+    },
+    {
+      "id": "MAT-2M-INT-0058",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 3(x + 5) = 21",
+      "alternativas": [
+        "A) x = 1",
+        "B) x = 2",
+        "C) x = 4",
+        "D) x = 3"
+      ],
+      "correcta": 1,
+      "explicacion": "Dividimos por 3: x + 5 = 7. Restamos 5: x = 2."
+    },
+    {
+      "id": "MAT-2M-INT-0059",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 5(x + 3) = 70",
+      "alternativas": [
+        "A) x = 13",
+        "B) x = 10",
+        "C) x = 11",
+        "D) x = 12"
+      ],
+      "correcta": 2,
+      "explicacion": "Dividimos por 5: x + 3 = 14. Restamos 3: x = 11."
+    },
+    {
+      "id": "MAT-2M-INT-0060",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Resuelve: 6(x + 2) = 24",
+      "alternativas": [
+        "A) x = 1",
+        "B) x = 3",
+        "C) x = 2",
+        "D) x = 4"
+      ],
+      "correcta": 2,
+      "explicacion": "Dividimos por 6: x + 2 = 4. Restamos 2: x = 2."
+    },
+    {
+      "id": "MAT-2M-INT-0061",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 20% de 400?",
+      "alternativas": [
+        "A) 80",
+        "B) 85",
+        "C) 90",
+        "D) 75"
+      ],
+      "correcta": 0,
+      "explicacion": "20% de 400 se calcula como 400 x 20/100 = 80."
+    },
+    {
+      "id": "MAT-2M-INT-0062",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 15% de 80?",
+      "alternativas": [
+        "A) 12",
+        "B) 7",
+        "C) 17",
+        "D) 22"
+      ],
+      "correcta": 0,
+      "explicacion": "15% de 80 se calcula como 80 x 15/100 = 12."
+    },
+    {
+      "id": "MAT-2M-INT-0063",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 15% de 300?",
+      "alternativas": [
+        "A) 45",
+        "B) 55",
+        "C) 40",
+        "D) 50"
+      ],
+      "correcta": 0,
+      "explicacion": "15% de 300 se calcula como 300 x 15/100 = 45."
+    },
+    {
+      "id": "MAT-2M-INT-0064",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 10% de 40?",
+      "alternativas": [
+        "A) 9",
+        "B) 14",
+        "C) 4",
+        "D) 1"
+      ],
+      "correcta": 2,
+      "explicacion": "10% de 40 se calcula como 40 x 10/100 = 4."
+    },
+    {
+      "id": "MAT-2M-INT-0065",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 75% de 80?",
+      "alternativas": [
+        "A) 65",
+        "B) 70",
+        "C) 55",
+        "D) 60"
+      ],
+      "correcta": 3,
+      "explicacion": "75% de 80 se calcula como 80 x 75/100 = 60."
+    },
+    {
+      "id": "MAT-2M-INT-0066",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 50% de 200?",
+      "alternativas": [
+        "A) 100",
+        "B) 95",
+        "C) 105",
+        "D) 110"
+      ],
+      "correcta": 0,
+      "explicacion": "50% de 200 se calcula como 200 x 50/100 = 100."
+    },
+    {
+      "id": "MAT-2M-INT-0067",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 60% de 400?",
+      "alternativas": [
+        "A) 240",
+        "B) 250",
+        "C) 245",
+        "D) 235"
+      ],
+      "correcta": 0,
+      "explicacion": "60% de 400 se calcula como 400 x 60/100 = 240."
+    },
+    {
+      "id": "MAT-2M-INT-0068",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 40% de 150?",
+      "alternativas": [
+        "A) 65",
+        "B) 70",
+        "C) 55",
+        "D) 60"
+      ],
+      "correcta": 3,
+      "explicacion": "40% de 150 se calcula como 150 x 40/100 = 60."
+    },
+    {
+      "id": "MAT-2M-INT-0069",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 75% de 400?",
+      "alternativas": [
+        "A) 300",
+        "B) 305",
+        "C) 310",
+        "D) 295"
+      ],
+      "correcta": 0,
+      "explicacion": "75% de 400 se calcula como 400 x 75/100 = 300."
+    },
+    {
+      "id": "MAT-2M-INT-0070",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 50% de 200?",
+      "alternativas": [
+        "A) 110",
+        "B) 95",
+        "C) 105",
+        "D) 100"
+      ],
+      "correcta": 3,
+      "explicacion": "50% de 200 se calcula como 200 x 50/100 = 100."
+    },
+    {
+      "id": "MAT-2M-INT-0071",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 60% de 40?",
+      "alternativas": [
+        "A) 24",
+        "B) 19",
+        "C) 34",
+        "D) 29"
+      ],
+      "correcta": 0,
+      "explicacion": "60% de 40 se calcula como 40 x 60/100 = 24."
+    },
+    {
+      "id": "MAT-2M-INT-0072",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 40% de 80?",
+      "alternativas": [
+        "A) 32",
+        "B) 37",
+        "C) 42",
+        "D) 27"
+      ],
+      "correcta": 0,
+      "explicacion": "40% de 80 se calcula como 80 x 40/100 = 32."
+    },
+    {
+      "id": "MAT-2M-INT-0073",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 75% de 60?",
+      "alternativas": [
+        "A) 50",
+        "B) 45",
+        "C) 55",
+        "D) 40"
+      ],
+      "correcta": 1,
+      "explicacion": "75% de 60 se calcula como 60 x 75/100 = 45."
+    },
+    {
+      "id": "MAT-2M-INT-0074",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 15% de 80?",
+      "alternativas": [
+        "A) 7",
+        "B) 22",
+        "C) 17",
+        "D) 12"
+      ],
+      "correcta": 3,
+      "explicacion": "15% de 80 se calcula como 80 x 15/100 = 12."
+    },
+    {
+      "id": "MAT-2M-INT-0075",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 10% de 40?",
+      "alternativas": [
+        "A) 14",
+        "B) 4",
+        "C) 1",
+        "D) 9"
+      ],
+      "correcta": 1,
+      "explicacion": "10% de 40 se calcula como 40 x 10/100 = 4."
+    },
+    {
+      "id": "MAT-2M-INT-0076",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 20% de 60?",
+      "alternativas": [
+        "A) 17",
+        "B) 7",
+        "C) 12",
+        "D) 22"
+      ],
+      "correcta": 2,
+      "explicacion": "20% de 60 se calcula como 60 x 20/100 = 12."
+    },
+    {
+      "id": "MAT-2M-INT-0077",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 30% de 200?",
+      "alternativas": [
+        "A) 70",
+        "B) 55",
+        "C) 65",
+        "D) 60"
+      ],
+      "correcta": 3,
+      "explicacion": "30% de 200 se calcula como 200 x 30/100 = 60."
+    },
+    {
+      "id": "MAT-2M-INT-0078",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 30% de 100?",
+      "alternativas": [
+        "A) 40",
+        "B) 30",
+        "C) 35",
+        "D) 25"
+      ],
+      "correcta": 1,
+      "explicacion": "30% de 100 se calcula como 100 x 30/100 = 30."
+    },
+    {
+      "id": "MAT-2M-INT-0079",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 20% de 200?",
+      "alternativas": [
+        "A) 40",
+        "B) 35",
+        "C) 45",
+        "D) 50"
+      ],
+      "correcta": 0,
+      "explicacion": "20% de 200 se calcula como 200 x 20/100 = 40."
+    },
+    {
+      "id": "MAT-2M-INT-0080",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 25% de 200?",
+      "alternativas": [
+        "A) 55",
+        "B) 45",
+        "C) 50",
+        "D) 60"
+      ],
+      "correcta": 2,
+      "explicacion": "25% de 200 se calcula como 200 x 25/100 = 50."
+    },
+    {
+      "id": "MAT-2M-INT-0081",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 40% de 100?",
+      "alternativas": [
+        "A) 35",
+        "B) 50",
+        "C) 45",
+        "D) 40"
+      ],
+      "correcta": 3,
+      "explicacion": "40% de 100 se calcula como 100 x 40/100 = 40."
+    },
+    {
+      "id": "MAT-2M-INT-0082",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 75% de 200?",
+      "alternativas": [
+        "A) 150",
+        "B) 155",
+        "C) 160",
+        "D) 145"
+      ],
+      "correcta": 0,
+      "explicacion": "75% de 200 se calcula como 200 x 75/100 = 150."
+    },
+    {
+      "id": "MAT-2M-INT-0083",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 50% de 40?",
+      "alternativas": [
+        "A) 30",
+        "B) 20",
+        "C) 15",
+        "D) 25"
+      ],
+      "correcta": 1,
+      "explicacion": "50% de 40 se calcula como 40 x 50/100 = 20."
+    },
+    {
+      "id": "MAT-2M-INT-0084",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 60% de 100?",
+      "alternativas": [
+        "A) 65",
+        "B) 60",
+        "C) 55",
+        "D) 70"
+      ],
+      "correcta": 1,
+      "explicacion": "60% de 100 se calcula como 100 x 60/100 = 60."
+    },
+    {
+      "id": "MAT-2M-INT-0085",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 20% de 120?",
+      "alternativas": [
+        "A) 34",
+        "B) 19",
+        "C) 29",
+        "D) 24"
+      ],
+      "correcta": 3,
+      "explicacion": "20% de 120 se calcula como 120 x 20/100 = 24."
+    },
+    {
+      "id": "MAT-2M-INT-0086",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 15% de 40?",
+      "alternativas": [
+        "A) 1",
+        "B) 6",
+        "C) 16",
+        "D) 11"
+      ],
+      "correcta": 1,
+      "explicacion": "15% de 40 se calcula como 40 x 15/100 = 6."
+    },
+    {
+      "id": "MAT-2M-INT-0087",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 25% de 40?",
+      "alternativas": [
+        "A) 20",
+        "B) 10",
+        "C) 5",
+        "D) 15"
+      ],
+      "correcta": 1,
+      "explicacion": "25% de 40 se calcula como 40 x 25/100 = 10."
+    },
+    {
+      "id": "MAT-2M-INT-0088",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 75% de 80?",
+      "alternativas": [
+        "A) 70",
+        "B) 60",
+        "C) 65",
+        "D) 55"
+      ],
+      "correcta": 1,
+      "explicacion": "75% de 80 se calcula como 80 x 75/100 = 60."
+    },
+    {
+      "id": "MAT-2M-INT-0089",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 60% de 150?",
+      "alternativas": [
+        "A) 95",
+        "B) 100",
+        "C) 90",
+        "D) 85"
+      ],
+      "correcta": 2,
+      "explicacion": "60% de 150 se calcula como 150 x 60/100 = 90."
+    },
+    {
+      "id": "MAT-2M-INT-0090",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cuanto es el 40% de 240?",
+      "alternativas": [
+        "A) 96",
+        "B) 106",
+        "C) 91",
+        "D) 101"
+      ],
+      "correcta": 0,
+      "explicacion": "40% de 240 se calcula como 240 x 40/100 = 96."
+    },
+    {
+      "id": "MAT-2M-INT-0091",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 121?",
+      "alternativas": [
+        "A) 11",
+        "B) 13",
+        "C) 12",
+        "D) 10"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 121 es 11, porque 11 x 11 = 121."
+    },
+    {
+      "id": "MAT-2M-INT-0092",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 144?",
+      "alternativas": [
+        "A) 12",
+        "B) 13",
+        "C) 14",
+        "D) 11"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 144 es 12, porque 12 x 12 = 144."
+    },
+    {
+      "id": "MAT-2M-INT-0093",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 576?",
+      "alternativas": [
+        "A) 26",
+        "B) 25",
+        "C) 23",
+        "D) 24"
+      ],
+      "correcta": 3,
+      "explicacion": "La raiz cuadrada de 576 es 24, porque 24 x 24 = 576."
+    },
+    {
+      "id": "MAT-2M-INT-0094",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 625?",
+      "alternativas": [
+        "A) 25",
+        "B) 26",
+        "C) 27",
+        "D) 24"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 625 es 25, porque 25 x 25 = 625."
+    },
+    {
+      "id": "MAT-2M-INT-0095",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 441?",
+      "alternativas": [
+        "A) 22",
+        "B) 20",
+        "C) 21",
+        "D) 23"
+      ],
+      "correcta": 2,
+      "explicacion": "La raiz cuadrada de 441 es 21, porque 21 x 21 = 441."
+    },
+    {
+      "id": "MAT-2M-INT-0096",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 529?",
+      "alternativas": [
+        "A) 23",
+        "B) 25",
+        "C) 22",
+        "D) 24"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 529 es 23, porque 23 x 23 = 529."
+    },
+    {
+      "id": "MAT-2M-INT-0097",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 289?",
+      "alternativas": [
+        "A) 18",
+        "B) 17",
+        "C) 19",
+        "D) 16"
+      ],
+      "correcta": 1,
+      "explicacion": "La raiz cuadrada de 289 es 17, porque 17 x 17 = 289."
+    },
+    {
+      "id": "MAT-2M-INT-0098",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 64?",
+      "alternativas": [
+        "A) 8",
+        "B) 9",
+        "C) 7",
+        "D) 10"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 64 es 8, porque 8 x 8 = 64."
+    },
+    {
+      "id": "MAT-2M-INT-0099",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 36?",
+      "alternativas": [
+        "A) 5",
+        "B) 7",
+        "C) 6",
+        "D) 8"
+      ],
+      "correcta": 2,
+      "explicacion": "La raiz cuadrada de 36 es 6, porque 6 x 6 = 36."
+    },
+    {
+      "id": "MAT-2M-INT-0100",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 169?",
+      "alternativas": [
+        "A) 14",
+        "B) 13",
+        "C) 15",
+        "D) 12"
+      ],
+      "correcta": 1,
+      "explicacion": "La raiz cuadrada de 169 es 13, porque 13 x 13 = 169."
+    },
+    {
+      "id": "MAT-2M-INT-0101",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 484?",
+      "alternativas": [
+        "A) 23",
+        "B) 22",
+        "C) 24",
+        "D) 21"
+      ],
+      "correcta": 1,
+      "explicacion": "La raiz cuadrada de 484 es 22, porque 22 x 22 = 484."
+    },
+    {
+      "id": "MAT-2M-INT-0102",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 16?",
+      "alternativas": [
+        "A) 4",
+        "B) 6",
+        "C) 5",
+        "D) 3"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 16 es 4, porque 4 x 4 = 16."
+    },
+    {
+      "id": "MAT-2M-INT-0103",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 256?",
+      "alternativas": [
+        "A) 17",
+        "B) 18",
+        "C) 15",
+        "D) 16"
+      ],
+      "correcta": 3,
+      "explicacion": "La raiz cuadrada de 256 es 16, porque 16 x 16 = 256."
+    },
+    {
+      "id": "MAT-2M-INT-0104",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 400?",
+      "alternativas": [
+        "A) 19",
+        "B) 22",
+        "C) 20",
+        "D) 21"
+      ],
+      "correcta": 2,
+      "explicacion": "La raiz cuadrada de 400 es 20, porque 20 x 20 = 400."
+    },
+    {
+      "id": "MAT-2M-INT-0105",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 225?",
+      "alternativas": [
+        "A) 14",
+        "B) 15",
+        "C) 16",
+        "D) 17"
+      ],
+      "correcta": 1,
+      "explicacion": "La raiz cuadrada de 225 es 15, porque 15 x 15 = 225."
+    },
+    {
+      "id": "MAT-2M-INT-0106",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 361?",
+      "alternativas": [
+        "A) 21",
+        "B) 20",
+        "C) 19",
+        "D) 18"
+      ],
+      "correcta": 2,
+      "explicacion": "La raiz cuadrada de 361 es 19, porque 19 x 19 = 361."
+    },
+    {
+      "id": "MAT-2M-INT-0107",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 81?",
+      "alternativas": [
+        "A) 11",
+        "B) 9",
+        "C) 10",
+        "D) 8"
+      ],
+      "correcta": 1,
+      "explicacion": "La raiz cuadrada de 81 es 9, porque 9 x 9 = 81."
+    },
+    {
+      "id": "MAT-2M-INT-0108",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 100?",
+      "alternativas": [
+        "A) 10",
+        "B) 12",
+        "C) 9",
+        "D) 11"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 100 es 10, porque 10 x 10 = 100."
+    },
+    {
+      "id": "MAT-2M-INT-0109",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 324?",
+      "alternativas": [
+        "A) 18",
+        "B) 19",
+        "C) 17",
+        "D) 20"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 324 es 18, porque 18 x 18 = 324."
+    },
+    {
+      "id": "MAT-2M-INT-0110",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 49?",
+      "alternativas": [
+        "A) 7",
+        "B) 8",
+        "C) 6",
+        "D) 9"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 49 es 7, porque 7 x 7 = 49."
+    },
+    {
+      "id": "MAT-2M-INT-0111",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 196?",
+      "alternativas": [
+        "A) 16",
+        "B) 15",
+        "C) 14",
+        "D) 13"
+      ],
+      "correcta": 2,
+      "explicacion": "La raiz cuadrada de 196 es 14, porque 14 x 14 = 196."
+    },
+    {
+      "id": "MAT-2M-INT-0112",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es la raiz cuadrada de 25?",
+      "alternativas": [
+        "A) 5",
+        "B) 4",
+        "C) 7",
+        "D) 6"
+      ],
+      "correcta": 0,
+      "explicacion": "La raiz cuadrada de 25 es 5, porque 5 x 5 = 25."
+    },
+    {
+      "id": "MAT-2M-INT-0113",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 3 cm por 13 cm?",
+      "alternativas": [
+        "A) 37",
+        "B) 41",
+        "C) 44",
+        "D) 39"
+      ],
+      "correcta": 3,
+      "explicacion": "El area del rectangulo es base por altura: 3 x 13 = 39."
+    },
+    {
+      "id": "MAT-2M-INT-0114",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 11 cm por 4 cm?",
+      "alternativas": [
+        "A) 32",
+        "B) 35",
+        "C) 30",
+        "D) 28"
+      ],
+      "correcta": 2,
+      "explicacion": "El perimetro es 2(11 + 4) = 30."
+    },
+    {
+      "id": "MAT-2M-INT-0115",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 17 cm por 9 cm?",
+      "alternativas": [
+        "A) 155",
+        "B) 153",
+        "C) 151",
+        "D) 158"
+      ],
+      "correcta": 1,
+      "explicacion": "El area del rectangulo es base por altura: 17 x 9 = 153."
+    },
+    {
+      "id": "MAT-2M-INT-0116",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 5 cm por 13 cm?",
+      "alternativas": [
+        "A) 38",
+        "B) 41",
+        "C) 36",
+        "D) 34"
+      ],
+      "correcta": 2,
+      "explicacion": "El perimetro es 2(5 + 13) = 36."
+    },
+    {
+      "id": "MAT-2M-INT-0117",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 9 cm por 12 cm?",
+      "alternativas": [
+        "A) 113",
+        "B) 108",
+        "C) 110",
+        "D) 106"
+      ],
+      "correcta": 1,
+      "explicacion": "El area del rectangulo es base por altura: 9 x 12 = 108."
+    },
+    {
+      "id": "MAT-2M-INT-0118",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 6 cm por 12 cm?",
+      "alternativas": [
+        "A) 34",
+        "B) 41",
+        "C) 38",
+        "D) 36"
+      ],
+      "correcta": 3,
+      "explicacion": "El perimetro es 2(6 + 12) = 36."
+    },
+    {
+      "id": "MAT-2M-INT-0119",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 7 cm por 13 cm?",
+      "alternativas": [
+        "A) 93",
+        "B) 89",
+        "C) 91",
+        "D) 96"
+      ],
+      "correcta": 2,
+      "explicacion": "El area del rectangulo es base por altura: 7 x 13 = 91."
+    },
+    {
+      "id": "MAT-2M-INT-0120",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 5 cm por 9 cm?",
+      "alternativas": [
+        "A) 30",
+        "B) 26",
+        "C) 28",
+        "D) 33"
+      ],
+      "correcta": 2,
+      "explicacion": "El perimetro es 2(5 + 9) = 28."
+    },
+    {
+      "id": "MAT-2M-INT-0121",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 5 cm por 13 cm?",
+      "alternativas": [
+        "A) 67",
+        "B) 63",
+        "C) 65",
+        "D) 70"
+      ],
+      "correcta": 2,
+      "explicacion": "El area del rectangulo es base por altura: 5 x 13 = 65."
+    },
+    {
+      "id": "MAT-2M-INT-0122",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 16 cm por 11 cm?",
+      "alternativas": [
+        "A) 52",
+        "B) 59",
+        "C) 54",
+        "D) 56"
+      ],
+      "correcta": 2,
+      "explicacion": "El perimetro es 2(16 + 11) = 54."
+    },
+    {
+      "id": "MAT-2M-INT-0123",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 11 cm por 4 cm?",
+      "alternativas": [
+        "A) 46",
+        "B) 44",
+        "C) 42",
+        "D) 49"
+      ],
+      "correcta": 1,
+      "explicacion": "El area del rectangulo es base por altura: 11 x 4 = 44."
+    },
+    {
+      "id": "MAT-2M-INT-0124",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 11 cm por 3 cm?",
+      "alternativas": [
+        "A) 28",
+        "B) 26",
+        "C) 30",
+        "D) 33"
+      ],
+      "correcta": 0,
+      "explicacion": "El perimetro es 2(11 + 3) = 28."
+    },
+    {
+      "id": "MAT-2M-INT-0125",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 10 cm por 2 cm?",
+      "alternativas": [
+        "A) 25",
+        "B) 18",
+        "C) 22",
+        "D) 20"
+      ],
+      "correcta": 3,
+      "explicacion": "El area del rectangulo es base por altura: 10 x 2 = 20."
+    },
+    {
+      "id": "MAT-2M-INT-0126",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 7 cm por 14 cm?",
+      "alternativas": [
+        "A) 40",
+        "B) 44",
+        "C) 47",
+        "D) 42"
+      ],
+      "correcta": 3,
+      "explicacion": "El perimetro es 2(7 + 14) = 42."
+    },
+    {
+      "id": "MAT-2M-INT-0127",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 13 cm por 2 cm?",
+      "alternativas": [
+        "A) 31",
+        "B) 26",
+        "C) 28",
+        "D) 24"
+      ],
+      "correcta": 1,
+      "explicacion": "El area del rectangulo es base por altura: 13 x 2 = 26."
+    },
+    {
+      "id": "MAT-2M-INT-0128",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 12 cm por 11 cm?",
+      "alternativas": [
+        "A) 46",
+        "B) 48",
+        "C) 44",
+        "D) 51"
+      ],
+      "correcta": 0,
+      "explicacion": "El perimetro es 2(12 + 11) = 46."
+    },
+    {
+      "id": "MAT-2M-INT-0129",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 12 cm por 6 cm?",
+      "alternativas": [
+        "A) 70",
+        "B) 74",
+        "C) 72",
+        "D) 77"
+      ],
+      "correcta": 2,
+      "explicacion": "El area del rectangulo es base por altura: 12 x 6 = 72."
+    },
+    {
+      "id": "MAT-2M-INT-0130",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 7 cm por 3 cm?",
+      "alternativas": [
+        "A) 22",
+        "B) 20",
+        "C) 18",
+        "D) 25"
+      ],
+      "correcta": 1,
+      "explicacion": "El perimetro es 2(7 + 3) = 20."
+    },
+    {
+      "id": "MAT-2M-INT-0131",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 14 cm por 13 cm?",
+      "alternativas": [
+        "A) 184",
+        "B) 182",
+        "C) 180",
+        "D) 187"
+      ],
+      "correcta": 1,
+      "explicacion": "El area del rectangulo es base por altura: 14 x 13 = 182."
+    },
+    {
+      "id": "MAT-2M-INT-0132",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 18 cm por 4 cm?",
+      "alternativas": [
+        "A) 49",
+        "B) 44",
+        "C) 46",
+        "D) 42"
+      ],
+      "correcta": 1,
+      "explicacion": "El perimetro es 2(18 + 4) = 44."
+    },
+    {
+      "id": "MAT-2M-INT-0133",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 5 cm por 11 cm?",
+      "alternativas": [
+        "A) 57",
+        "B) 53",
+        "C) 55",
+        "D) 60"
+      ],
+      "correcta": 2,
+      "explicacion": "El area del rectangulo es base por altura: 5 x 11 = 55."
+    },
+    {
+      "id": "MAT-2M-INT-0134",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 11 cm por 14 cm?",
+      "alternativas": [
+        "A) 55",
+        "B) 52",
+        "C) 48",
+        "D) 50"
+      ],
+      "correcta": 3,
+      "explicacion": "El perimetro es 2(11 + 14) = 50."
+    },
+    {
+      "id": "MAT-2M-INT-0135",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 18 cm por 8 cm?",
+      "alternativas": [
+        "A) 149",
+        "B) 144",
+        "C) 146",
+        "D) 142"
+      ],
+      "correcta": 1,
+      "explicacion": "El area del rectangulo es base por altura: 18 x 8 = 144."
+    },
+    {
+      "id": "MAT-2M-INT-0136",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 9 cm por 10 cm?",
+      "alternativas": [
+        "A) 36",
+        "B) 40",
+        "C) 38",
+        "D) 43"
+      ],
+      "correcta": 2,
+      "explicacion": "El perimetro es 2(9 + 10) = 38."
+    },
+    {
+      "id": "MAT-2M-INT-0137",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 6 cm por 5 cm?",
+      "alternativas": [
+        "A) 35",
+        "B) 28",
+        "C) 30",
+        "D) 32"
+      ],
+      "correcta": 2,
+      "explicacion": "El area del rectangulo es base por altura: 6 x 5 = 30."
+    },
+    {
+      "id": "MAT-2M-INT-0138",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 10 cm por 2 cm?",
+      "alternativas": [
+        "A) 29",
+        "B) 22",
+        "C) 26",
+        "D) 24"
+      ],
+      "correcta": 3,
+      "explicacion": "El perimetro es 2(10 + 2) = 24."
+    },
+    {
+      "id": "MAT-2M-INT-0139",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 16 cm por 4 cm?",
+      "alternativas": [
+        "A) 64",
+        "B) 62",
+        "C) 69",
+        "D) 66"
+      ],
+      "correcta": 0,
+      "explicacion": "El area del rectangulo es base por altura: 16 x 4 = 64."
+    },
+    {
+      "id": "MAT-2M-INT-0140",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 8 cm por 2 cm?",
+      "alternativas": [
+        "A) 18",
+        "B) 22",
+        "C) 20",
+        "D) 25"
+      ],
+      "correcta": 2,
+      "explicacion": "El perimetro es 2(8 + 2) = 20."
+    },
+    {
+      "id": "MAT-2M-INT-0141",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el area de un rectangulo de 11 cm por 6 cm?",
+      "alternativas": [
+        "A) 64",
+        "B) 68",
+        "C) 71",
+        "D) 66"
+      ],
+      "correcta": 3,
+      "explicacion": "El area del rectangulo es base por altura: 11 x 6 = 66."
+    },
+    {
+      "id": "MAT-2M-INT-0142",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Cual es el perimetro de un rectangulo de 15 cm por 12 cm?",
+      "alternativas": [
+        "A) 59",
+        "B) 56",
+        "C) 52",
+        "D) 54"
+      ],
+      "correcta": 3,
+      "explicacion": "El perimetro es 2(15 + 12) = 54."
+    },
+    {
+      "id": "MAT-2M-INT-0143",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 10 y 24, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 26",
+        "B) 28",
+        "C) 27",
+        "D) 25"
+      ],
+      "correcta": 0,
+      "explicacion": "Por Pitagoras: 10^2 + 24^2 = 676. La raiz de 676 es 26."
+    },
+    {
+      "id": "MAT-2M-INT-0144",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 9 y 12, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 17",
+        "B) 16",
+        "C) 14",
+        "D) 15"
+      ],
+      "correcta": 3,
+      "explicacion": "Por Pitagoras: 9^2 + 12^2 = 225. La raiz de 225 es 15."
+    },
+    {
+      "id": "MAT-2M-INT-0145",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 3 y 4, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 4",
+        "B) 6",
+        "C) 5",
+        "D) 7"
+      ],
+      "correcta": 2,
+      "explicacion": "Por Pitagoras: 3^2 + 4^2 = 25. La raiz de 25 es 5."
+    },
+    {
+      "id": "MAT-2M-INT-0146",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 10 y 24, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 25",
+        "B) 28",
+        "C) 27",
+        "D) 26"
+      ],
+      "correcta": 3,
+      "explicacion": "Por Pitagoras: 10^2 + 24^2 = 676. La raiz de 676 es 26."
+    },
+    {
+      "id": "MAT-2M-INT-0147",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 3 y 4, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 7",
+        "B) 6",
+        "C) 4",
+        "D) 5"
+      ],
+      "correcta": 3,
+      "explicacion": "Por Pitagoras: 3^2 + 4^2 = 25. La raiz de 25 es 5."
+    },
+    {
+      "id": "MAT-2M-INT-0148",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 10 y 24, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 27",
+        "B) 25",
+        "C) 28",
+        "D) 26"
+      ],
+      "correcta": 3,
+      "explicacion": "Por Pitagoras: 10^2 + 24^2 = 676. La raiz de 676 es 26."
+    },
+    {
+      "id": "MAT-2M-INT-0149",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 9 y 12, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 15",
+        "B) 16",
+        "C) 17",
+        "D) 14"
+      ],
+      "correcta": 0,
+      "explicacion": "Por Pitagoras: 9^2 + 12^2 = 225. La raiz de 225 es 15."
+    },
+    {
+      "id": "MAT-2M-INT-0150",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 9 y 12, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 16",
+        "B) 17",
+        "C) 15",
+        "D) 14"
+      ],
+      "correcta": 2,
+      "explicacion": "Por Pitagoras: 9^2 + 12^2 = 225. La raiz de 225 es 15."
+    },
+    {
+      "id": "MAT-2M-INT-0151",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 6 y 8, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 10",
+        "B) 12",
+        "C) 11",
+        "D) 9"
+      ],
+      "correcta": 0,
+      "explicacion": "Por Pitagoras: 6^2 + 8^2 = 100. La raiz de 100 es 10."
+    },
+    {
+      "id": "MAT-2M-INT-0152",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 9 y 12, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 17",
+        "B) 15",
+        "C) 14",
+        "D) 16"
+      ],
+      "correcta": 1,
+      "explicacion": "Por Pitagoras: 9^2 + 12^2 = 225. La raiz de 225 es 15."
+    },
+    {
+      "id": "MAT-2M-INT-0153",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 8 y 15, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 16",
+        "B) 18",
+        "C) 19",
+        "D) 17"
+      ],
+      "correcta": 3,
+      "explicacion": "Por Pitagoras: 8^2 + 15^2 = 289. La raiz de 289 es 17."
+    },
+    {
+      "id": "MAT-2M-INT-0154",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 12 y 16, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 21",
+        "B) 22",
+        "C) 19",
+        "D) 20"
+      ],
+      "correcta": 3,
+      "explicacion": "Por Pitagoras: 12^2 + 16^2 = 400. La raiz de 400 es 20."
+    },
+    {
+      "id": "MAT-2M-INT-0155",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 3 y 4, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 4",
+        "B) 6",
+        "C) 5",
+        "D) 7"
+      ],
+      "correcta": 2,
+      "explicacion": "Por Pitagoras: 3^2 + 4^2 = 25. La raiz de 25 es 5."
+    },
+    {
+      "id": "MAT-2M-INT-0156",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 10 y 24, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 26",
+        "B) 27",
+        "C) 25",
+        "D) 28"
+      ],
+      "correcta": 0,
+      "explicacion": "Por Pitagoras: 10^2 + 24^2 = 676. La raiz de 676 es 26."
+    },
+    {
+      "id": "MAT-2M-INT-0157",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 5 y 12, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 13",
+        "B) 14",
+        "C) 12",
+        "D) 15"
+      ],
+      "correcta": 0,
+      "explicacion": "Por Pitagoras: 5^2 + 12^2 = 169. La raiz de 169 es 13."
+    },
+    {
+      "id": "MAT-2M-INT-0158",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 6 y 8, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 11",
+        "B) 9",
+        "C) 10",
+        "D) 12"
+      ],
+      "correcta": 2,
+      "explicacion": "Por Pitagoras: 6^2 + 8^2 = 100. La raiz de 100 es 10."
+    },
+    {
+      "id": "MAT-2M-INT-0159",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 8 y 15, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 16",
+        "B) 17",
+        "C) 18",
+        "D) 19"
+      ],
+      "correcta": 1,
+      "explicacion": "Por Pitagoras: 8^2 + 15^2 = 289. La raiz de 289 es 17."
+    },
+    {
+      "id": "MAT-2M-INT-0160",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 12 y 16, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 22",
+        "B) 20",
+        "C) 19",
+        "D) 21"
+      ],
+      "correcta": 1,
+      "explicacion": "Por Pitagoras: 12^2 + 16^2 = 400. La raiz de 400 es 20."
+    },
+    {
+      "id": "MAT-2M-INT-0161",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 3 y 4, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 6",
+        "B) 7",
+        "C) 5",
+        "D) 4"
+      ],
+      "correcta": 2,
+      "explicacion": "Por Pitagoras: 3^2 + 4^2 = 25. La raiz de 25 es 5."
+    },
+    {
+      "id": "MAT-2M-INT-0162",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si un triangulo rectangulo tiene catetos 8 y 15, cual es la hipotenusa?",
+      "alternativas": [
+        "A) 19",
+        "B) 17",
+        "C) 18",
+        "D) 16"
+      ],
+      "correcta": 1,
+      "explicacion": "Por Pitagoras: 8^2 + 15^2 = 289. La raiz de 289 es 17."
+    },
+    {
+      "id": "MAT-2M-INT-0163",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 4 lapices cuestan 400, cuanto cuestan 10 lapices?",
+      "alternativas": [
+        "A) 1200",
+        "B) 1100",
+        "C) 900",
+        "D) 1000"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 100. Entonces 10 lapices cuestan 10 x 100 = 1000."
+    },
+    {
+      "id": "MAT-2M-INT-0164",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 2 lapices cuestan 800, cuanto cuestan 8 lapices?",
+      "alternativas": [
+        "A) 2800",
+        "B) 3200",
+        "C) 3600",
+        "D) 4000"
+      ],
+      "correcta": 1,
+      "explicacion": "Cada lapiz cuesta 400. Entonces 8 lapices cuestan 8 x 400 = 3200."
+    },
+    {
+      "id": "MAT-2M-INT-0165",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 3 lapices cuestan 300, cuanto cuestan 9 lapices?",
+      "alternativas": [
+        "A) 900",
+        "B) 1000",
+        "C) 800",
+        "D) 1100"
+      ],
+      "correcta": 0,
+      "explicacion": "Cada lapiz cuesta 100. Entonces 9 lapices cuestan 9 x 100 = 900."
+    },
+    {
+      "id": "MAT-2M-INT-0166",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 5 lapices cuestan 1000, cuanto cuestan 5 lapices?",
+      "alternativas": [
+        "A) 1200",
+        "B) 800",
+        "C) 1000",
+        "D) 1400"
+      ],
+      "correcta": 2,
+      "explicacion": "Cada lapiz cuesta 200. Entonces 5 lapices cuestan 5 x 200 = 1000."
+    },
+    {
+      "id": "MAT-2M-INT-0167",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 5 lapices cuestan 1250, cuanto cuestan 6 lapices?",
+      "alternativas": [
+        "A) 1750",
+        "B) 2000",
+        "C) 1250",
+        "D) 1500"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 250. Entonces 6 lapices cuestan 6 x 250 = 1500."
+    },
+    {
+      "id": "MAT-2M-INT-0168",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 2 lapices cuestan 800, cuanto cuestan 10 lapices?",
+      "alternativas": [
+        "A) 4000",
+        "B) 4400",
+        "C) 4800",
+        "D) 3600"
+      ],
+      "correcta": 0,
+      "explicacion": "Cada lapiz cuesta 400. Entonces 10 lapices cuestan 10 x 400 = 4000."
+    },
+    {
+      "id": "MAT-2M-INT-0169",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 3 lapices cuestan 600, cuanto cuestan 4 lapices?",
+      "alternativas": [
+        "A) 1000",
+        "B) 1200",
+        "C) 600",
+        "D) 800"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 200. Entonces 4 lapices cuestan 4 x 200 = 800."
+    },
+    {
+      "id": "MAT-2M-INT-0170",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 5 lapices cuestan 2000, cuanto cuestan 7 lapices?",
+      "alternativas": [
+        "A) 2400",
+        "B) 3200",
+        "C) 3600",
+        "D) 2800"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 400. Entonces 7 lapices cuestan 7 x 400 = 2800."
+    },
+    {
+      "id": "MAT-2M-INT-0171",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 2 lapices cuestan 400, cuanto cuestan 7 lapices?",
+      "alternativas": [
+        "A) 1800",
+        "B) 1400",
+        "C) 1600",
+        "D) 1200"
+      ],
+      "correcta": 1,
+      "explicacion": "Cada lapiz cuesta 200. Entonces 7 lapices cuestan 7 x 200 = 1400."
+    },
+    {
+      "id": "MAT-2M-INT-0172",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 6 lapices cuestan 600, cuanto cuestan 5 lapices?",
+      "alternativas": [
+        "A) 700",
+        "B) 600",
+        "C) 500",
+        "D) 400"
+      ],
+      "correcta": 2,
+      "explicacion": "Cada lapiz cuesta 100. Entonces 5 lapices cuestan 5 x 100 = 500."
+    },
+    {
+      "id": "MAT-2M-INT-0173",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 4 lapices cuestan 800, cuanto cuestan 10 lapices?",
+      "alternativas": [
+        "A) 2400",
+        "B) 1800",
+        "C) 2200",
+        "D) 2000"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 200. Entonces 10 lapices cuestan 10 x 200 = 2000."
+    },
+    {
+      "id": "MAT-2M-INT-0174",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 3 lapices cuestan 300, cuanto cuestan 7 lapices?",
+      "alternativas": [
+        "A) 800",
+        "B) 900",
+        "C) 600",
+        "D) 700"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 100. Entonces 7 lapices cuestan 7 x 100 = 700."
+    },
+    {
+      "id": "MAT-2M-INT-0175",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 6 lapices cuestan 1200, cuanto cuestan 11 lapices?",
+      "alternativas": [
+        "A) 2400",
+        "B) 2000",
+        "C) 2200",
+        "D) 2600"
+      ],
+      "correcta": 2,
+      "explicacion": "Cada lapiz cuesta 200. Entonces 11 lapices cuestan 11 x 200 = 2200."
+    },
+    {
+      "id": "MAT-2M-INT-0176",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 5 lapices cuestan 1250, cuanto cuestan 11 lapices?",
+      "alternativas": [
+        "A) 2500",
+        "B) 3250",
+        "C) 2750",
+        "D) 3000"
+      ],
+      "correcta": 2,
+      "explicacion": "Cada lapiz cuesta 250. Entonces 11 lapices cuestan 11 x 250 = 2750."
+    },
+    {
+      "id": "MAT-2M-INT-0177",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 2 lapices cuestan 600, cuanto cuestan 12 lapices?",
+      "alternativas": [
+        "A) 4200",
+        "B) 3900",
+        "C) 3300",
+        "D) 3600"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 300. Entonces 12 lapices cuestan 12 x 300 = 3600."
+    },
+    {
+      "id": "MAT-2M-INT-0178",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 3 lapices cuestan 750, cuanto cuestan 5 lapices?",
+      "alternativas": [
+        "A) 1750",
+        "B) 1500",
+        "C) 1250",
+        "D) 1000"
+      ],
+      "correcta": 2,
+      "explicacion": "Cada lapiz cuesta 250. Entonces 5 lapices cuestan 5 x 250 = 1250."
+    },
+    {
+      "id": "MAT-2M-INT-0179",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 6 lapices cuestan 900, cuanto cuestan 7 lapices?",
+      "alternativas": [
+        "A) 1050",
+        "B) 1200",
+        "C) 900",
+        "D) 1350"
+      ],
+      "correcta": 0,
+      "explicacion": "Cada lapiz cuesta 150. Entonces 7 lapices cuestan 7 x 150 = 1050."
+    },
+    {
+      "id": "MAT-2M-INT-0180",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 3 lapices cuestan 600, cuanto cuestan 4 lapices?",
+      "alternativas": [
+        "A) 600",
+        "B) 800",
+        "C) 1200",
+        "D) 1000"
+      ],
+      "correcta": 1,
+      "explicacion": "Cada lapiz cuesta 200. Entonces 4 lapices cuestan 4 x 200 = 800."
+    },
+    {
+      "id": "MAT-2M-INT-0181",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 5 lapices cuestan 1250, cuanto cuestan 11 lapices?",
+      "alternativas": [
+        "A) 2750",
+        "B) 3250",
+        "C) 3000",
+        "D) 2500"
+      ],
+      "correcta": 0,
+      "explicacion": "Cada lapiz cuesta 250. Entonces 11 lapices cuestan 11 x 250 = 2750."
+    },
+    {
+      "id": "MAT-2M-INT-0182",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 2 lapices cuestan 300, cuanto cuestan 12 lapices?",
+      "alternativas": [
+        "A) 1650",
+        "B) 1950",
+        "C) 2100",
+        "D) 1800"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 150. Entonces 12 lapices cuestan 12 x 150 = 1800."
+    },
+    {
+      "id": "MAT-2M-INT-0183",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 5 lapices cuestan 500, cuanto cuestan 10 lapices?",
+      "alternativas": [
+        "A) 900",
+        "B) 1100",
+        "C) 1200",
+        "D) 1000"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 100. Entonces 10 lapices cuestan 10 x 100 = 1000."
+    },
+    {
+      "id": "MAT-2M-INT-0184",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 3 lapices cuestan 450, cuanto cuestan 8 lapices?",
+      "alternativas": [
+        "A) 1200",
+        "B) 1500",
+        "C) 1350",
+        "D) 1050"
+      ],
+      "correcta": 0,
+      "explicacion": "Cada lapiz cuesta 150. Entonces 8 lapices cuestan 8 x 150 = 1200."
+    },
+    {
+      "id": "MAT-2M-INT-0185",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 2 lapices cuestan 600, cuanto cuestan 11 lapices?",
+      "alternativas": [
+        "A) 3000",
+        "B) 3900",
+        "C) 3600",
+        "D) 3300"
+      ],
+      "correcta": 3,
+      "explicacion": "Cada lapiz cuesta 300. Entonces 11 lapices cuestan 11 x 300 = 3300."
+    },
+    {
+      "id": "MAT-2M-INT-0186",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 2 lapices cuestan 200, cuanto cuestan 10 lapices?",
+      "alternativas": [
+        "A) 1200",
+        "B) 1100",
+        "C) 1000",
+        "D) 900"
+      ],
+      "correcta": 2,
+      "explicacion": "Cada lapiz cuesta 100. Entonces 10 lapices cuestan 10 x 100 = 1000."
+    },
+    {
+      "id": "MAT-2M-INT-0187",
+      "asignatura": "Matematica",
+      "nivel": "2 Medio",
+      "dificultad": "Intermedio",
+      "pregunta": "[BANCO MAESTRO REAL] Si 3 lapices cuestan 1200, cuanto cuestan 11 lapices?",
+      "alternativas": [
+        "A) 5200",
+        "B) 4000",
+        "C) 4400",
+        "D) 4800"
+      ],
+      "correcta": 2,
+      "explicacion": "Cada lapiz cuesta 400. Entonces 11 lapices cuestan 11 x 400 = 4400."
+    }
+  ]
+}

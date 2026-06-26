@@ -1,5 +1,5 @@
-// src/pages/Home.jsx 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+// src/pages/Home.jsx
+import React, { useEffect, useState, useMemo, useRef, useContext } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { getClaseVigente } from "../services/PlanificadorService";
 import { auth } from "../firebase";
@@ -7,6 +7,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../lib/api";
 import AuthModal from "../components/AuthModal";
+import { PlanContext } from "../context/PlanContext"; // ✅ NUEVO
 
 const BACKEND_URL =
   (import.meta && import.meta.env && import.meta.env.VITE_BACKEND_URL)
@@ -170,6 +171,7 @@ function Splash({ seconds = 5, onDone = () => {} }) {
           img.onload = () => resolve(true);
           img.onerror = () => resolve(false);
           img.src = c + `?v=${Date.now()}`;
+          return;
         });
         if (ok && !cancelled) {
           setLogoSrc(c);
@@ -312,6 +314,7 @@ function HeroIntro() {
           img.onload = () => resolve(true);
           img.onerror = () => resolve(false);
           img.src = c + `?v=${Date.now()}`;
+          return;
         });
         if (ok && !cancelled) {
           setLogoSrc(c);
@@ -537,6 +540,32 @@ function HintButton({
   );
 }
 
+/* Helper para detectar idioma actual (es/en) */
+function detectLanguage() {
+  let lang = "es";
+  try {
+    const stored =
+      localStorage.getItem("pragma_lang") ||
+      localStorage.getItem("appLanguage") ||
+      localStorage.getItem("language");
+
+    if (stored === "en" || stored === "es") {
+      lang = stored;
+    } else {
+      const navLang = (navigator.language || navigator.userLanguage || "es")
+        .toLowerCase()
+        .slice(0, 2);
+      if (navLang === "en") lang = "en";
+    }
+  } catch (e) {
+    // si algo falla, nos quedamos con "es"
+  }
+  return lang;
+}
+
+// 🔑 clave de storage para la Clase especial
+const SPECIAL_CLASS_KEY = "pragma:specialClass";
+
 /* ───────────────── MAIN COMPONENT ────────────── */
 export default function Home() {
   const nav = useNavigate();
@@ -563,11 +592,55 @@ export default function Home() {
   // menú hamburguesa
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // tooltip / ayuda
+  // tooltip / ayuda (no se usa, pero no se elimina)
   const [hoverHelp, setHoverHelp] = useState("");
 
   // 🔐 Para evitar spam de redirecciones
   const hasRedirectedRef = useRef(false);
+
+  // 🔗 contexto de plan (para Clase especial)
+  const planCtx = useContext(PlanContext); // ✅
+
+  // 🧪 Modal para Clase especial
+  const [showSpecialModal, setShowSpecialModal] = useState(false);
+  const [specialLanguage, setSpecialLanguage] = useState(() => detectLanguage() || "es");
+  const [showSpecialForm, setShowSpecialForm] = useState(false);
+
+  const [specialFormData, setSpecialFormData] = useState({
+    teacherName: "",
+    subject: "",
+    modoEspecial: true,
+    language: "en", // se actualizará con el idioma elegido
+    unit: "",
+    objective: "",
+    skills: "",
+  });
+
+  // 🔎 Bloque legado (ahora reemplazado por launchSpecialClass)
+  // Queda comentado para referencia, pero no se ejecuta ni rompe nada.
+  /*
+  const meta = {
+    ...specialFormData,
+    language: "en",
+    modoEspecial: true,
+  };
+  // 1) Guardar en localStorage para que InicioClase lo lea si entra por URL
+  localStorage.setItem("pragma:specialClassMeta", JSON.stringify(meta));
+  // 2) Pasarlo también por state al navegar
+  nav("/InicioClase?special=1&lang=en", {
+    state: {
+      from: "home-clase-especial",
+      specialMeta: meta,
+    },
+  });
+  */
+
+  const updateSpecialField = (field, value) => {
+    setSpecialFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
   async function hardLocalLogout() {
     try {
@@ -711,73 +784,68 @@ export default function Home() {
         ? claseVigente.habilidades.join(", ")
         : claseVigente.habilidades;
       if (hab) parts.push(`Habilidades: ${hab}`);
-    }
-    function HeaderMenu() {
-  const navigate = useNavigate();
 
-  const [loggedIn, setLoggedIn] = useState(false); // hay usuario firebase cargado
-  const [isAnon, setIsAnon] = useState(true);      // por defecto asumimos anónimo
+      function HeaderMenu() {
+        const navigate = useNavigate();
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) {
-        // no hay user (tal vez todavía no terminó de crear anon)
-        setLoggedIn(false);
-        setIsAnon(true);
-        return;
+        const [loggedIn, setLoggedIn] = useState(false); // hay usuario firebase cargado
+        const [isAnon, setIsAnon] = useState(true); // por defecto asumimos anónimo
+
+        useEffect(() => {
+          const unsub = onAuthStateChanged(auth, (u) => {
+            if (!u) {
+              // no hay user (tal vez todavía no terminó de crear anon)
+              setLoggedIn(false);
+              setIsAnon(true);
+              return;
+            }
+            setLoggedIn(true);
+            setIsAnon(!!u.isAnonymous);
+          });
+          return () => unsub();
+        }, []);
+
+        // cerrar sesión solo aplica si NO eres anónimo
+        const handleLogout = async () => {
+          try {
+            await signOut(auth);
+            // opcional: limpiar algunas cosas de profe
+            localStorage.removeItem("uid");
+            // mandar de vuelta al landing
+            navigate("/home", { replace: true });
+          } catch (e) {
+            console.error("signOut error", e);
+          }
+        };
+
+        return (
+          <div className="tu-menu-ejemplo">
+            {/* ...links comunes tipo Producto / Cómo funciona / etc... */}
+
+            {loggedIn && !isAnon ? (
+              <>
+                <button onClick={() => navigate("/perfil")} className="btn">
+                  Mi perfil
+                </button>
+
+                <button onClick={handleLogout} className="btn btn-secundario">
+                  Cerrar sesión
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="btn btn-primario"
+                >
+                  Iniciar sesión
+                </button>
+              </>
+            )}
+          </div>
+        );
       }
-      setLoggedIn(true);
-      setIsAnon(!!u.isAnonymous);
-    });
-    return () => unsub();
-  }, []);
-
-  // cerrar sesión solo aplica si NO eres anónimo
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      // opcional: limpiar algunas cosas de profe
-      localStorage.removeItem("uid");
-      // mandar de vuelta al landing
-      navigate("/home", { replace: true });
-    } catch (e) {
-      console.error("signOut error", e);
     }
-  };
-
-  return (
-    <div className="tu-menu-ejemplo">
-      {/* ...links comunes tipo Producto / Cómo funciona / etc... */}
-
-      {loggedIn && !isAnon ? (
-        <>
-          <button
-            onClick={() => navigate("/perfil")}
-            className="btn"
-          >
-            Mi perfil
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="btn btn-secundario"
-          >
-            Cerrar sesión
-          </button>
-        </>
-      ) : (
-        <>
-          <button
-            onClick={() => navigate("/login")}
-            className="btn btn-primario"
-          >
-            Iniciar sesión
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
 
     const cursoBits = [];
     if (claseVigente.nivel)
@@ -916,6 +984,134 @@ export default function Home() {
       console.log("[doSignOut] replace -> /#/home?force=1");
     } catch (err) {
       console.warn("[doSignOut] redirect error:", err);
+    }
+  };
+
+  // ⚙️ Handler para abrir el modal de "Clase especial"
+  const handleClaseEspecialClick = () => {
+    const currentLanguage = detectLanguage();
+    setSpecialLanguage(currentLanguage === "en" ? "en" : "es");
+    setShowSpecialModal(true);
+  };
+
+  // ✅ Guardar idioma y abrir formulario
+  const confirmSpecialClass = () => {
+    const chosenLanguage = specialLanguage || detectLanguage() || "es";
+
+    try {
+      localStorage.setItem("pragma_lang", chosenLanguage);
+      const payload = {
+        modoEspecial: true,
+        language: chosenLanguage,
+        createdAt: Date.now(),
+      };
+      localStorage.setItem(SPECIAL_CLASS_KEY, JSON.stringify(payload));
+    } catch (e) {
+      console.warn("[Home] no se pudo guardar Clase especial en storage:", e);
+    }
+
+    // cerramos modal idioma y abrimos formulario de datos
+    setShowSpecialModal(false);
+    setShowSpecialForm(true);
+  };
+
+  // ✅ Lanzar realmente la clase especial con los datos del formulario
+  const launchSpecialClass = () => {
+    const chosenLanguage = specialLanguage || detectLanguage() || "es";
+
+    // Plan base
+    let planEspecialBase =
+      chosenLanguage === "en"
+        ? {
+            asignatura: "Mathematics",
+            eje: "Algebra and Functions",
+            unidad: "Special Class: Quadratic Functions",
+            objetivo:
+              "Understand and apply quadratic functions in real-life contexts.",
+            habilidades: ["Analyze", "Model", "Reason", "Communicate"],
+          }
+        : {
+            asignatura: "Matemática",
+            eje: "Álgebra y funciones",
+            unidad: "Clase especial: Funciones cuadráticas",
+            objetivo:
+              "Comprender y aplicar funciones cuadráticas en contextos reales.",
+            habilidades: ["Analizar", "Modelar", "Razonar", "Comunicar"],
+          };
+
+    // Overrides desde formulario
+    const subj = specialFormData.subject?.trim();
+    const unit = specialFormData.unit?.trim();
+    const objective = specialFormData.objective?.trim();
+    const skillsArray = specialFormData.skills
+      ? specialFormData.skills
+          .split(/[;,]/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : null;
+
+    const overrides = {};
+    if (subj) overrides.asignatura = subj;
+    if (unit) overrides.unidad = unit;
+    if (objective) overrides.objetivo = objective;
+    if (skillsArray && skillsArray.length) overrides.habilidades = skillsArray;
+    if (specialFormData.teacherName)
+      overrides.profesor = specialFormData.teacherName;
+
+    // Contexto global de plan
+    if (planCtx) {
+      const { setPlan, setModoEspecial, setLanguage } = planCtx;
+
+      if (typeof setLanguage === "function") {
+        setLanguage(chosenLanguage);
+      }
+
+      if (typeof setModoEspecial === "function") {
+        setModoEspecial(true);
+      }
+
+      if (typeof setPlan === "function") {
+        setPlan((prev) => ({
+          ...(prev && typeof prev === "object" ? prev : {}),
+          ...planEspecialBase,
+          ...overrides,
+          esEspecial: true,
+          language: chosenLanguage,
+        }));
+      }
+    }
+
+    // Guardar meta en localStorage para que InicioClase lo recupere si hace falta
+    try {
+      const meta = {
+        ...specialFormData,
+        language: chosenLanguage,
+        modoEspecial: true,
+        createdAt: Date.now(),
+      };
+      localStorage.setItem("pragma:specialClassMeta", JSON.stringify(meta));
+    } catch (e) {
+      console.warn("[Home] no se pudo guardar specialClassMeta:", e);
+    }
+
+    const url = `/InicioClase?special=1&lang=${encodeURIComponent(
+      chosenLanguage
+    )}`;
+
+    try {
+      nav(url, {
+        state: {
+          from: "home-clase-especial",
+          modoEspecial: true,
+          language: chosenLanguage,
+          special: true,
+          specialMeta: { ...specialFormData },
+        },
+      });
+    } catch (err) {
+      window.location.assign(url);
+    } finally {
+      setShowSpecialForm(false);
     }
   };
 
@@ -1245,8 +1441,19 @@ export default function Home() {
               estudiantes con QR, nubes de palabras y carreras, y cierra con
               evidencias… sin complicarte.
             </p>
-
+           
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <HintButton
+  as="button"
+  style={{
+    ...btnPrimary,
+    background: "linear-gradient(90deg,#22c55e,#16a34a)",
+  }}
+  hint="Mira en segundos cómo se verá tu clase automática sin configurar nada."
+  onClick={() => nav("/demo")}
+>
+  🚀 Ver clase en acción
+</HintButton>
               {/* Probar gratis */}
               <HintButton
                 as="button"
@@ -1305,8 +1512,8 @@ export default function Home() {
               <HintButton
                 as="button"
                 style={btnGhost}
-                hint="Abre una clase fuera de la planificación, con selección de idioma."
-                onClick={() => nav("/clase-especial")}
+                hint="Abre una clase fuera de la planificación, respetando el idioma seleccionado."
+                onClick={handleClaseEspecialClick}
               >
                 🧪 Clase especial
               </HintButton>
@@ -1608,6 +1815,417 @@ export default function Home() {
         data-test="slogan-banner"
       ></div>
 
+      {/* 🧪 Modal para elegir idioma de Clase especial */}
+      {showSpecialModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200000,
+          }}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: 16,
+              maxWidth: 360,
+              width: "90%",
+              padding: 20,
+              boxShadow: "0 18px 45px rgba(15,23,42,0.35)",
+            }}
+          >
+            <h2
+              style={{
+                marginTop: 0,
+                marginBottom: 8,
+                fontSize: 20,
+                fontWeight: 800,
+                color: COLORS.textDark,
+              }}
+            >
+              Special Class / Clase especial
+            </h2>
+            <p
+              style={{
+                ...pMuted,
+                marginBottom: 12,
+                fontSize: 14,
+              }}
+            >
+              Choose the language for this special class.
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                marginBottom: 16,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setSpecialLanguage("es")}
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border:
+                    specialLanguage === "es"
+                      ? "2px solid #0ea5e9"
+                      : "1px solid #e5e7eb",
+                  background:
+                    specialLanguage === "es" ? "#f0f9ff" : "#ffffff",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Español
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpecialLanguage("en")}
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border:
+                    specialLanguage === "en"
+                      ? "2px solid #0ea5e9"
+                      : "1px solid #e5e7eb",
+                  background:
+                    specialLanguage === "en" ? "#f0f9ff" : "#ffffff",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                English
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowSpecialModal(false)}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                  background: "#ffffff",
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmSpecialClass}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "linear-gradient(90deg,#2193b0,#6dd5ed)",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                Start special class
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🧾 Modal para datos de la Clase especial */}
+      {showSpecialForm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200001,
+          }}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: 16,
+              maxWidth: 480,
+              width: "95%",
+              padding: 20,
+              boxShadow: "0 18px 45px rgba(15,23,42,0.35)",
+            }}
+          >
+            {specialLanguage === "en" ? (
+              <>
+                <h2
+                  style={{
+                    marginTop: 0,
+                    marginBottom: 8,
+                    fontSize: 20,
+                    fontWeight: 800,
+                    color: COLORS.textDark,
+                  }}
+                >
+                  Configure your special class
+                </h2>
+                <p style={{ ...pMuted, marginBottom: 12, fontSize: 14 }}>
+                  These details will appear in <strong>InicioClase</strong> in
+                  English (Unit, Objective, Skills, etc.).
+                </p>
+              </>
+            ) : (
+              <>
+                <h2
+                  style={{
+                    marginTop: 0,
+                    marginBottom: 8,
+                    fontSize: 20,
+                    fontWeight: 800,
+                    color: COLORS.textDark,
+                  }}
+                >
+                  Configura tu clase especial
+                </h2>
+                <p style={{ ...pMuted, marginBottom: 12, fontSize: 14 }}>
+                  Estos datos aparecerán en <strong>InicioClase</strong> (Unidad,
+                  Objetivo, Habilidades, etc.).
+                </p>
+              </>
+            )}
+
+            <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
+              {/* Nombre profesor */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 4,
+                  }}
+                >
+                  {specialLanguage === "en"
+                    ? "Teacher name"
+                    : "Nombre del profesor"}
+                </label>
+                <input
+                  type="text"
+                  value={specialFormData.teacherName}
+                  onChange={(e) =>
+                    updateSpecialField("teacherName", e.target.value)
+                  }
+                  placeholder={
+                    specialLanguage === "en"
+                      ? "e.g. Professor Freddy Contreras"
+                      : "Ej: Profesor Freddy Contreras"
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                    fontSize: 14,
+                  }}
+                />
+              </div>
+
+              {/* Asignatura */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 4,
+                  }}
+                >
+                  {specialLanguage === "en" ? "Subject" : "Asignatura"}
+                </label>
+                <input
+                  type="text"
+                  value={specialFormData.subject}
+                  onChange={(e) =>
+                    updateSpecialField("subject", e.target.value)
+                  }
+                  placeholder={
+                    specialLanguage === "en"
+                      ? "e.g. Mathematics"
+                      : "Ej: Matemática"
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                    fontSize: 14,
+                  }}
+                />
+              </div>
+
+              {/* Unidad */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 4,
+                  }}
+                >
+                  {specialLanguage === "en" ? "Unit" : "Unidad"}
+                </label>
+                <input
+                  type="text"
+                  value={specialFormData.unit}
+                  onChange={(e) => updateSpecialField("unit", e.target.value)}
+                  placeholder={
+                    specialLanguage === "en"
+                      ? "e.g. Numbers and operations"
+                      : "Ej: Números y operaciones"
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                    fontSize: 14,
+                  }}
+                />
+              </div>
+
+              {/* Objetivo */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 4,
+                  }}
+                >
+                  {specialLanguage === "en"
+                    ? "Objective"
+                    : "Objetivo de la clase"}
+                </label>
+                <textarea
+                  value={specialFormData.objective}
+                  onChange={(e) =>
+                    updateSpecialField("objective", e.target.value)
+                  }
+                  rows={3}
+                  placeholder={
+                    specialLanguage === "en"
+                      ? "Describe the learning objective for this special class..."
+                      : "Describe el objetivo de aprendizaje de esta clase especial..."
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                    fontSize: 14,
+                    resize: "vertical",
+                  }}
+                />
+              </div>
+
+              {/* Habilidades */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 4,
+                  }}
+                >
+                  {specialLanguage === "en"
+                    ? "Skills (comma separated)"
+                    : "Habilidades (separadas por comas)"}
+                </label>
+                <input
+                  type="text"
+                  value={specialFormData.skills}
+                  onChange={(e) =>
+                    updateSpecialField("skills", e.target.value)
+                  }
+                  placeholder={
+                    specialLanguage === "en"
+                      ? "e.g. Analyze, Reason, Communicate"
+                      : "Ej: Analizar, Razonar, Comunicar"
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #e5e7eb",
+                    fontSize: 14,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginTop: 4,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowSpecialForm(false)}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                  background: "#ffffff",
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+              >
+                {specialLanguage === "en" ? "Back" : "Volver"}
+              </button>
+              <button
+                type="button"
+                onClick={launchSpecialClass}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "linear-gradient(90deg,#22c55e,#16a34a)",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                {specialLanguage === "en"
+                  ? "Start class with these details"
+                  : "Iniciar clase con estos datos"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de autenticación */}
       <AuthModal
         open={authOpen}
@@ -1680,3 +2298,10 @@ function FAQ({ q, a }) {
     </div>
   );
 }
+
+
+
+
+
+
+

@@ -20,7 +20,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 
 /* Ã°Å¸â€˜â€¡ CAMBIO: importar el worker ESM (.mjs) y asignarlo */
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+// pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
 /* ===== Copias originales (NO eliminadas) Ã¢â‚¬â€ comentadas para evitar colisiÃƒÂ³n ===== */
 // import "react-pdf/dist/Page/AnnotationLayer.css";
