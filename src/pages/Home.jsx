@@ -8,6 +8,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../lib/api";
 import AuthModal from "../components/AuthModal";
 import { PlanContext } from "../context/PlanContext"; // ✅ NUEVO
+import WorldPlatformIntro from "../home/WorldPlatformIntro";
+import AutoClassShowcase from "../home/AutoClassShowcase";
+import FutureClassDemo from "../components/home/FutureClassDemo";
+import EcosystemPlatform from "../components/home/EcosystemPlatform";
+import FourWorldsPlatform from "../components/home/FourWorldsPlatform";
+import TransformationMessage from "../components/home/TransformationMessage";
+
+
 
 const BACKEND_URL =
   (import.meta && import.meta.env && import.meta.env.VITE_BACKEND_URL)
@@ -1358,7 +1366,52 @@ export default function Home() {
 
       <div style={container}>
         <HeroIntro />
+         <WorldPlatformIntro />
+         <FutureClassDemo />
+         <TransformationMessage />
+         <EcosystemPlatform />
+         <FourWorldsPlatform />
+        {/* Cómo funciona */}
+        <div id="como-funciona" style={{ ...section }}>
+          <h2 style={h2}>Un día con PragmaProfe</h2>
+          <div style={grid()}>
+            <StepCard
+              step="07.55"
+              title="Llegas al Colegio"
+              text="La clase ya está abierta"
+            />
+            <StepCard
+              step="08:00"
+              title="La IA detecta"
+              text="Curso, Asignatura, OA, Unidad, Contenido específico"
+            />
+            <StepCard
+              step="08:03"
+              title="Los alumnos escanean el QR"
+              text="
+██████████████
 
+32 estudiantes conectados"
+            />
+            <StepCard
+              step="08:05"
+              title="Empieza una nube de palabras"
+              text="██████████
+
+━━━━━━━━━━━━━━━━━━━━━━"
+            />
+            <StepCard
+              step="08:15"
+              title="Comienza Gincana Nexus"
+              text="Juego de Aventura con estaciones y emociones"
+            />
+            <StepCard
+              step="08:35"
+              title="Gincana Nexus da las calificaciones del juego"
+              text="Tienes registros evaluativos de la clase"
+            />
+          </div>
+        </div>
         {/* Eslogan bajo Hero */}
         <div style={{ textAlign: "center", marginTop: 8 }}>
           <div
@@ -1369,7 +1422,6 @@ export default function Home() {
             }}
             data-test="slogan-under-hero"
           >
-            De un profe para los profes
           </div>
         </div>
 
@@ -1443,81 +1495,65 @@ export default function Home() {
             </p>
            
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <HintButton
-  as="button"
-  style={{
-    ...btnPrimary,
-    background: "linear-gradient(90deg,#22c55e,#16a34a)",
-  }}
-  hint="Mira en segundos cómo se verá tu clase automática sin configurar nada."
-  onClick={() => nav("/demo")}
->
-  🚀 Ver clase en acción
-</HintButton>
-              {/* Probar gratis */}
-              <HintButton
-                as="button"
-                style={btnPrimary}
-                hint={
-                  "Usa todas las funciones Pro durante 7 días. Sin tarjeta. Al final tú decides si sigues o no."
-                }
-                onClick={() => nav("/registro")}
-              >
-                🎁 Probar gratis 7 días
-              </HintButton>
 
-              {/* Suscribirse */}
-              <HintButton
-                as="button"
-                style={{
-                  ...btnGhost,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: loadingSub ? 0.7 : 1,
-                  pointerEvents: loadingSub ? "none" : "auto",
-                }}
-                hint={
-                  "Te llevamos a la pantalla de pago seguro. Si aún no inicias sesión te la pedimos primero."
-                }
-                onClick={(e) => {
-                  try {
-                    e.preventDefault();
-                  } catch {}
-                  nav("/pago", { state: { from: "suscripcion" } });
-                }}
-                disabled={loadingSub}
-              >
-                💳 Suscribirse
-              </HintButton>
+  {/* BOTÓN PRINCIPAL */}
+  <HintButton
+    as="button"
+    style={{
+      ...btnPrimary,
+      background: "linear-gradient(90deg,#0ea5e9,#0284c7)",
+    }}
+    hint="Comienza inmediatamente con PragmaProfe y descubre cómo preparar una clase completa en minutos."
+    onClick={() => nav("/registro")}
+  >
+    🎁 Comenzar ahora
+  </HintButton>
 
-              {/* Ver planes */}
-              <HintButton
-                as="button"
-                style={btnGhost}
-                hint={
-                  "Mira qué incluye cada plan (Free, Básico, Pro): objetivos sugeridos, seguimiento, QR asistencia, etc."
-                }
-                onClick={(e) => {
-                  try {
-                    e.preventDefault();
-                  } catch {}
-                  nav("/planes");
-                }}
-              >
-                Ver planes
-              </HintButton>
+  {/* VIDEO */}
+  <HintButton
+    as="button"
+    style={{
+      ...btnPrimary,
+      background: "linear-gradient(90deg,#22c55e,#16a34a)",
+    }}
+    hint="Observa una demostración real de una clase preparada automáticamente con PragmaProfe."
+    onClick={() => {
+      const video = document.querySelector("iframe");
+      if (video) {
+        video.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }}
+  >
+    ▶️ Ver clase en acción
+  </HintButton>
 
-              {/* 🆕 Clase especial */}
-              <HintButton
-                as="button"
-                style={btnGhost}
-                hint="Abre una clase fuera de la planificación, respetando el idioma seleccionado."
-                onClick={handleClaseEspecialClick}
-              >
-                🧪 Clase especial
-              </HintButton>
-            </div>
+  {/* EXPLORAR */}
+  <HintButton
+    as="button"
+    style={btnGhost}
+    hint="Recorre todas las funciones de PragmaProfe y descubre cómo trabaja todo el ecosistema."
+    onClick={() => {
+      const seccion = document.getElementById("producto");
+      if (seccion) {
+        seccion.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      } else {
+        window.scrollTo({
+          top: window.innerHeight,
+          behavior: "smooth",
+        });
+      }
+    }}
+  >
+    📖 Explorar PragmaProfe
+  </HintButton>
+
+</div>
 
             {hoverHelp && (
               <div
@@ -1604,125 +1640,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Lo que obtienes */}
-        <div style={{ ...section }}>
-          <h2 style={h2}>Lo que obtienes</h2>
-          <div style={grid()}>
-            <FeatureCard
-              title="Planificador inteligente"
-              text="Importa tu horario y recibe sugerencias de unidad, objetivo y recursos alineados."
-            />
-            <FeatureCard
-              title="Participación en vivo"
-              text="Comparte un QR y recoge respuestas al instante con nubes de palabras y carreras."
-            />
-            <FeatureCard
-              title="Evidencias en un clic"
-              text="Guarda resultados por clase y registra la participación del curso."
-            />
-            <FeatureCard
-              title="Privado y simple"
-              text="Login con Google. Datos en Firebase. Sin instalaciones."
-            />
-          </div>
-        </div>
-
-        {/* Cómo funciona */}
-        <div id="como-funciona" style={{ ...section }}>
-          <h2 style={h2}>Cómo funciona</h2>
-          <div style={grid()}>
-            <StepCard
-              step="Paso 1"
-              title="Planifica"
-              text="Define unidad, objetivo y habilidades para el bloque."
-            />
-            <StepCard
-              step="Paso 2"
-              title="Comparte"
-              text="Muestra el QR; cada estudiante responde desde su móvil."
-            />
-            <StepCard
-              step="Paso 3"
-              title="Observa"
-              text="La nube y el progreso aparecen en tiempo real."
-            />
-            <StepCard
-              step="Paso 4"
-              title="Cierra"
-              text="Guarda evidencias y resume la clase."
-            />
-          </div>
-        </div>
-
-        {/* Pensado para tu contexto */}
-        <div id="docentes" style={{ ...section }}>
-          <h2 style={h2}>Pensado para tu contexto</h2>
-          <div style={grid()}>
-            <FeatureCard
-              title="Educación Básica"
-              text="Actividades rápidas para iniciar y cerrar con participación."
-            />
-            <FeatureCard
-              title="Educación Media"
-              text="Evaluación formativa en tiempo real y evidencias."
-            />
-            <FeatureCard
-              title="Preuniversitario"
-              text="Práctica ágil y métricas de avance."
-            />
-          </div>
-
-          <div style={{ marginTop: 8 }}>
-            <Link
-              to="/participa"
-              style={{
-                color: "#0ea5e9",
-                textDecoration: "none",
-              }}
-            >
-              ¿Eres estudiante? Mira cómo participar →
-            </Link>
-          </div>
-        </div>
-
-        {/* Nuestro por qué */}
-        <div style={{ ...section }}>
-          <h2 style={h2}>Nuestro por qué</h2>
-          <div style={grid()}>
-            <FeatureCard
-              title="Misión"
-              text="Facilitar clases activas y alineadas al currículo, ahorrando tiempo al docente y elevando la participación."
-            />
-            <FeatureCard
-              title="Visión"
-              text="Convertir cada clase en una experiencia participativa basada en datos, accesible para cualquier escuela."
-            />
-          </div>
-        </div>
-
-        {/* Preguntas frecuentes */}
-        <div id="faq" style={{ ...section }}>
-          <h2 style={h2}>Preguntas frecuentes</h2>
-          <div style={grid()}>
-            <FAQ
-              q="¿Mis estudiantes necesitan cuenta?"
-              a="No. Responden desde un enlace/QR sin registrarse."
-            />
-            <FAQ
-              q="¿Funciona sin internet?"
-              a="Necesitas conexión para ver respuestas en tiempo real."
-            />
-            <FAQ
-              q="¿Qué datos guardan?"
-              a="Solo lo necesario para la clase y tu planificación; puedes borrar cuando quieras."
-            />
-            <FAQ
-              q="¿Tiene costo?"
-              a="Prueba Gratis por 7 días y luego te suscribes. Planes para equipos próximamente."
-            />
           </div>
         </div>
 
