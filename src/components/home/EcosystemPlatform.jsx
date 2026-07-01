@@ -46,20 +46,102 @@ export default function EcosystemPlatform() {
         ))}
       </div>
 
-      <div style={soonGrid}>
-        <Soon title="Google Classroom" />
-        <Soon title="Microsoft Teams" />
-        <Soon title="Moodle" />
-      </div>
+      <div
+  style={{
+    marginTop: 18,
+    padding: 18,
+    borderRadius: 20,
+    background: "#f8fafc",
+    border: "1px solid #dbeafe",
+  }}
+>
+  <div
+    style={{
+      fontWeight: 900,
+      fontSize: 20,
+      color: "#0f172a",
+      marginBottom: 8,
+    }}
+  >
+    🚀 Ecosistema en expansión
+  </div>
+
+  <p
+    style={{
+      color: "#475569",
+      marginTop: 0,
+      marginBottom: 18,
+      lineHeight: 1.6,
+    }}
+  >
+    PragmaProfe está diseñado para integrarse con los principales entornos
+    educativos utilizados en escuelas, universidades y organizaciones.
+  </p>
+
+  <div style={soonGrid}>
+    <Soon
+      title="Google Classroom"
+      desc="Sincronización de cursos y tareas."
+    />
+
+    <Soon
+      title="Microsoft Teams"
+      desc="Acceso y gestión desde Teams."
+    />
+
+    <Soon
+      title="Moodle"
+      desc="Importación automática de cursos."
+    />
+  </div>
+
+  <div
+    style={{
+      marginTop: 16,
+      color: "#64748b",
+      fontSize: 14,
+      textAlign: "center",
+      fontStyle: "italic",
+    }}
+  >
+    Estas integraciones forman parte de la hoja de ruta de PragmaProfe.
+  </div>
+</div>
     </section>
   );
 }
 
-function Soon({ title }) {
+function Soon({ title, desc }) {
   return (
     <div style={soon}>
-      <span>{title}</span>
-      <strong>Próximamente</strong>
+      <div>
+        <div
+          style={{
+            fontWeight: 900,
+            color: "#0f172a",
+            marginBottom: 4,
+          }}
+        >
+          {title}
+        </div>
+
+        <div
+          style={{
+            fontSize: 14,
+            color: "#64748b",
+          }}
+        >
+          {desc}
+        </div>
+      </div>
+
+      <strong
+        style={{
+          color: "#0891b2",
+        }}
+      >
+        Futuro
+      </strong>
     </div>
   );
 }
