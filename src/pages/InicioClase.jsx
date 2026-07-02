@@ -398,6 +398,7 @@ function InicioClaseInner() {
   const [asignaturaProfe, setAsignaturaProfe] = useState("");
   const [horaActual, setHoraActual] = useState("");
   const [claseActual, setClaseActual] = useState(null);
+  const [fallbackClase, setFallbackClase] = useState(null);
   const [planSug, setPlanSug] = useState(null);
   const [preguntaClase, setPreguntaClase] = useState(lang === "en" ? "Which word best represents the last class?" : "¿Qué palabra representa mejor la última clase?");
   const [ultimos, setUltimos] = useState([]);
@@ -553,6 +554,15 @@ function InicioClaseInner() {
     })();
   }, [authed, asignaturaProfe, isEspecial, lang]);
 
+useEffect(() => {
+  fetch("/data/inicio_clase_fallback.json")
+    .then((res) => res.json())
+    .then((data) => setFallbackClase(data))
+    .catch((err) => {
+      console.warn("No se pudo cargar inicio_clase_fallback.json", err);
+    });
+}, []);
+
   useEffect(() => {
     (async () => {
       let code = salaCode; if (!code) { code = randCode(); localStorage.setItem("salaCode", code); setSalaCode(code); }
@@ -669,6 +679,53 @@ function InicioClaseInner() {
   const debugData = { lang, isEspecial, tituloEspecial, objetivoEspecial, currentSlotId, salaCode, plan, authed, isAnon, claseActual, curriculoLoaded: !!curriculo };
   const asistentesCount = presentes?.length || 0;
 
+  // ✅ Clase segura: primero usa datos reales; si fallan, usa el JSON fallback.
+  const claseSegura = claseActual || fallbackClase || {};
+  const profesorSeguro =
+    nombre && nombre !== "Profesor" ? nombre : fallbackClase?.profesor || "Profesor";
+  const colegioSeguro = fallbackClase?.colegio || "Institución educativa";
+  const sloganSeguro = slogan || fallbackClase?.slogan || DEFAULT_SLOGAN;
+  const asignaturaSegura =
+    claseSegura?.asignatura || asignaturaProfe || fallbackClase?.asignatura || "(sin asignatura)";
+  const cursoSeguro =
+    claseSegura?.curso ||
+    fallbackClase?.curso ||
+    [claseSegura?.nivel, claseSegura?.seccion].filter(Boolean).join(" ") ||
+    "(sin curso)";
+  const unidadSegura =
+    claseSegura?.unidad || (isEspecial ? tituloEspecial : "") || fallbackClase?.unidad || "(sin unidad)";
+  const objetivoCurricularSeguro =
+    claseSegura?.objetivoCurricular ||
+    claseSegura?.oa ||
+    claseVigente?.oa ||
+    fallbackClase?.objetivoCurricular ||
+    "";
+  const objetivoClaseSeguro =
+    claseSegura?.objetivoClase ||
+    claseSegura?.objetivo ||
+    (isEspecial ? objetivoEspecial : "") ||
+    fallbackClase?.objetivoClase ||
+    fallbackClase?.objetivo ||
+    "(sin objetivo)";
+  const habilidadesSeguras = Array.isArray(claseSegura?.habilidades)
+    ? claseSegura.habilidades
+    : Array.isArray(fallbackClase?.habilidades)
+      ? fallbackClase.habilidades
+      : String(claseSegura?.habilidades || "(sin habilidades)")
+          .split(/[;,·]/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+  const preguntaSegura =
+    preguntaClase || fallbackClase?.preguntaClase || "¿Qué palabra representa mejor la clase de hoy?";
+  const recursosSeguros = Array.isArray(fallbackClase?.recursos)
+    ? fallbackClase.recursos
+    : ["QR activo", "Nube de palabras", "Evidencias", "Gincana Nexus"];
+  const fechaClase = new Date().toLocaleDateString("es-CL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
   const handleIrADesarrollo = () => {
     const ficha = makeFicha(); saveCurrentSlot();
     navigate("/desarrollo", { state: { slotId: currentSlotId || "0-0", endMs: Date.now(), clase: claseActual || null, ficha, nombre, especial: isEspecial, lang, tituloEspecial, objetivoEspecial, notasEspeciales } });
@@ -699,148 +756,545 @@ function InicioClaseInner() {
         </div>
       )}
 
-      <div style={{ ...row("1rem"), marginBottom:"1rem" }}>
-        <div style={card}>
-          <div style={{ fontWeight:800, fontSize:18, marginBottom:4 }}>{horaActual}</div>
-          <div style={{ fontSize:13, color:COLORS.textMuted, marginBottom:8 }}>Inicio de clase — activación</div>
-          <div style={{ fontSize:12, fontWeight:600, marginBottom:4 }}>Cuenta regresiva (10 min)</div>
-          <div style={{ fontSize:26, fontFamily:"monospace", marginBottom:8 }}>{formatMMSS(remaining.m, remaining.s)}</div>
-          <button style={btnTiny} onClick={resetCountdown}>Reiniciar cronómetro</button>
-          <div style={{ marginTop:12, fontSize:11, color:COLORS.textMuted }}>Slot actual: <strong>{currentSlotId}</strong></div>
+      {/* ───────────────── PANTALLA DE MANDO DEL PROFESOR ───────────────── */}
+      <div
+        style={{
+          maxWidth: 1320,
+          margin: "0 auto",
+          display: "grid",
+          gap: "1rem",
+        }}
+      >
+        <section
+          style={{
+            background: "linear-gradient(135deg, rgba(15,23,42,.96), rgba(14,116,144,.96))",
+            border: "1px solid rgba(255,255,255,.18)",
+            borderRadius: 28,
+            padding: "1.3rem",
+            boxShadow: "0 28px 80px rgba(2,6,23,.24)",
+            color: "#ffffff",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "1rem",
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: "inline-flex",
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,.12)",
+                  border: "1px solid rgba(255,255,255,.18)",
+                  color: "#a5f3fc",
+                  fontWeight: 900,
+                  marginBottom: 12,
+                }}
+              >
+                InicioClase · Pantalla de mando docente
+              </div>
+
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: "clamp(34px,5vw,68px)",
+                  lineHeight: .95,
+                  letterSpacing: "-2px",
+                }}
+              >
+                Buenos días, {profesorSeguro.split(" ")[0] || "profesor"} 👋
+              </h1>
+
+              <p
+                style={{
+                  margin: "12px 0 0",
+                  color: "#dbeafe",
+                  fontSize: 18,
+                  lineHeight: 1.5,
+                  maxWidth: 850,
+                }}
+              >
+                La clase está lista para proyectarse: curso, objetivo, QR,
+                participación y evidencias en un solo lugar.
+              </p>
+            </div>
+
+            <div
+              style={{
+                minWidth: 230,
+                padding: 16,
+                borderRadius: 22,
+                background: "rgba(255,255,255,.10)",
+                border: "1px solid rgba(255,255,255,.16)",
+                textAlign: "right",
+              }}
+            >
+              <div style={{ fontSize: 14, color: "#bae6fd", fontWeight: 800 }}>
+                {fechaClase}
+              </div>
+              <div style={{ fontSize: 38, fontWeight: 950, lineHeight: 1, marginTop: 6 }}>
+                {horaActual || "--:--"}
+              </div>
+              <div style={{ fontSize: 13, color: "#dbeafe", marginTop: 8 }}>
+                Slot actual: <strong>{currentSlotId}</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(320px, 1.25fr) minmax(280px, .75fr)",
+            gap: "1rem",
+            alignItems: "stretch",
+          }}
+        >
+          {/* Información principal de la clase */}
+          <section
+            style={{
+              ...card,
+              borderRadius: 26,
+              padding: "1.25rem",
+              boxShadow: "0 24px 60px rgba(15,23,42,.14)",
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              <InfoTile icon="👨‍🏫" label="Profesor" value={profesorSeguro} />
+              <InfoTile icon="🏫" label="Institución" value={colegioSeguro} />
+              <InfoTile icon="📘" label="Asignatura" value={asignaturaSegura} />
+              <InfoTile icon="🎓" label="Curso" value={cursoSeguro} />
+            </div>
+
+            <div
+              style={{
+                borderRadius: 24,
+                padding: "1rem",
+                background:
+                  "radial-gradient(circle at top right, rgba(14,165,233,.10), transparent 35%), #f8fafc",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <div style={{ display: "grid", gap: 14 }}>
+                <BigInfo
+                  icon="📚"
+                  label="Unidad"
+                  value={unidadSegura}
+                />
+
+                {objetivoCurricularSeguro && (
+                  <BigInfo
+                    icon="🎯"
+                    label="Objetivo curricular"
+                    value={objetivoCurricularSeguro}
+                  />
+                )}
+
+                <BigInfo
+                  icon="✅"
+                  label="Objetivo de esta clase"
+                  value={objetivoClaseSeguro}
+                />
+
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#64748b",
+                      fontWeight: 950,
+                      textTransform: "uppercase",
+                      letterSpacing: ".08em",
+                      marginBottom: 8,
+                    }}
+                  >
+                    🧠 Habilidades que se desarrollarán hoy
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {habilidadesSeguras.length ? (
+                      habilidadesSeguras.map((h) => (
+                        <span
+                          key={h}
+                          style={{
+                            display: "inline-flex",
+                            padding: "8px 11px",
+                            borderRadius: 999,
+                            background: "#ecfeff",
+                            color: "#0e7490",
+                            fontWeight: 900,
+                            fontSize: 14,
+                          }}
+                        >
+                          {h}
+                        </span>
+                      ))
+                    ) : (
+                      <span style={{ color: COLORS.textMuted }}>(sin habilidades)</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {isEspecial && notasEspeciales && (
+              <div
+                style={{
+                  marginTop: 12,
+                  fontSize: 13,
+                  padding: 12,
+                  background: "#fefce8",
+                  borderRadius: 14,
+                  border: "1px dashed #eab308",
+                }}
+              >
+                <strong>Notas del profesor: </strong>{notasEspeciales}
+              </div>
+            )}
+
+            {objetivoIA && (
+              <div
+                style={{
+                  marginTop: 12,
+                  fontSize: 13,
+                  padding: 12,
+                  background: "#eff6ff",
+                  borderRadius: 14,
+                  border: "1px dashed #60a5fa",
+                }}
+              >
+                <div style={{ fontWeight: 800, marginBottom: 4 }}>
+                  {LABELS.es.objetivoNubeIdea}
+                </div>
+                <div>{objetivoIA}</div>
+              </div>
+            )}
+
+            {!isEspecial && evalsProximas.length > 0 && (
+              <div style={{ marginTop: 14, display:"flex", flexDirection:"column", gap:6 }}>
+                <div style={{ fontSize:12, fontWeight:900, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:1 }}>
+                  📋 Evaluaciones próximas
+                </div>
+                {evalsProximas.map((ev) => {
+                  const restantes = ev.clasesRestantes;
+                  const colorBg = restantes <= 2 ? "#fef2f2" : restantes <= 5 ? "#fff7ed" : "#f0fdf4";
+                  const colorBorder = restantes <= 2 ? "#fca5a5" : restantes <= 5 ? "#fcd34d" : "#86efac";
+                  const colorText = restantes <= 2 ? "#dc2626" : restantes <= 5 ? "#d97706" : "#16a34a";
+                  return (
+                    <div key={ev.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius:12, background:colorBg, border:`1px solid ${colorBorder}`, fontSize:12 }}>
+                      <span>
+                        <strong>{ev.nombre}</strong>
+                        <span style={{ color:COLORS.textMuted, marginLeft:6 }}>
+                          {new Date(ev.fecha + "T12:00:00").toLocaleDateString("es-CL", { day:"numeric", month:"short" })}
+                        </span>
+                      </span>
+                      <span style={{ fontWeight:900, color:colorText, whiteSpace:"nowrap", marginLeft:8 }}>
+                        {restantes === 0 ? "¡Hoy!" : `${restantes} clase${restantes !== 1 ? "s" : ""}`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div
+              style={{
+                borderTop: `1px dashed ${COLORS.border}`,
+                marginTop: 18,
+                paddingTop: 14,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <button style={btnWhite} onClick={handleIrADesarrollo}>🚀 {labels.irDesarrollo}</button>
+              <button style={btnTiny} onClick={() => navigate(getInicioClasePath())}>{labels.volverInicio}</button>
+              <button style={btnTiny} onClick={() => navigate("/horario")}>🗓️ {labels.editarHorario}</button>
+              <button style={{ ...btnTiny, color:"#ef4444" }} onClick={nuevaSala}>🔄 Nueva sala</button>
+            </div>
+
+            {saveError && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#b91c1c" }}>
+                {saveError}
+              </div>
+            )}
+          </section>
+
+          {/* Panel lateral: QR, cronómetro, conexión */}
+          <aside
+            style={{
+              display: "grid",
+              gap: "1rem",
+            }}
+          >
+            <div
+              style={{
+                ...card,
+                borderRadius: 26,
+                padding: "1.15rem",
+                textAlign: "center",
+                boxShadow: "0 24px 60px rgba(15,23,42,.14)",
+              }}
+            >
+              <div style={{ fontSize: 13, color: COLORS.textMuted, fontWeight: 900, marginBottom: 4 }}>
+                ⏱ Cronómetro de activación
+              </div>
+              <div style={{ fontSize: 54, fontFamily: "monospace", fontWeight: 950, color: "#0f172a", lineHeight: 1 }}>
+                {formatMMSS(remaining.m, remaining.s)}
+              </div>
+              <button style={{ ...btnTiny, marginTop: 12 }} onClick={resetCountdown}>
+                Reiniciar cronómetro
+              </button>
+            </div>
+
+            <div
+              style={{
+                ...card,
+                borderRadius: 26,
+                padding: "1.15rem",
+                boxShadow: "0 24px 60px rgba(15,23,42,.14)",
+              }}
+            >
+              <div style={{ fontWeight: 950, fontSize: 16, marginBottom: 10 }}>
+                📱 QR de ingreso
+              </div>
+
+              <div
+                style={{
+                  background: "#f8fafc",
+                  borderRadius: 18,
+                  padding: 12,
+                  marginBottom: 10,
+                  display: "flex",
+                  justifyContent: "center",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                {participaURL && (
+                  <QRCode value={participaURL} size={170} style={{ width:"100%", maxWidth: 190, height:"auto" }} />
+                )}
+              </div>
+
+              <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 10, wordBreak:"break-all" }}>
+                {participaURL}
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 8,
+                }}
+              >
+                <MetricBox label="Conectados" value={asistentesCount} icon="👥" />
+                <MetricBox label="Sala" value={salaCode || "—"} icon="🔑" />
+              </div>
+
+              {asistentesCount === 0 && (
+                <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 10 }}>
+                  {labels.nadieEscanea}
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                ...card,
+                borderRadius: 26,
+                padding: "1.15rem",
+                boxShadow: "0 24px 60px rgba(15,23,42,.14)",
+              }}
+            >
+              <div style={{ fontWeight: 950, fontSize: 16, marginBottom: 8 }}>
+                Recursos listos
+              </div>
+
+              <div style={{ display: "grid", gap: 8 }}>
+                {recursosSeguros.map((r) => (
+                  <div
+                    key={r}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: "#0f172a",
+                    }}
+                  >
+                    <span style={{ color: "#16a34a", fontWeight: 950 }}>✓</span>
+                    <span>{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
         </div>
 
-        <div style={card}>
-          <div style={{ textAlign:"center", marginBottom:10 }}>
-            <span style={{ fontSize:28, fontWeight:900, letterSpacing:4, color:"#2193b0", textTransform:"uppercase" }}>Bienvenidos</span>
-          </div>
-          <div style={{ marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
-            <div>
-              <div style={{ fontWeight:800, fontSize:18, marginBottom:2 }}>{labels.profesor}: {nombre || "Profesor"}</div>
-              <div style={{ fontSize:12, color:COLORS.textMuted }}>{slogan}</div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(260px, .8fr) minmax(320px, 1.4fr) minmax(260px, .8fr)",
+            gap: "1rem",
+          }}
+        >
+          <div style={{ ...card, borderRadius: 24 }}>
+            <div style={{ fontWeight: 950, fontSize: 15, marginBottom: 8 }}>
+              💡 Pregunta de activación
             </div>
-            {isEspecial && <span style={{ fontSize:11, fontWeight:700, color:"#b91c1c", background:"#fee2e2", borderRadius:999, padding:"4px 10px" }}>{labels.especialTitulo}</span>}
-          </div>
-          <div style={{ marginBottom:10 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:1, marginBottom:2 }}>{labels.unidadLabel}</div>
-            <div style={{ fontSize:17, fontWeight:800, color:"#1f2937", lineHeight:1.3 }}>{claseActual?.unidad || (isEspecial ? tituloEspecial || "(sin unidad)" : "(sin unidad)")}</div>
-          </div>
-          <div style={{ marginBottom:10 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:1, marginBottom:2 }}>{labels.objetivoLabel}</div>
-            <div style={{ fontSize:16, fontWeight:700, color:"#1f2937", lineHeight:1.4 }}>{claseActual?.objetivo || (isEspecial ? objetivoEspecial || "(sin objetivo)" : "(sin objetivo)")}</div>
-          </div>
-          <div style={{ marginBottom:10 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:1, marginBottom:2 }}>{labels.habilidadesLabel}</div>
-            <div style={{ fontSize:15, fontWeight:700, color:"#2563eb", lineHeight:1.4 }}>{Array.isArray(claseActual?.habilidades) ? claseActual.habilidades.join(" · ") : claseActual?.habilidades || "(sin habilidades)"}</div>
-          </div>
-          <div style={{ display:"flex", gap:16, marginBottom:10 }}>
-            <div>
-              <div style={{ fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:1, marginBottom:2 }}>{labels.cursoLabel}</div>
-              <div style={{ fontSize:15, fontWeight:700, color:"#1f2937" }}>{claseActual?.curso || "(sin curso)"}</div>
+            <div style={{ fontSize: 14, marginBottom: 12, color: "#0f172a", lineHeight: 1.45 }}>
+              {preguntaSegura}
             </div>
-            {claseActual?.seccion && (
-              <div>
-                <div style={{ fontSize:11, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:1, marginBottom:2 }}>{labels.seccionLabel}</div>
-                <div style={{ fontSize:15, fontWeight:700, color:"#1f2937" }}>{claseActual.seccion}</div>
+            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
+              {LABELS.es.objetivoNubeTitulo}
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 10 }}>
+              {LABELS.es.objetivoNubeDesc}
+            </div>
+            <button style={btnTiny} onClick={objetivoDesdeNube} disabled={savingSlot}>
+              {LABELS.es.objetivoNubeBtn}
+            </button>
+          </div>
+
+          <div style={{ ...card, borderRadius: 24 }}>
+            <div style={{ fontWeight: 950, fontSize: 15, marginBottom: 8 }}>
+              {labels.nube}
+            </div>
+            {DISABLE_CLOUD ? (
+              <div style={{ fontSize:12, color:COLORS.textMuted }}>{LABELS.es.nubeDesactivada}</div>
+            ) : !cloudData.length ? (
+              <div style={{ fontSize:12, color:COLORS.textMuted }}>{LABELS.es.nubeSinPalabras}</div>
+            ) : (
+              <div style={{ width:"100%", height:220 }}>
+                {cloudMode === "svg" && (
+                  <CloudBoundary fallback={<HtmlCloud data={cloudData} palette={palette} fontSize={fontSize} />}>
+                    <WordCloud data={cloudData} font="Segoe UI" fontWeight="bold" fontSize={fontSize} spiral="archimedean" width={520} height={220} padding={2} rotate={0} fill={(d, i) => palette[i % palette.length]} />
+                  </CloudBoundary>
+                )}
+                {cloudMode === "canvas" && <CanvasCloud data={cloudData} palette={palette} width={520} height={220} fontSize={fontSize} />}
+                {cloudMode === "html" && <HtmlCloud data={cloudData} palette={palette} fontSize={fontSize} />}
               </div>
             )}
           </div>
-          {isEspecial && notasEspeciales && (
-            <div style={{ marginTop:8, fontSize:12, padding:8, background:"#fefce8", borderRadius:8, border:"1px dashed #eab308" }}>
-              <strong>Notas del profesor: </strong>{notasEspeciales}
+
+          <div style={{ ...card, borderRadius: 24 }}>
+            <div style={{ fontWeight: 950, fontSize: 15, marginBottom: 8 }}>
+              {labels.ultimosEnvios}
             </div>
-          )}
-          {objetivoIA && (
-            <div style={{ marginTop:10, fontSize:12, padding:8, background:"#eff6ff", borderRadius:8, border:"1px dashed #60a5fa" }}>
-              <div style={{ fontWeight:700, marginBottom:4 }}>{LABELS.es.objetivoNubeIdea}</div>
-              <div>{objetivoIA}</div>
-            </div>
-          )}
-          {!isEspecial && evalsProximas.length > 0 && (
-            <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:6 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:COLORS.textMuted, textTransform:"uppercase", letterSpacing:1, marginBottom:2 }}>📋 Evaluaciones próximas</div>
-              {evalsProximas.map((ev) => {
-                const restantes = ev.clasesRestantes;
-                const colorBg = restantes <= 2 ? "#fef2f2" : restantes <= 5 ? "#fff7ed" : "#f0fdf4";
-                const colorBorder = restantes <= 2 ? "#fca5a5" : restantes <= 5 ? "#fcd34d" : "#86efac";
-                const colorText = restantes <= 2 ? "#dc2626" : restantes <= 5 ? "#d97706" : "#16a34a";
-                return (
-                  <div key={ev.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 10px", borderRadius:8, background:colorBg, border:`1px solid ${colorBorder}`, fontSize:12 }}>
-                    <span><strong>{ev.nombre}</strong><span style={{ color:COLORS.textMuted, marginLeft:6 }}>{new Date(ev.fecha + "T12:00:00").toLocaleDateString("es-CL", { day:"numeric", month:"short" })}</span></span>
-                    <span style={{ fontWeight:800, color:colorText, whiteSpace:"nowrap", marginLeft:8 }}>{restantes === 0 ? "¡Hoy!" : `${restantes} clase${restantes !== 1 ? "s" : ""}`}</span>
+            {!ultimos.length ? (
+              <div style={{ fontSize:12, color:COLORS.textMuted }}>{labels.sinRespuestas}</div>
+            ) : (
+              <div style={{ maxHeight:220, overflowY:"auto", fontSize:12 }}>
+                {ultimos.map((r) => (
+                  <div key={r.id} style={{ padding:"5px 0", borderBottom:"1px solid #e5e7eb" }}>
+                    <strong>{r.numeroLista != null ? `#${r.numeroLista} · ` : ""}</strong>
+                    <span>{r.texto}</span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ borderTop:`1px dashed ${COLORS.border}`, marginTop:16, paddingTop:12, display:"flex", gap:8, flexWrap:"wrap" }}>
-            <button style={btnWhite} onClick={handleIrADesarrollo}>{labels.irDesarrollo}</button>
-            <button style={btnTiny} onClick={() => navigate(getInicioClasePath())}>{labels.volverInicio}</button>
-            <button style={btnTiny} onClick={() => navigate("/horario")}>🗓️ {labels.editarHorario}</button>
-            <button style={{ ...btnTiny, color:"#ef4444" }} onClick={nuevaSala}>🔄 Nueva sala</button>
+                ))}
+              </div>
+            )}
           </div>
-          {saveError && <div style={{ marginTop:8, fontSize:11, color:"#b91c1c" }}>{saveError}</div>}
-        </div>
-
-        <div style={card}>
-          <div style={{ fontWeight:700, fontSize:14, marginBottom:6 }}>{labels.escanea}</div>
-          <div style={{ background:"#f9fafb", borderRadius:12, padding:8, marginBottom:8, display:"flex", justifyContent:"center" }}>
-            {participaURL && <QRCode value={participaURL} size={144} style={{ width:"100%", height:"auto" }} />}
-          </div>
-          <div style={{ fontSize:11, color:COLORS.textMuted, marginBottom:8, wordBreak:"break-all" }}>{participaURL}</div>
-          <div style={{ fontWeight:700, fontSize:13, marginBottom:4 }}>{labels.asistencia} · {labels.presentes}: {asistentesCount}</div>
-          {asistentesCount === 0 && <div style={{ fontSize:12, color:COLORS.textMuted }}>{labels.nadieEscanea}</div>}
-        </div>
-      </div>
-
-      <div style={{ ...row("1rem"), marginBottom:"1rem" }}>
-        <div style={card}>
-          <div style={{ fontWeight:700, fontSize:14, marginBottom:8 }}>Pregunta de la clase</div>
-          <div style={{ fontSize:13, marginBottom:10 }}>{preguntaClase}</div>
-          <div style={{ fontWeight:700, fontSize:13, marginBottom:4 }}>{LABELS.es.objetivoNubeTitulo}</div>
-          <div style={{ fontSize:12, color:COLORS.textMuted, marginBottom:8 }}>{LABELS.es.objetivoNubeDesc}</div>
-          <button style={btnTiny} onClick={objetivoDesdeNube} disabled={savingSlot}>{LABELS.es.objetivoNubeBtn}</button>
-        </div>
-        <div style={card}>
-          <div style={{ fontWeight:700, fontSize:14, marginBottom:6 }}>{labels.nube}</div>
-          {DISABLE_CLOUD ? (
-            <div style={{ fontSize:12, color:COLORS.textMuted }}>{LABELS.es.nubeDesactivada}</div>
-          ) : !cloudData.length ? (
-            <div style={{ fontSize:12, color:COLORS.textMuted }}>{LABELS.es.nubeSinPalabras}</div>
-          ) : (
-            <div style={{ width:"100%", height:220 }}>
-              {cloudMode === "svg" && (
-                <CloudBoundary fallback={<HtmlCloud data={cloudData} palette={palette} fontSize={fontSize} />}>
-                  <WordCloud data={cloudData} font="Segoe UI" fontWeight="bold" fontSize={fontSize} spiral="archimedean" width={520} height={220} padding={2} rotate={0} fill={(d, i) => palette[i % palette.length]} />
-                </CloudBoundary>
-              )}
-              {cloudMode === "canvas" && <CanvasCloud data={cloudData} palette={palette} width={520} height={220} fontSize={fontSize} />}
-              {cloudMode === "html" && <HtmlCloud data={cloudData} palette={palette} fontSize={fontSize} />}
-            </div>
-          )}
-        </div>
-        <div style={card}>
-          <div style={{ fontWeight:700, fontSize:14, marginBottom:6 }}>{labels.ultimosEnvios}</div>
-          {!ultimos.length ? (
-            <div style={{ fontSize:12, color:COLORS.textMuted }}>{labels.sinRespuestas}</div>
-          ) : (
-            <div style={{ maxHeight:220, overflowY:"auto", fontSize:12 }}>
-              {ultimos.map((r) => (
-                <div key={r.id} style={{ padding:"4px 0", borderBottom:"1px solid #e5e7eb" }}>
-                  <strong>{r.numeroLista != null ? `#${r.numeroLista} · ` : ""}</strong><span>{r.texto}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
       <EpicStarters
-        t={t} idioma={lang} isSpecialClass={isEspecial}
-        asignatura={claseActual?.asignatura || asignaturaProfe || "(sin asignatura)"}
-        curso={claseActual?.curso || "(sin curso)"}
-        unidad={claseActual?.unidad || tituloEspecial || "(sin unidad)"}
-        objetivo={claseActual?.objetivo || objetivoEspecial || "(sin objetivo)"}
+        t={t}
+        idioma={lang}
+        isSpecialClass={isEspecial}
+        asignatura={asignaturaSegura}
+        curso={cursoSeguro}
+        unidad={unidadSegura}
+        objetivo={objetivoClaseSeguro}
       />
+    </div>
+  );
+}
+
+
+function InfoTile({ icon, label, value }) {
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 18,
+        background: "#ffffff",
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 10px 28px rgba(15,23,42,.06)",
+      }}
+    >
+      <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
+      <div
+        style={{
+          fontSize: 11,
+          color: "#64748b",
+          fontWeight: 950,
+          textTransform: "uppercase",
+          letterSpacing: ".08em",
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: 17, fontWeight: 950, color: "#0f172a", lineHeight: 1.15 }}>
+        {value || "—"}
+      </div>
+    </div>
+  );
+}
+
+function BigInfo({ icon, label, value }) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 12,
+          color: "#64748b",
+          fontWeight: 950,
+          textTransform: "uppercase",
+          letterSpacing: ".08em",
+          marginBottom: 5,
+        }}
+      >
+        {icon} {label}
+      </div>
+      <div style={{ fontSize: 21, fontWeight: 950, color: "#0f172a", lineHeight: 1.25 }}>
+        {value || "—"}
+      </div>
+    </div>
+  );
+}
+
+function MetricBox({ icon, label, value }) {
+  return (
+    <div
+      style={{
+        padding: 10,
+        borderRadius: 16,
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontSize: 18 }}>{icon}</div>
+      <div style={{ fontSize: 22, fontWeight: 950, color: "#0f172a", lineHeight: 1 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 11, color: "#64748b", fontWeight: 800, marginTop: 4 }}>
+        {label}
+      </div>
     </div>
   );
 }

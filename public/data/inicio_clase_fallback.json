@@ -1,0 +1,29 @@
+{
+  "profesor": "Freddy Contreras",
+  "colegio": "Liceo Presidente Balmaceda",
+  "slogan": "De un profe para los profes",
+  "curso": "2° Medio B",
+  "nivel": "2° Medio",
+  "seccion": "B",
+  "asignatura": "Matemática",
+  "sala": "Sala 15",
+  "unidad": "Funciones cuadráticas",
+  "objetivoCurricular": "OA4",
+  "objetivo": "Representar funciones cuadráticas mediante tablas, gráficos y expresión algebraica.",
+  "objetivoClase": "Reconocer cómo el valor de a modifica la apertura de la parábola.",
+  "habilidades": [
+    "Representar",
+    "Analizar",
+    "Argumentar"
+  ],
+  "preguntaClase": "¿Qué palabra representa mejor lo que recuerdas de la clase anterior?",
+  "recursos": [
+    "Horario reconocido",
+    "Objetivo cargado",
+    "Recursos listos",
+    "QR generado",
+    "Nube preparada",
+    "Gincana Nexus disponible",
+    "Evidencias activas"
+  ]
+}
