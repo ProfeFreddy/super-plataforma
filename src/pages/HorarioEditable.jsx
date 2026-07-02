@@ -130,7 +130,20 @@ function generarBloques(config) {
 }
 
 function minToHHMM(min) { const h = Math.floor(min / 60); const m = min % 60; return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`; }
-function celdaVacia() { return { asignatura: "", nivel: "", seccion: "", unidad: "", unidadTitulo: "", objetivo: "", habilidades: [] }; }
+function celdaVacia() {
+  return {
+    asignatura: "",
+    nivel: "",
+    seccion: "",
+    unidad: "",
+    unidadTitulo: "",
+    objetivoCurricular: "",
+    objetivo: "",
+    objetivoClase: "",
+    habilidades: [],
+    preguntaActivacion: "",
+  };
+}
 function construirMatrizDesde(bloques) { return bloques.filter((b) => b.tipo === "clase").map(() => Array.from({ length: 5 }, () => celdaVacia())); }
 function normalizarConfigParaFS(config) { return { horaInicio: config.horaInicio, duracionMin: config.duracionMin, totalBloques: config.totalBloques, pausas: config.pausas || [] }; }
 
@@ -138,7 +151,18 @@ function rebuildMatriz(flat, clasesBloques) {
   const m = construirMatrizDesde(clasesBloques);
   for (const c of flat || []) {
     if (Number.isInteger(c.row) && Number.isInteger(c.col) && c.row < m.length && c.col < 5) {
-      m[c.row][c.col] = { asignatura: c.asignatura || "", nivel: c.nivel || "", seccion: c.seccion || "", unidad: c.unidad || "", unidadTitulo: c.unidadTitulo || c.unidad || "", objetivo: c.objetivo || "", habilidades: Array.isArray(c.habilidades) ? c.habilidades : [] };
+      m[c.row][c.col] = {
+        asignatura: c.asignatura || "",
+        nivel: c.nivel || "",
+        seccion: c.seccion || "",
+        unidad: c.unidad || "",
+        unidadTitulo: c.unidadTitulo || c.unidad || "",
+        objetivoCurricular: c.objetivoCurricular || c.oa || c.unidad || "",
+        objetivo: c.objetivo || c.objetivoClase || "",
+        objetivoClase: c.objetivoClase || c.objetivo || "",
+        habilidades: Array.isArray(c.habilidades) ? c.habilidades : [],
+        preguntaActivacion: c.preguntaActivacion || "",
+      };
     }
   }
   return m;
@@ -161,8 +185,41 @@ async function writeSlots(uid, matriz, bloqueClases, profesorNombre) {
       const cell = matriz[row]?.[col] || celdaVacia();
       if (!cell.asignatura) continue;
       const slotId = `${row}-${col}`;
-      const payload = { asignatura: cell.asignatura, nivel: cell.nivel || "", seccion: cell.seccion || "", curso: ((cell.nivel || "") + (cell.seccion ? ` ${cell.seccion}` : "")).trim(), bloque: bloqueClases[row]?.label || "", bloqueInicio: bloqueClases[row]?.inicio || "", dia: DIAS[col] || "", profesor: profesorNombre || "", unidad: cell.unidadTitulo || cell.unidad || "", objetivo: cell.objetivo || "", habilidades: Array.isArray(cell.habilidades) ? cell.habilidades : [], updatedAt: serverTimestamp() };
+      const objetivoClase = cell.objetivoClase || cell.objetivo || "";
+      const objetivoCurricular = cell.objetivoCurricular || cell.unidad || "";
+      const preguntaActivacion = cell.preguntaActivacion || (cell.unidadTitulo
+        ? `¿Qué recuerdas o sabes sobre ${cell.unidadTitulo}?`
+        : "¿Qué idea importante recuerdas de la clase anterior?");
+      const payload = {
+        asignatura: cell.asignatura,
+        nivel: cell.nivel || "",
+        seccion: cell.seccion || "",
+        curso: ((cell.nivel || "") + (cell.seccion ? ` ${cell.seccion}` : "")).trim(),
+        bloque: bloqueClases[row]?.label || "",
+        bloqueInicio: bloqueClases[row]?.inicio || "",
+        bloqueFin: bloqueClases[row]?.fin || "",
+        dia: DIAS[col] || "",
+        profesor: profesorNombre || "",
+        unidad: cell.unidadTitulo || cell.unidad || "",
+        unidadCodigo: cell.unidad || "",
+        objetivoCurricular,
+        objetivo: objetivoClase,
+        objetivoClase,
+        habilidades: Array.isArray(cell.habilidades) ? cell.habilidades : [],
+        preguntaActivacion,
+        recursos: [
+          "Horario reconocido",
+          "Objetivo cargado",
+          "Recursos listos",
+          "QR generado",
+          "Nube preparada",
+          "Gincana Nexus disponible",
+          "Evidencias activas",
+        ],
+        updatedAt: serverTimestamp(),
+      };
       await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), payload, { merge: true });
+      await setDoc(doc(db, "planificaciones", uid, "bloques", slotId), payload, { merge: true });
     }
   }
 }
@@ -233,12 +290,20 @@ function CeldaHorario({ cell, rowIdx, col, onChange }) {
     setLoadingUnidades(true);
     fetchUnidades(cell.asignatura, cell.nivel).then((u) => { setUnidades(u); setLoadingUnidades(false); });
   }, [cell.asignatura, cell.nivel]);
-  function handleAsignatura(value) { onChange(rowIdx, col, "asignatura", value); onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "habilidades", []); }
-  function handleNivel(value) { onChange(rowIdx, col, "nivel", value); onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "habilidades", []); }
+  function handleAsignatura(value) { onChange(rowIdx, col, "asignatura", value); onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivoCurricular", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "objetivoClase", ""); onChange(rowIdx, col, "habilidades", []); onChange(rowIdx, col, "preguntaActivacion", ""); }
+  function handleNivel(value) { onChange(rowIdx, col, "nivel", value); onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivoCurricular", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "objetivoClase", ""); onChange(rowIdx, col, "habilidades", []); onChange(rowIdx, col, "preguntaActivacion", ""); }
   function handleUnidad(codUnidad) {
-    if (!codUnidad) { onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "habilidades", []); return; }
+    if (!codUnidad) { onChange(rowIdx, col, "unidad", ""); onChange(rowIdx, col, "unidadTitulo", ""); onChange(rowIdx, col, "objetivoCurricular", ""); onChange(rowIdx, col, "objetivo", ""); onChange(rowIdx, col, "objetivoClase", ""); onChange(rowIdx, col, "habilidades", []); onChange(rowIdx, col, "preguntaActivacion", ""); return; }
     const u = unidades.find((x) => x.codUnidad === codUnidad);
-    if (u) { onChange(rowIdx, col, "unidad", u.codUnidad); onChange(rowIdx, col, "unidadTitulo", u.titulo); onChange(rowIdx, col, "objetivo", u.objetivo || ""); onChange(rowIdx, col, "habilidades", u.habilidades || []); }
+    if (u) {
+      onChange(rowIdx, col, "unidad", u.codUnidad);
+      onChange(rowIdx, col, "unidadTitulo", u.titulo);
+      onChange(rowIdx, col, "objetivoCurricular", u.codUnidad);
+      onChange(rowIdx, col, "objetivo", u.objetivo || "");
+      onChange(rowIdx, col, "objetivoClase", u.objetivo || "");
+      onChange(rowIdx, col, "habilidades", u.habilidades || []);
+      onChange(rowIdx, col, "preguntaActivacion", `¿Qué recuerdas o sabes sobre ${u.titulo}?`);
+    }
   }
   const tieneUnidades = unidades.length > 0;
   const unidadSeleccionada = cell.unidad || "";
@@ -260,6 +325,25 @@ function CeldaHorario({ cell, rowIdx, col, onChange }) {
           ) : (<div style={{ fontSize: 10, color: "#f59e0b", fontStyle: "italic", padding: "3px 6px", background: "#fefce8", borderRadius: 4 }}>Sin unidades en currículo</div>)}
         </div>
       )}
+      {cell.asignatura && cell.nivel && cell.unidad && (
+        <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
+          <textarea
+            style={{ ...inputStyle, minHeight: 54, fontSize: 11, resize: "vertical" }}
+            value={cell.objetivoClase || cell.objetivo || ""}
+            onChange={(e) => onChange(rowIdx, col, "objetivoClase", e.target.value)}
+            placeholder="Objetivo específico de esta clase"
+            title="Objetivo específico que verá InicioClase"
+          />
+          <input
+            style={{ ...inputStyle, fontSize: 11 }}
+            value={cell.preguntaActivacion || ""}
+            onChange={(e) => onChange(rowIdx, col, "preguntaActivacion", e.target.value)}
+            placeholder="Pregunta de activación"
+            title="Pregunta inicial para proyectar"
+          />
+        </div>
+      )}
+
       {cell.asignatura && cell.nivel && (
         <div style={{ marginTop: 5, fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "2px 6px", textAlign: "center", background: cell.unidad ? "#eff6ff" : COLORS.greenLight, color: cell.unidad ? "#2563eb" : COLORS.green }}>
           {cell.unidad ? `✓ ${cell.unidadTitulo || cell.unidad}` : `${cell.nivel}${cell.seccion ? ` ${cell.seccion}` : ""}`}

@@ -125,13 +125,13 @@ export default function Registro() {
       setSuccess(true); setError("");
       try { window.history.replaceState({}, "", window.location.pathname); } catch {}
 
-      // ✅ Nuevo flujo: Registro → OnboardingExpress (3 preguntas) → InicioClase
-      nav("/onboarding", { replace: true, state: { from: "registro" } });
+      // ✅ Flujo correcto: Registro → Horario → Planificaciones → InicioClase
+nav("/horario", { replace: true, state: { from: "registro" } });
 
-      setTimeout(() => {
-        const now = window.location.pathname + window.location.hash + window.location.search;
-        if (!now.includes("onboarding")) window.location.assign("/#/onboarding");
-      }, 450);
+setTimeout(() => {
+  const now = window.location.pathname + window.location.hash + window.location.search;
+  if (!now.toLowerCase().includes("horario")) window.location.assign("/#/horario");
+}, 450);
 
     } catch (err) {
       setError(msgFromFirebaseCode(err?.code) || "No se pudo crear la cuenta. Inténtalo nuevamente.");
