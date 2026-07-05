@@ -728,6 +728,7 @@ const cursoSeguro =
   cursoDesdeNivelSeccion ||
   "(sin curso)";
   const unidadSegura =
+  fallbackClase?.unidad ||
   claseSegura?.unidad ||
   "(sin unidad)";
   const objetivoCurricularSeguro =
@@ -737,20 +738,16 @@ const cursoSeguro =
     fallbackClase?.objetivoCurricular ||
     "";
   const objetivoClaseSeguro =
-    claseSegura?.objetivoClase ||
-    claseSegura?.objetivo ||
-    (isEspecial ? objetivoEspecial : "") ||
-    fallbackClase?.objetivoClase ||
-    fallbackClase?.objetivo ||
-    "(sin objetivo)";
-  const habilidadesSeguras = Array.isArray(claseSegura?.habilidades)
+  fallbackClase?.objetivoClase ||
+  fallbackClase?.objetivo ||
+  claseSegura?.objetivoClase ||
+  claseSegura?.objetivo ||
+  "(sin objetivo)";
+  const habilidadesSeguras = Array.isArray(fallbackClase?.habilidades)
+  ? fallbackClase.habilidades
+  : Array.isArray(claseSegura?.habilidades)
     ? claseSegura.habilidades
-    : Array.isArray(fallbackClase?.habilidades)
-      ? fallbackClase.habilidades
-      : String(claseSegura?.habilidades || "(sin habilidades)")
-          .split(/[;,·]/)
-          .map((s) => s.trim())
-          .filter(Boolean);
+    : [];
   const preguntaSegura =
     preguntaClase || fallbackClase?.preguntaClase || "¿Qué palabra representa mejor la clase de hoy?";
   const recursosSeguros = Array.isArray(fallbackClase?.recursos)
