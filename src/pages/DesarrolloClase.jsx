@@ -682,6 +682,8 @@ if (MODO_JURADO_SEGURO) {
 
   useEffect(() => {
     const run = async () => {
+      const MODO_JURADO_SEGURO = true;
+if (MODO_JURADO_SEGURO) return;
       const q = (objetivo || "").trim(); if (!q) return;
       try {
         let firstTitle = ""; let lang = "es";
