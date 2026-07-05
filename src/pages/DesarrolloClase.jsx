@@ -48,7 +48,7 @@ async function fetchJSON(url) {
   return r.json();
 }
 
-/import { getYearWeek } from "../services/PlanificadorService";
+import { getYearWeek } from "../services/PlanificadorService";
 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
@@ -527,14 +527,20 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
 
       // ✅ Leer datos de clase desde el state (propagados desde InicioClase)
       if (st.clase) {
-        setUnidad((prev) => prev || st.clase.unidad || "");
-        setObjetivo((prev) => prev || st.clase.objetivo || "");
-        const habsFromState = Array.isArray(st.clase.habilidades) ? st.clase.habilidades.join(", ") : st.clase.habilidades || "";
-        setHabilidades((prev) => prev || habsFromState);
-        if (st.clase.asignatura) setAsignatura(st.clase.asignatura);
-        if (st.clase.curso) setCurso(st.clase.curso);
-        if (!st.clase.curso && (st.clase.nivel || st.clase.seccion)) setCurso(cursoFromNivelSeccion(st.clase.nivel, st.clase.seccion));
-      }
+  const c = st.clase;
+
+  setUnidad(c.unidad || "");
+  setObjetivo(c.objetivoClase || c.objetivo || "");
+
+  const habsFromState = Array.isArray(c.habilidades)
+    ? c.habilidades.join(", ")
+    : c.habilidades || "";
+
+  setHabilidades(habsFromState);
+  setAsignatura(c.asignatura || S.noSubject);
+  setCurso(c.curso || cursoFromNivelSeccion(c.nivel, c.seccion) || S.noCourse);
+  setNombreProfesor(c.nombreProfesor || c.profesor || nombreProfesor || "Profesor");
+}
 
       if (st.slotId) { try { localStorage.setItem("__lastSlotId", st.slotId); } catch {} }
       if (Number.isFinite(+st.endMs) && +st.endMs > 0) {
