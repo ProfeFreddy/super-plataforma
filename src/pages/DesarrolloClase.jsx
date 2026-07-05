@@ -354,6 +354,39 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   const [claseVigente, setClaseVigente] = useState(null);
 
   useEffect(() => {
+  const cargarFallbackDesdeHorario = async () => {
+    try {
+      const params = new URLSearchParams(window.location.hash.split("?")[1] || "");
+      const slot =
+        location?.state?.slotId ||
+        params.get("slot") ||
+        localStorage.getItem("__lastSlotId") ||
+        "9-3";
+
+      const res = await fetch("/data/fallback/horario.json");
+      const data = await res.json();
+      const clase = data?.[slot];
+
+      if (!clase) return;
+
+      if (clase.unidad) setUnidad(clase.unidad);
+      if (clase.objetivoClase || clase.objetivo) {
+        setObjetivo(clase.objetivoClase || clase.objetivo);
+      }
+      if (Array.isArray(clase.habilidades)) {
+        setHabilidades(clase.habilidades.join(", "));
+      }
+      if (clase.asignatura) setAsignatura(clase.asignatura);
+      if (clase.curso) setCurso(clase.curso);
+    } catch (e) {
+      console.warn("[Desarrollo] fallback horario no disponible:", e);
+    }
+  };
+
+  cargarFallbackDesdeHorario();
+}, []);
+
+  useEffect(() => {
     (async () => {
       try {
         const res = await getClaseVigente(new Date());
