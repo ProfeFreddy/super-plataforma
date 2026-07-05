@@ -628,6 +628,17 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
         const cursoForOA = location?.state?.clase?.curso || curso || "";
 
         if (unidadParaOA) {
+          const MODO_JURADO_SEGURO = true;
+
+if (MODO_JURADO_SEGURO) {
+  console.warn("[Desarrollo] Modo jurado seguro activo: se omiten MINEDUC/Wikipedia para evitar CORS.");
+  setOaMinisterio(null);
+  setWikipediaUrl(null);
+  setWikiTitle("");
+  setWikiSummary("");
+  setWikiThumb("");
+  return;
+}
           const asigSlug = asigToSlug(asigForOA);
           const nivelApi = nivelToApi(cursoForOA, claseVigente?.nivel || "");
           try {
