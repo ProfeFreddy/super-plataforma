@@ -358,13 +358,17 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
       try {
         const res = await getClaseVigente(new Date());
         setClaseVigente(res);
-        if (res) {
-          if (res.unidad && !unidad) setUnidad(res.unidad);
-          if (res.objetivo && !objetivo) setObjetivo(res.objetivo);
-          if (res.habilidades && !habilidades) setHabilidades(res.habilidades);
-          if (res.asignatura && asignatura === S.noSubject) setAsignatura(res.asignatura);
-          if ((res.nivel || res.seccion) && curso === S.noCourse) setCurso(cursoFromNivelSeccion(res.nivel, res.seccion));
-        }
+        const claseFromState = location?.state?.clase;
+
+if (!claseFromState) {
+  if (res.unidad && !unidad) setUnidad(res.unidad);
+  if (res.objetivo && !objetivo) setObjetivo(res.objetivo);
+  if (res.habilidades && !habilidades) setHabilidades(res.habilidades);
+  if (res.asignatura && asignatura === S.noSubject) setAsignatura(res.asignatura);
+  if ((res.nivel || res.seccion) && curso === S.noCourse) {
+    setCurso(cursoFromNivelSeccion(res.nivel, res.seccion));
+  }
+}
       } catch (e) { console.error("[Desarrollo] getClaseVigente:", e); }
     })();
   }, []); // eslint-disable-line
