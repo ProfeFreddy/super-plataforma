@@ -610,7 +610,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
         if (!unidadInicial) {
           try {
             const uref = doc(db, "usuarios", uid); const usnap = await getDoc(uref);
-            if (usnap.exists()) { const u = usnap.data() || {}; unidadInicial = (u.unidadInicial || u.unidad || "").trim(); setUnidad((prev) => prev || unidadInicial); if (u.asignatura && asignatura === S.noSubject) setAsignatura(u.asignatura); if (u.curso && curso === S.noCourse) setCurso(u.curso); }
+            if (usnap.exists()) { const u = usnap.data() || {}; unidadInicial = (u.unidadInicial || u.unidad || "").trim(); setUnidad((prev) => prev || unidadInicial); if (u.asignatura) setAsignatura((prev) => prev === S.noSubject ? u.asignatura : prev); if (u.curso) setCurso((prev) => prev === S.noCourse ? u.curso : prev); }
           } catch (e) { if (e?.code !== "permission-denied") console.warn("[Desarrollo] usuarios fallback:", e?.code || e); }
         }
 
@@ -623,7 +623,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
             setUnidad((prev) => prev || det.unidad || "");
             setObjetivo((prev) => prev || det.objetivo || "");
             setHabilidades((prev) => prev || (Array.isArray(det.habilidades) ? det.habilidades.join(", ") : det.habilidades || ""));
-            if (det.asignatura && asignatura === S.noSubject) setAsignatura(det.asignatura);
+            if (det.asignatura) setAsignatura((prev) => prev === S.noSubject ? det.asignatura : prev);
             if (curso === S.noCourse) {
               if (det.curso || det.nivel || det.seccion) setCurso(det.curso || cursoFromNivelSeccion(det.nivel, det.seccion) || S.noCourse);
             }
@@ -639,7 +639,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
                 setUnidad((prev) => prev || det2.unidad || "");
                 setObjetivo((prev) => prev || det2.objetivo || "");
                 setHabilidades((prev) => prev || (Array.isArray(det2.habilidades) ? det2.habilidades.join(", ") : det2.habilidades || ""));
-                if (det2.asignatura && asignatura === S.noSubject) setAsignatura(det2.asignatura);
+                if (det2.asignatura) setAsignatura((prev) => prev === S.noSubject ? det2.asignatura : prev);
                 if (curso === S.noCourse) setCurso(det2.curso || cursoFromNivelSeccion(det2.nivel, det2.seccion) || S.noCourse);
               }
             }
@@ -726,25 +726,31 @@ if (MODO_JURADO_SEGURO) return;
 
   // ✅ handleEnd — propaga todos los datos de clase al Cierre
   const handleEnd = () => {
-    const stateToSend = {
-      ...(location?.state || {}),
-      isClaseEspecial: isSpecial,
-      language,
-      clase: {
-  unidad,
-  objetivo,
-  objetivoClase: objetivo,
-  habilidades: habilidades || "",
-  asignatura,
-  curso,
-  nombreProfesor,
-  profesor: nombreProfesor,
-},
-      slotId: location?.state?.slotId || localStorage.getItem("__lastSlotId") || "0-0",
-    };
-    if (onIrACierre) onIrACierre(stateToSend);
-    else navigate("/cierre", { state: stateToSend });
+  const claseParaCierre = {
+    unidad,
+    objetivo,
+    objetivoClase: objetivo,
+    habilidades: habilidades || "",
+    asignatura,
+    curso,
+    nombreProfesor,
+    profesor: nombreProfesor,
   };
+
+  try {
+    localStorage.setItem("__pragmaClaseActual", JSON.stringify(claseParaCierre));
+  } catch {}
+
+  const stateToSend = {
+  ...(location?.state || {}),
+  clase: claseParaCierre,
+  isClaseEspecial: isSpecial,
+  language,
+  slotId: location?.state?.slotId || localStorage.getItem("__lastSlotId") || "9-3",
+};
+
+if (onIrACierre) onIrACierre(stateToSend);
+else navigate("/cierre", { state: stateToSend });};
 
   const [prompt3D, setPrompt3D] = useState("");
   const [glbUrl, setGlbUrl] = useState("");
@@ -862,7 +868,7 @@ if (MODO_JURADO_SEGURO) return;
   const unidadShown = emergency?.active ? emergency.unidad || unidad : unidad;
   const objetivoShown = emergency?.active ? emergency.objetivo || objetivo : objetivo;
   const habilidadesShown = emergency?.active ? (Array.isArray(emergency.habilidades) ? emergency.habilidades.join(", ") : emergency.habilidades || habilidades) : habilidades;
-
+  
   return (
     <div style={page}>
       {isSpecial && (
@@ -1094,29 +1100,14 @@ if (MODO_JURADO_SEGURO) return;
 
       {/* ✅ Botón Ir al Cierre — propaga todos los datos de clase */}
       <div style={{ textAlign: "center", marginTop: "1rem" }}>
-        <button
-          onClick={() =>
-            navigate("/cierre", {
-              state: {
-                ...(location?.state || {}),
-                isClaseEspecial: isSpecial,
-                language,
-                clase: {
-                  unidad, objetivo,
-                  habilidades: habilidades || "",
-                  asignatura,
-                  curso,
-                },
-                slotId: location?.state?.slotId || localStorage.getItem("__lastSlotId") || "0-0",
-              },
-            })
-          }
-          style={btnWhite}
-          title={S.goToClosureTitle}
-        >
-          {S.goToClosure}
-        </button>
-      </div>
+  <button
+    onClick={handleEnd}
+    style={btnWhite}
+    title={S.goToClosureTitle}
+  >
+    {S.goToClosure}
+  </button>
+</div>
     </div>
   );
 }

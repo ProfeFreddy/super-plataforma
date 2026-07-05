@@ -818,6 +818,26 @@ const cursoSeguro =
 
   const handleIrADesarrollo = () => {
     const ficha = makeFicha(); saveCurrentSlot();
+    const claseParaFlujo = {
+  profesor: profesorSeguro,
+  nombreProfesor: profesorSeguro,
+  asignatura: asignaturaSegura,
+  curso: cursoSeguro,
+  unidad: unidadSegura,
+  oa: objetivoCurricularSeguro,
+  objetivo: objetivoClaseSeguro,
+  objetivoClase: objetivoClaseSeguro,
+  habilidades: habilidadesSeguras,
+};
+
+localStorage.setItem("__pragmaClaseActual", JSON.stringify(claseParaFlujo));
+
+navigate("/desarrollo", {
+  state: {
+    slotId: currentSlotId || "9-3",
+    clase: claseParaFlujo,
+  },
+});
     navigate("/desarrollo", { state: { slotId: currentSlotId || "0-0", endMs: Date.now(), clase: claseActual || null, ficha, nombre, especial: isEspecial, lang, tituloEspecial, objetivoEspecial, notasEspeciales } });
   };
 
