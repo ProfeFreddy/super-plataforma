@@ -48,7 +48,7 @@ async function fetchJSON(url) {
   return r.json();
 }
 
-import { getClaseVigente, getYearWeek } from "../services/PlanificadorService";
+/import { getYearWeek } from "../services/PlanificadorService";
 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
@@ -385,26 +385,6 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
 
   cargarFallbackDesdeHorario();
 }, []);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await getClaseVigente(new Date());
-        setClaseVigente(res);
-        const claseFromState = location?.state?.clase;
-
-if (!claseFromState) {
-  if (res.unidad && !unidad) setUnidad(res.unidad);
-  if (res.objetivo && !objetivo) setObjetivo(res.objetivo);
-  if (res.habilidades && !habilidades) setHabilidades(res.habilidades);
-  if (res.asignatura && asignatura === S.noSubject) setAsignatura(res.asignatura);
-  if ((res.nivel || res.seccion) && curso === S.noCourse) {
-    setCurso(cursoFromNivelSeccion(res.nivel, res.seccion));
-  }
-}
-      } catch (e) { console.error("[Desarrollo] getClaseVigente:", e); }
-    })();
-  }, []); // eslint-disable-line
 
   const ensureHttp = (u) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
   const openInNew = (url) => window.open(url, "_blank", "noopener,noreferrer");
@@ -745,11 +725,15 @@ if (MODO_JURADO_SEGURO) return;
       isClaseEspecial: isSpecial,
       language,
       clase: {
-        unidad, objetivo,
-        habilidades: habilidades || "",
-        asignatura,
-        curso,
-      },
+  unidad,
+  objetivo,
+  objetivoClase: objetivo,
+  habilidades: habilidades || "",
+  asignatura,
+  curso,
+  nombreProfesor,
+  profesor: nombreProfesor,
+},
       slotId: location?.state?.slotId || localStorage.getItem("__lastSlotId") || "0-0",
     };
     if (onIrACierre) onIrACierre(stateToSend);

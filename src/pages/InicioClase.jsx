@@ -692,7 +692,30 @@ const slot =
       const key = makeCountKey(currentSlotId || "0-0"), endStr = localStorage.getItem(key) || localStorage.getItem(COUNT_KEY) || String(Date.now()), endMs = Number(endStr);
       try { localStorage.setItem("__lastSlotId", currentSlotId || "0-0"); } catch {}
       const ficha = makeFicha(); saveCurrentSlot();
-      navigate("/desarrollo", { state: { slotId: currentSlotId || "0-0", endMs, clase: claseActual || null, ficha, nombre, especial: isEspecial, lang, tituloEspecial, objetivoEspecial, notasEspeciales } });
+      navigate("/desarrollo", {
+  state: {
+    slotId: currentSlotId || "0-0",
+    endMs,
+    clase: {
+      profesor: profesorSeguro,
+      nombreProfesor: profesorSeguro,
+      asignatura: asignaturaSegura,
+      curso: cursoSeguro,
+      unidad: unidadSegura,
+      oa: objetivoCurricularSeguro,
+      objetivo: objetivoClaseSeguro,
+      objetivoClase: objetivoClaseSeguro,
+      habilidades: habilidadesSeguras,
+    },
+    ficha,
+    nombre: profesorSeguro,
+    especial: isEspecial,
+    lang,
+    tituloEspecial,
+    objetivoEspecial,
+    notasEspeciales,
+  },
+});
     }
   }, [remaining, navigate, currentSlotId, claseActual, chronoDone, BYPASS_NAV, isEspecial, lang, tituloEspecial, objetivoEspecial, notasEspeciales, nombre]);
 
