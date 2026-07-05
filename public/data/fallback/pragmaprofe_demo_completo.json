@@ -1,0 +1,45 @@
+{
+  "perfil": {
+    "profesor": "Freddy Contreras",
+    "institucion": "Liceo Presidente Balmaceda",
+    "pais": "Chile",
+    "ciudad": "Santiago"
+  },
+  "claseActual": {
+    "slotId": "9-3",
+    "dia": "Jueves",
+    "bloque": "Bloque 9",
+    "bloqueInicio": "14:30",
+    "bloqueFin": "15:15",
+    "curso": "2° Medio B",
+    "nivel": "2° Medio",
+    "seccion": "B",
+    "asignatura": "Matemática",
+    "unidad": "Funciones cuadráticas",
+    "objetivoCurricular": "OA4",
+    "objetivoClase": "Reconocer cómo el valor de a modifica la apertura de la parábola.",
+    "habilidades": [
+      "Representar",
+      "Analizar",
+      "Argumentar"
+    ],
+    "preguntaActivacion": "¿Por qué algunas parábolas son más abiertas que otras?",
+    "recursos": [
+      "Horario reconocido",
+      "Objetivo cargado",
+      "QR generado",
+      "Nube preparada",
+      "Gincana Nexus disponible",
+      "Evidencias activas"
+    ]
+  },
+  "desarrollo": {
+    "actividadInicial": "Observar tres parábolas y comparar su apertura.",
+    "actividadCentral": "Modificar el coeficiente a en una función cuadrática y explicar el cambio visual.",
+    "actividadCierre": "Responder una pregunta breve para verificar comprensión."
+  },
+  "cierre": {
+    "evidenciaEsperada": "El estudiante explica que el valor de a afecta la apertura y orientación de la parábola.",
+    "ticketSalida": "¿Qué ocurre con la parábola cuando el valor absoluto de a aumenta?"
+  }
+}

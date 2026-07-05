@@ -26,7 +26,10 @@ import { SHOWTIME_PRESET } from "../lib/cloudPresets";
 import EpicStarters from "../components/EpicStarters";
 import { usePeriodoEval } from "../hooks/usePeriodoEval";
 import BannerTrial from "../components/BannerTrial"; // ✅ AGREGADO
-
+import {
+  leerProfesorFallback,
+  leerClaseFallback
+} from "../lib/pragmaFallback";
 function clearAllCountdowns() {
   try {
     const toDelete = [];
@@ -399,6 +402,7 @@ function InicioClaseInner() {
   const [horaActual, setHoraActual] = useState("");
   const [claseActual, setClaseActual] = useState(null);
   const [fallbackClase, setFallbackClase] = useState(null);
+  const [fallbackProfesor, setFallbackProfesor] = useState(null);
   const [planSug, setPlanSug] = useState(null);
   const [preguntaClase, setPreguntaClase] = useState(lang === "en" ? "Which word best represents the last class?" : "¿Qué palabra representa mejor la última clase?");
   const [ultimos, setUltimos] = useState([]);
@@ -557,7 +561,35 @@ function InicioClaseInner() {
 useEffect(() => {
   fetch("/data/inicio_clase_fallback.json")
     .then((res) => res.json())
-    .then((data) => setFallbackClase(data))
+    .then(async (data) => {
+    setFallbackClase(data);
+
+    const profesor = await leerProfesorFallback();
+    setFallbackProfesor(profesor);
+
+    const params = new URLSearchParams(window.location.hash.split("?")[1] || "");
+const slot =
+  params.get("slot") ||
+  localStorage.getItem("__lastSlotId") ||
+  currentSlotId ||
+  "9-3";
+
+    const clase = await leerClaseFallback(slot);
+
+    if (clase) {
+    setFallbackClase((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+            Object.entries(clase || {}).filter(([_, v]) => {
+                if (Array.isArray(v)) return v.length > 0;
+                return v !== "" && v !== null && v !== undefined;
+            })
+        ),
+        profesor: profesor?.nombre || prev?.profesor,
+        colegio: profesor?.colegio || prev?.colegio
+    }));
+}
+})
     .catch((err) => {
       console.warn("No se pudo cargar inicio_clase_fallback.json", err);
     });
@@ -686,12 +718,18 @@ useEffect(() => {
   const colegioSeguro = fallbackClase?.colegio || "Institución educativa";
   const sloganSeguro = slogan || fallbackClase?.slogan || DEFAULT_SLOGAN;
   const asignaturaSegura =
-    claseSegura?.asignatura || asignaturaProfe || fallbackClase?.asignatura || "(sin asignatura)";
-  const cursoSeguro =
-    claseSegura?.curso ||
-    fallbackClase?.curso ||
-    [claseSegura?.nivel, claseSegura?.seccion].filter(Boolean).join(" ") ||
-    "(sin curso)";
+  fallbackClase?.asignatura ||
+  claseSegura?.asignatura ||
+  asignaturaProfe ||
+  "(sin asignatura)";
+  const cursoDesdeNivelSeccion =
+  [claseSegura?.nivel, claseSegura?.seccion].filter(Boolean).join(" ").trim();
+
+const cursoSeguro =
+  fallbackClase?.curso ||
+  claseSegura?.curso ||
+  cursoDesdeNivelSeccion ||
+  "(sin curso)";
   const unidadSegura =
     claseSegura?.unidad || (isEspecial ? tituloEspecial : "") || fallbackClase?.unidad || "(sin unidad)";
   const objetivoCurricularSeguro =
@@ -725,6 +763,40 @@ useEffect(() => {
     day: "numeric",
     month: "long",
   });
+
+  const horaDelDia = new Date().getHours();
+  const saludoClase =
+    horaDelDia < 12
+      ? "Buenos días"
+      : horaDelDia < 20
+      ? "Buenas tardes"
+      : "Buenas noches";
+
+  const tituloPantalla =
+    cursoSeguro && cursoSeguro !== "(sin curso)"
+      ? cursoSeguro
+      : profesorSeguro.split(" ")[0] || "profesor";
+
+  const handleModoDemo = () => {
+    const demoSlot = window.prompt(
+      "Escribe el bloque demo. Ejemplo: 9-3 para jueves bloque 9, o 10-3 para jueves bloque 10.",
+      currentSlotId && currentSlotId !== "0-0" ? currentSlotId : "9-3"
+    );
+
+    if (!demoSlot) return;
+
+    const slotLimpio = demoSlot.trim();
+    if (!/^\d+-\d+$/.test(slotLimpio)) {
+      alert("Formato inválido. Usa algo como 9-3 o 10-3.");
+      return;
+    }
+
+    try {
+      localStorage.setItem("__lastSlotId", slotLimpio);
+    } catch {}
+
+    window.location.assign(`/#/InicioClase?slot=${encodeURIComponent(slotLimpio)}`);
+  };
 
   const handleIrADesarrollo = () => {
     const ficha = makeFicha(); saveCurrentSlot();
@@ -809,7 +881,7 @@ useEffect(() => {
                   letterSpacing: "-2px",
                 }}
               >
-                Buenos días, {profesorSeguro.split(" ")[0] || "profesor"} 👋
+                {saludoClase}, {tituloPantalla} 👋
               </h1>
 
               <p
@@ -1021,6 +1093,7 @@ useEffect(() => {
               }}
             >
               <button style={btnWhite} onClick={handleIrADesarrollo}>🚀 {labels.irDesarrollo}</button>
+              <button style={btnTiny} onClick={handleModoDemo}>🎬 Modo demo</button>
               <button style={btnTiny} onClick={() => navigate(getInicioClasePath())}>{labels.volverInicio}</button>
               <button style={btnTiny} onClick={() => navigate("/horario")}>🗓️ {labels.editarHorario}</button>
               <button style={{ ...btnTiny, color:"#ef4444" }} onClick={nuevaSala}>🔄 Nueva sala</button>
