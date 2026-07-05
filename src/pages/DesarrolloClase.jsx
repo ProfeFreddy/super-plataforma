@@ -589,9 +589,36 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   useEffect(() => {
     if (!authed) return;
     const obtenerDatos = async () => {
-      try {
-        const uid = localStorage.getItem("uid") || auth.currentUser?.uid; if (!uid) return;
+  try {
+    const claseOficial =
+      location?.state?.clase ||
+      JSON.parse(localStorage.getItem("__pragmaClaseActual") || "null");
 
+    if (claseOficial) {
+      setUnidad(claseOficial.unidad || "");
+      setObjetivo(claseOficial.objetivoClase || claseOficial.objetivo || "");
+      setHabilidades(
+        Array.isArray(claseOficial.habilidades)
+          ? claseOficial.habilidades.join(", ")
+          : claseOficial.habilidades || ""
+      );
+      setAsignatura(claseOficial.asignatura || S.noSubject);
+      setCurso(claseOficial.curso || S.noCourse);
+      setNombreProfesor(
+  c.nombreProfesor && c.nombreProfesor !== "Profesor"
+    ? c.nombreProfesor
+    : c.profesor && c.profesor !== "Profesor"
+      ? c.profesor
+      : "Freddy Contreras"
+);
+      return;
+    }
+
+    const uid = localStorage.getItem("uid") || auth.currentUser?.uid;
+    if (!uid) return;
+
+    // aquí sigue lo demás de Firestore
+    
         try { const pref = doc(db, "profesores", uid); const psnap = await getDoc(pref); if (psnap.exists()) { const data = psnap.data() || {}; const nombreP = data.nombre || data.nombreCompleto || data.profesorNombre || null; if (nombreP) setNombreProfesor(nombreP); } } catch (e) { if (e?.code !== "permission-denied") console.warn("[Desarrollo] profesores read:", e?.code || e); }
         try { const uref = doc(db, "usuarios", uid); const usnap = await getDoc(uref); if (usnap.exists()) { const u = usnap.data() || {}; if (nombreProfesor === "Profesor") { const nombreU = u.nombre || u.nombreCompleto || null; if (nombreU) setNombreProfesor(nombreU); } } } catch (e) { if (e?.code !== "permission-denied") console.warn("[Desarrollo] usuarios read:", e?.code || e); }
 

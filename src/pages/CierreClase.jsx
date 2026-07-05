@@ -233,6 +233,29 @@ export default function CierreClase({ duracion = 10 }) {
   const [iaError, setIaError] = useState(null);
 
   useEffect(() => {
+  try {
+    const raw = localStorage.getItem("__pragmaClaseActual");
+    if (!raw) return;
+
+    const c = JSON.parse(raw);
+
+    setUnidad(c.unidad || "");
+    setObjetivo(c.objetivoClase || c.objetivo || "");
+    setAsignatura(c.asignatura || "(sin asignatura)");
+    setCurso(c.curso || "(sin curso)");
+    setNombreProfesor(
+  c.nombreProfesor && c.nombreProfesor !== "Profesor"
+    ? c.nombreProfesor
+    : c.profesor && c.profesor !== "Profesor"
+      ? c.profesor
+      : "Freddy Contreras"
+);
+  } catch (e) {
+    console.warn("[Cierre] No se pudo leer __pragmaClaseActual", e);
+  }
+}, []);
+
+  useEffect(() => {
     if (!authed) return;
     const obtenerDatos = async () => {
       try {
