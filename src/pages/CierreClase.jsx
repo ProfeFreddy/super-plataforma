@@ -114,6 +114,52 @@ function clearAllCountdowns() {
 
 const isPlaceholder = (v) => /^\(sin/i.test(String(v || ""));
 
+function leerClaseActualLocal() {
+  try {
+    return JSON.parse(localStorage.getItem("__pragmaClaseActual") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function nombreProfesorSeguro(...sources) {
+  const esNombreValido = (valor) => {
+    const nombre = String(valor || "").trim();
+    if (!nombre) return "";
+    const lower = nombre.toLowerCase();
+    if (lower === "profesor" || lower === "teacher") return "";
+    if (lower === "(sin profesor)" || lower === "(no teacher)") return "";
+    if (lower === "(sin nombre)" || lower === "(no name)") return "";
+    return nombre;
+  };
+
+  for (const source of sources) {
+    const directo = typeof source === "string" ? esNombreValido(source) : "";
+    if (directo) return directo;
+
+    if (!source || typeof source !== "object") continue;
+
+    const candidatos = [
+      source.nombreProfesor,
+      source.profesor,
+      source.nombre,
+      source.nombreCompleto,
+      source.profesorNombre,
+      source.teacherName,
+      source.teacher,
+      source?.profesor?.nombre,
+      source?.usuario?.nombre,
+    ];
+
+    for (const candidato of candidatos) {
+      const nombre = esNombreValido(candidato);
+      if (nombre) return nombre;
+    }
+  }
+
+  return "Profesor";
+}
+
 const HoraActualText = React.memo(function HoraActualText() {
   const [t, setT] = useState(new Date().toLocaleTimeString());
   useEffect(() => { const id = setInterval(() => setT(new Date().toLocaleTimeString()), 1000); return () => clearInterval(id); }, []);
@@ -186,7 +232,8 @@ export default function CierreClase({ duracion = 10 }) {
       if (stateClase.objetivo && !isPlaceholder(stateClase.objetivo)) setObjetivo(stateClase.objetivo);
       if (stateClase.asignatura && !isPlaceholder(stateClase.asignatura)) setAsignatura(stateClase.asignatura);
       if (stateClase.curso && !isPlaceholder(stateClase.curso)) setCurso(stateClase.curso);
-      if (stateClase.nombreProfesor) setNombreProfesor(stateClase.nombreProfesor);
+      const nombreDesdeState = nombreProfesorSeguro(location?.state, stateClase, leerClaseActualLocal());
+      if (nombreDesdeState !== "Profesor") setNombreProfesor(nombreDesdeState);
     }
   }, [location.state]);
 
@@ -243,13 +290,8 @@ export default function CierreClase({ duracion = 10 }) {
     setObjetivo(c.objetivoClase || c.objetivo || "");
     setAsignatura(c.asignatura || "(sin asignatura)");
     setCurso(c.curso || "(sin curso)");
-    setNombreProfesor(
-  c.nombreProfesor && c.nombreProfesor !== "Profesor"
-    ? c.nombreProfesor
-    : c.profesor && c.profesor !== "Profesor"
-      ? c.profesor
-      : "Freddy Contreras"
-);
+    const nombreDesdeFlujo = nombreProfesorSeguro(location?.state, location?.state?.clase, c);
+    if (nombreDesdeFlujo !== "Profesor") setNombreProfesor(nombreDesdeFlujo);
   } catch (e) {
     console.warn("[Cierre] No se pudo leer __pragmaClaseActual", e);
   }

@@ -691,31 +691,45 @@ const slot =
       setChronoDone(true);
       const key = makeCountKey(currentSlotId || "0-0"), endStr = localStorage.getItem(key) || localStorage.getItem(COUNT_KEY) || String(Date.now()), endMs = Number(endStr);
       try { localStorage.setItem("__lastSlotId", currentSlotId || "0-0"); } catch {}
-      const ficha = makeFicha(); saveCurrentSlot();
+      const ficha = makeFicha(); 
+      saveCurrentSlot();
+
+      const nombreProfesorFinal =
+        profesorSeguro && profesorSeguro !== "Profesor"
+          ? profesorSeguro
+          : fallbackProfesor?.nombre || fallbackClase?.profesor || "Profesor";
+
+      const claseParaFlujo = {
+        profesor: nombreProfesorFinal,
+        nombreProfesor: nombreProfesorFinal,
+        asignatura: asignaturaSegura,
+        curso: cursoSeguro,
+        unidad: unidadSegura,
+        oa: objetivoCurricularSeguro,
+        objetivo: objetivoClaseSeguro,
+        objetivoClase: objetivoClaseSeguro,
+        habilidades: habilidadesSeguras,
+      };
+
+      try {
+        localStorage.setItem("__lastSlotId", currentSlotId || "0-0");
+        localStorage.setItem("__pragmaClaseActual", JSON.stringify(claseParaFlujo));
+      } catch {}
+
       navigate("/desarrollo", {
-  state: {
-    slotId: currentSlotId || "0-0",
-    endMs,
-    clase: {
-      profesor: profesorSeguro,
-      nombreProfesor: profesorSeguro,
-      asignatura: asignaturaSegura,
-      curso: cursoSeguro,
-      unidad: unidadSegura,
-      oa: objetivoCurricularSeguro,
-      objetivo: objetivoClaseSeguro,
-      objetivoClase: objetivoClaseSeguro,
-      habilidades: habilidadesSeguras,
-    },
-    ficha,
-    nombre: profesorSeguro,
-    especial: isEspecial,
-    lang,
-    tituloEspecial,
-    objetivoEspecial,
-    notasEspeciales,
-  },
-});
+        state: {
+          slotId: currentSlotId || "0-0",
+          endMs,
+          clase: claseParaFlujo,
+          ficha,
+          nombre: nombreProfesorFinal,
+          especial: isEspecial,
+          lang,
+          tituloEspecial,
+          objetivoEspecial,
+          notasEspeciales,
+        },
+      });
     }
   }, [remaining, navigate, currentSlotId, claseActual, chronoDone, BYPASS_NAV, isEspecial, lang, tituloEspecial, objetivoEspecial, notasEspeciales, nombre]);
 
@@ -815,51 +829,46 @@ const cursoSeguro =
 
     window.location.assign(`/#/InicioClase?slot=${encodeURIComponent(slotLimpio)}`);
   };
-
   const handleIrADesarrollo = () => {
-    const ficha = makeFicha(); saveCurrentSlot();
-    const claseParaFlujo = {
-  profesor: profesorSeguro,
-  nombreProfesor: profesorSeguro,
-  asignatura: asignaturaSegura,
-  curso: cursoSeguro,
-  unidad: unidadSegura,
-  oa: objetivoCurricularSeguro,
-  objetivo: objetivoClaseSeguro,
-  objetivoClase: objetivoClaseSeguro,
-  habilidades: habilidadesSeguras,
-};
+    const nombreProfesorFinal =
+      profesorSeguro && profesorSeguro !== "Profesor"
+        ? profesorSeguro
+        : fallbackProfesor?.nombre || fallbackClase?.profesor || "Profesor";
 
-localStorage.setItem("__pragmaClaseActual", JSON.stringify(claseParaFlujo));
-localStorage.setItem("__pragmaClaseActual", JSON.stringify({
-  profesor: profesorSeguro !== "Profesor" ? profesorSeguro : (fallbackProfesor?.nombre || fallbackClase?.profesor || "Profesor"),
-nombreProfesor: profesorSeguro !== "Profesor" ? profesorSeguro : (fallbackProfesor?.nombre || fallbackClase?.profesor || "Profesor"),
-  asignatura: asignaturaSegura,
-  curso: cursoSeguro,
-  unidad: unidadSegura,
-  oa: objetivoCurricularSeguro,
-  objetivo: objetivoClaseSeguro,
-  objetivoClase: objetivoClaseSeguro,
-  habilidades: habilidadesSeguras,
-}));
-navigate("/desarrollo", {
-  state: {
-    slotId: currentSlotId || "9-3",
-    clase: claseParaFlujo,
-  },
-});
-localStorage.setItem("__pragmaClaseActual", JSON.stringify({
-  profesor: profesorSeguro,
-  nombreProfesor: profesorSeguro,
-  asignatura: asignaturaSegura,
-  curso: cursoSeguro,
-  unidad: unidadSegura,
-  oa: objetivoCurricularSeguro,
-  objetivo: objetivoClaseSeguro,
-  objetivoClase: objetivoClaseSeguro,
-  habilidades: habilidadesSeguras,
-}));
-    navigate("/desarrollo", { state: { slotId: currentSlotId || "0-0", endMs: Date.now(), clase: claseActual || null, ficha, nombre, especial: isEspecial, lang, tituloEspecial, objetivoEspecial, notasEspeciales } });
+    const ficha = makeFicha();
+    saveCurrentSlot();
+
+    const claseParaFlujo = {
+      profesor: nombreProfesorFinal,
+      nombreProfesor: nombreProfesorFinal,
+      asignatura: asignaturaSegura,
+      curso: cursoSeguro,
+      unidad: unidadSegura,
+      oa: objetivoCurricularSeguro,
+      objetivo: objetivoClaseSeguro,
+      objetivoClase: objetivoClaseSeguro,
+      habilidades: habilidadesSeguras,
+    };
+
+    try {
+      localStorage.setItem("__lastSlotId", currentSlotId || "9-3");
+      localStorage.setItem("__pragmaClaseActual", JSON.stringify(claseParaFlujo));
+    } catch {}
+
+    navigate("/desarrollo", {
+      state: {
+        slotId: currentSlotId || "9-3",
+        endMs: Date.now(),
+        clase: claseParaFlujo,
+        ficha,
+        nombre: nombreProfesorFinal,
+        especial: isEspecial,
+        lang,
+        tituloEspecial,
+        objetivoEspecial,
+        notasEspeciales,
+      },
+    });
   };
 
   if (!authReady) {
