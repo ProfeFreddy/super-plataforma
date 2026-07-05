@@ -712,26 +712,24 @@ const slot =
   const asistentesCount = presentes?.length || 0;
 
   // ✅ Clase segura: primero usa datos reales; si fallan, usa el JSON fallback.
-  const claseSegura = claseActual || fallbackClase || {};
+  const claseSegura = fallbackClase || claseActual || {};
   const profesorSeguro =
     nombre && nombre !== "Profesor" ? nombre : fallbackClase?.profesor || "Profesor";
   const colegioSeguro = fallbackClase?.colegio || "Institución educativa";
   const sloganSeguro = slogan || fallbackClase?.slogan || DEFAULT_SLOGAN;
   const asignaturaSegura =
-  fallbackClase?.asignatura ||
   claseSegura?.asignatura ||
-  asignaturaProfe ||
   "(sin asignatura)";
   const cursoDesdeNivelSeccion =
   [claseSegura?.nivel, claseSegura?.seccion].filter(Boolean).join(" ").trim();
 
 const cursoSeguro =
-  fallbackClase?.curso ||
   claseSegura?.curso ||
   cursoDesdeNivelSeccion ||
   "(sin curso)";
   const unidadSegura =
-    claseSegura?.unidad || (isEspecial ? tituloEspecial : "") || fallbackClase?.unidad || "(sin unidad)";
+  claseSegura?.unidad ||
+  "(sin unidad)";
   const objetivoCurricularSeguro =
     claseSegura?.objetivoCurricular ||
     claseSegura?.oa ||
