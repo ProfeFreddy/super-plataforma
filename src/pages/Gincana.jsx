@@ -4,6 +4,9 @@ import { useLocation } from "react-router-dom";
 const DOWNLOAD_URL =
   "https://drive.google.com/uc?export=download&id=1xmjGtEXFNJU3D88LKIKEAPYcCqRSJmYT";
 
+// Cambia a false cuando quieras volver a mostrar los planes.
+const MODO_EVALUACION = true;
+
 export default function Gincana() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
@@ -87,21 +90,25 @@ export default function Gincana() {
           ))}
         </div>
 
-        {/* PLANES */}
-        <h2 style={{ color: "#00d4ff", margin: "48px 0 24px" }}>Planes</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
-          {[
-            { n: "Gratis", p: "$0", d: "Estaciones 1-5, hasta 30 alumnos, panel profesor básico", c: "#555" },
-            { n: "Pro", p: "$9.990/mes", d: "Estaciones 1-10, ranking entre salas, informes avanzados", c: "#00d4ff" },
-            { n: "Elite", p: "$19.990/mes", d: "Todas las estaciones, torneos entre colegios, soporte prioritario", c: "#ffd700" },
-          ].map(p => (
-            <div key={p.n} style={{ background: "#1a1a2e", borderRadius: 12, padding: 24, border: `2px solid ${p.c}` }}>
-              <div style={{ fontSize: "1.3rem", fontWeight: 700, color: p.c }}>{p.n}</div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 700, margin: "8px 0" }}>{p.p}</div>
-              <div style={{ color: "#aaa", fontSize: "0.9rem" }}>{p.d}</div>
+        {/* PLANES — ocultos temporalmente durante la evaluación */}
+        {!MODO_EVALUACION && (
+          <>
+            <h2 style={{ color: "#00d4ff", margin: "48px 0 24px" }}>Planes</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
+              {[
+                { n: "Gratis", p: "$0", d: "Estaciones 1-5, hasta 30 alumnos, panel profesor básico", c: "#555" },
+                { n: "Pro", p: "$9.990/mes", d: "Estaciones 1-10, ranking entre salas, informes avanzados", c: "#00d4ff" },
+                { n: "Elite", p: "$19.990/mes", d: "Todas las estaciones, torneos entre colegios, soporte prioritario", c: "#ffd700" },
+              ].map(p => (
+                <div key={p.n} style={{ background: "#1a1a2e", borderRadius: 12, padding: 24, border: `2px solid ${p.c}` }}>
+                  <div style={{ fontSize: "1.3rem", fontWeight: 700, color: p.c }}>{p.n}</div>
+                  <div style={{ fontSize: "1.8rem", fontWeight: 700, margin: "8px 0" }}>{p.p}</div>
+                  <div style={{ color: "#aaa", fontSize: "0.9rem" }}>{p.d}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
 
         {/* PANEL PROFESOR */}
         <h2 style={{ color: "#00d4ff", margin: "48px 0 16px" }}>Panel Profesor en tiempo real</h2>

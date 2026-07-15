@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   fetchSignInMethodsForEmail,
   onAuthStateChanged,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth } from "../firebase";
 
@@ -140,7 +141,7 @@ export default function Login() {
   */
   const goAfterLogin = React.useCallback(() => {
     const next = qs.get("next");
-    const dest = next || "/inicioclase";
+    const dest = next || "/horario";
 
     console.log("[Login] goAfterLogin dest=", dest);
 
@@ -246,6 +247,25 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  const recuperarPassword = async () => {
+  const mail = email.trim().toLowerCase();
+
+  if (!mail) {
+    setError("Primero escribe tu correo.");
+    return;
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, mail);
+
+    alert(
+      "Te enviamos un correo para recuperar tu contraseña. Revisa también la carpeta Spam."
+    );
+  } catch (err) {
+    setError(msgFromFirebaseCode(err.code));
+  }
+};
 
   const goToRegister = () => {
     const url = new URLSearchParams();
@@ -412,6 +432,13 @@ export default function Login() {
           >
             {loading ? "Ingresando…" : "Ingresar"}
           </button>
+          <button
+    type="button"
+    onClick={recuperarPassword}
+    style={styles.btnSecondary}
+>
+    ¿Olvidaste tu contraseña?
+</button>
         </form>
 
         <div style={styles.muted}>

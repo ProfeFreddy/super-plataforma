@@ -1,387 +1,442 @@
 // src/pages/Planificaciones.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  collection, getDocs, doc, setDoc, serverTimestamp,
-  query, where, getDoc,
-} from "firebase/firestore";
-import { db, auth } from "../firebase";
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "../firebase";
 import BannerTrial from "../components/BannerTrial";
 
-const toId = (s = "") =>
-  s.toString().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "").trim();
-
-const toNivelId = (raw = "") => {
-  const s = raw.toString().toLowerCase().replace(/\s+/g, " ").replace(/[°º]/g, "").replace("básico", "basico").trim();
-  return toId(s);
-};
-
-const ASIG_DISPLAY = {
-  matematica: "Matemática", lenguaje: "Lenguaje", ciencias: "Ciencias",
-  historia: "Historia", fisica: "Física", quimica: "Química",
-  biologia: "Biología", ingles: "Inglés", tecnologia: "Tecnología",
-};
-
-const NIVEL_VARIANTES = {
-  "1° medio": ["1º Medio", "1° Medio", "1 Medio"],
-  "2° medio": ["2º Medio", "2° Medio", "2 Medio"],
-  "3° medio": ["3º Medio", "3° Medio", "3 Medio"],
-  "4° medio": ["4º Medio", "4° Medio", "4 Medio"],
-  "7° básico": ["7º Básico", "7° Básico", "7 Básico"],
-  "8° básico": ["8º Básico", "8° Básico", "8 Básico"],
-  "1° básico": ["1º Básico", "1° Básico"],
-  "2° básico": ["2º Básico", "2° Básico"],
-};
+/**
+ * Planificaciones.jsx — versión simple/productiva
+ *
+ * Horario = día, bloque, curso, asignatura.
+ * Planificación semanal = lo que cambia esa semana.
+ * El profesor escribe poco; PragmaProfe completa lo demás.
+ */
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 
-function getNivelVariantes(nivel = "") {
-  const key = nivel.toLowerCase().replace(/[°º]/g, "°").trim();
-  return NIVEL_VARIANTES[key] || [nivel];
+const COLORS = {
+  brandA: "#2193b0",
+  brandB: "#6dd5ed",
+  navy: "#0f172a",
+  white: "#ffffff",
+  soft: "#f8fafc",
+  border: "#e5e7eb",
+  muted: "#64748b",
+  blue: "#0ea5e9",
+  green: "#10b981",
+  yellow: "#facc15",
+};
+
+const page = {
+  minHeight: "100vh",
+  background: `linear-gradient(135deg, ${COLORS.brandA}, ${COLORS.brandB})`,
+  padding: 24,
+  boxSizing: "border-box",
+  fontFamily: "Segoe UI, system-ui, sans-serif",
+};
+
+const shell = { maxWidth: 1180, margin: "0 auto", display: "grid", gap: 18 };
+const hero = {
+  background: "rgba(15,23,42,.92)",
+  color: "#fff",
+  borderRadius: 30,
+  padding: "30px 32px",
+  boxShadow: "0 18px 44px rgba(15,23,42,.25)",
+};
+const card = {
+  background: COLORS.white,
+  border: `1px solid ${COLORS.border}`,
+  borderRadius: 22,
+  padding: 20,
+  boxShadow: "0 18px 42px rgba(15,23,42,.12)",
+};
+const miniCard = { background: COLORS.soft, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 14 };
+const btn = { border: `1px solid ${COLORS.border}`, borderRadius: 13, padding: "10px 14px", background: COLORS.white, color: COLORS.navy, fontWeight: 900, cursor: "pointer" };
+const btnPrimary = { ...btn, border: "none", background: COLORS.blue, color: "#fff" };
+const btnGreen = { ...btn, border: "none", background: COLORS.green, color: "#fff" };
+const input = { width: "100%", padding: "11px 13px", borderRadius: 12, border: `1px solid ${COLORS.border}`, fontSize: 14, boxSizing: "border-box", background: "#fff", color: COLORS.navy };
+const textarea = { ...input, minHeight: 98, resize: "vertical", lineHeight: 1.45, fontFamily: "Segoe UI, system-ui, sans-serif" };
+const label = { display: "block", fontSize: 12, color: COLORS.muted, fontWeight: 950, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".04em" };
+
+function clean(v, fallback = "") {
+  const s = String(v ?? "").trim();
+  if (!s) return fallback;
+  if (/undefined|null/i.test(s)) return fallback;
+  if (/^\(sin /i.test(s)) return fallback;
+  if (/^sin /i.test(s)) return fallback;
+  return s;
 }
 
-const niceCard = {
-  background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "1rem",
-  boxShadow: "0 6px 18px rgba(16,24,40,.06), 0 2px 6px rgba(16,24,40,.03)",
-};
-const btn = (bg) => ({ padding: ".45rem .85rem", borderRadius: 8, border: "none", color: "#fff", background: bg, cursor: "pointer" });
-const input = { padding: ".5rem .75rem", borderRadius: 8, border: "1px solid #d1d5db" };
+function getWeekKey(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+function addDays(d, days) { const x = new Date(d); x.setDate(x.getDate() + days); return x; }
+function previousWeekKey() { return getWeekKey(addDays(new Date(), -7)); }
+function nextWeekKey() { return getWeekKey(addDays(new Date(), 7)); }
+function slotFromCell(cell) { return `${Number(cell?.row ?? 0)}-${Number(cell?.col ?? 0)}`; }
+function cursoFromCell(cell) {
+  const nivel = clean(cell?.nivel);
+  const seccion = clean(cell?.seccion);
+  return clean(cell?.curso) || [nivel, seccion].filter(Boolean).join(" ");
+}
+function getDia(cell) { return DIAS[Number(cell?.col)] || clean(cell?.dia); }
+function getBloque(cell) { return clean(cell?.bloque) || `Bloque ${Number(cell?.row || 0) + 1}`; }
+function getHorario(cell) {
+  const inicio = clean(cell?.bloqueInicio);
+  const fin = clean(cell?.bloqueFin);
+  if (inicio && fin) return `${inicio}-${fin}`;
+  if (inicio) return inicio;
+  return "";
+}
+function fromTextList(value) {
+  return String(value || "").split(/,|\n/).map((x) => x.trim()).filter(Boolean);
+}
+
+function inferirUnidad({ asignatura, curso, objetivoSemana, contenidoBloque }) {
+  const texto = `${objetivoSemana} ${contenidoBloque}`.toLowerCase();
+  if (texto.includes("estad")) return "Estadística";
+  if (texto.includes("probab")) return "Probabilidad";
+  if (texto.includes("normal")) return "Distribución normal";
+  if (texto.includes("binomial")) return "Distribución binomial";
+  if (texto.includes("homotec")) return "Homotecia";
+  if (texto.includes("logarit")) return "Logaritmos";
+  if (texto.includes("trigonom")) return "Trigonometría";
+  if (texto.includes("deriv")) return "Derivadas";
+  if (texto.includes("circunferencia")) return "Circunferencia";
+  if (texto.includes("recta")) return "Rectas";
+  if (texto.includes("modelo")) return "Modelación matemática";
+  return clean(asignatura, "Unidad");
+}
+
+function inferirOA({ curso, unidad, objetivoSemana }) {
+  const texto = `${curso} ${unidad} ${objetivoSemana}`.toLowerCase();
+  if (texto.includes("homotec")) return "OA08";
+  if (texto.includes("estad") || texto.includes("probab")) {
+    if (texto.includes("3")) return "FG-MATE-3M";
+    if (texto.includes("4")) return "FG-MATE-4M";
+    return "OA";
+  }
+  if (texto.includes("deriv")) return "FG-MATE-LDI";
+  return "OA";
+}
+
+function construirClaseMagistral(plan) {
+  const curso = clean(plan.curso, "el curso");
+  const asignatura = clean(plan.asignatura, "la asignatura");
+  const objetivoSemana = clean(plan.objetivoSemana, "comprender el contenido central de la semana");
+  const contenidoBloque = clean(plan.contenidoBloque, "el contenido de este bloque");
+  const unidad = clean(plan.unidad) || inferirUnidad(plan);
+  const oa = clean(plan.oa) || inferirOA({ ...plan, unidad });
+  const objetivoClase = clean(plan.objetivoClase) || `Aplicar ${contenidoBloque} para avanzar en el objetivo semanal: ${objetivoSemana}.`;
+  const preguntaActivacion = clean(plan.preguntaActivacion) || `¿Qué recuerdas o sabes que podría ayudarte hoy con ${unidad}?`;
+
+  return {
+    unidad,
+    oa,
+    objetivoClase,
+    preguntaActivacion,
+    introduccionFormal: `Hoy trabajaremos ${unidad} en ${asignatura}. El foco será conectar el objetivo semanal con una actividad concreta: ${contenidoBloque}.`,
+    explicacionBasica: `En simple: primero activamos lo que ya saben, luego vemos el concepto, resolvemos un ejemplo guiado y finalmente lo aplicamos.`,
+    explicacionNormal: `Para desarrollar ${contenidoBloque}, inicia con una situación breve, identifica datos relevantes, modela el procedimiento y pide que los estudiantes verbalicen la estrategia.`,
+    explicacionAvanzada: `El nivel avanzado aparece cuando el estudiante justifica el procedimiento, compara estrategias, detecta errores y transfiere lo aprendido a otro contexto.`,
+    ejemploGuiado: `1. Presenta una situación relacionada con ${contenidoBloque}.\n2. Pregunta qué información es relevante.\n3. Modela el primer paso.\n4. Pide anticipar el siguiente paso.\n5. Resuelve completo.\n6. Cierra preguntando qué estrategia se puede reutilizar.`,
+    actividadPrincipal: clean(plan.actividadPrincipal) || "Trabajo en parejas con problemas reales y discusión de estrategias.",
+    recursosIA: `Preparar explicación breve, ejemplo guiado, errores frecuentes, pregunta desafiante, actividad colaborativa y ticket de salida.`,
+    ticketSalida: `1. Escribe con tus palabras qué aprendiste hoy.\n2. Resuelve o describe un ejemplo breve sobre ${unidad}.\n3. Explica qué parte fue más difícil y cómo la mejorarías.`,
+    gincanaPrompt: `Crear evaluación gamificada para ${curso} en ${asignatura} sobre ${unidad}. Contenido: ${contenidoBloque}. Incluir preguntas baja, media y alta con retroalimentación.`,
+    evaluacion: "Ticket de salida y evaluación gamificada con GincanaNexus.",
+    habilidadesTexto: "Analizar, representar, argumentar",
+    recursosTexto: "IA, YouTube, GeoGebra, Desmos, PDF, simulador, GincanaNexus",
+  };
+}
+
+function emptyPlan(cell = {}) {
+  const curso = cursoFromCell(cell);
+  return {
+    asignatura: clean(cell.asignatura), nivel: clean(cell.nivel), seccion: clean(cell.seccion), curso,
+    dia: getDia(cell), bloque: getBloque(cell), horario: getHorario(cell),
+    bloqueInicio: clean(cell.bloqueInicio), bloqueFin: clean(cell.bloqueFin),
+    objetivoSemana: clean(cell.objetivoSemana),
+    contenidoBloque: clean(cell.contenidoBloque || cell.contenido),
+    actividadPrincipal: clean(cell.actividadPrincipal),
+    observaciones: clean(cell.observaciones || cell.notasDocente),
+    unidad: clean(cell.unidad), oa: clean(cell.oa || cell.objetivoCurricular),
+    objetivoClase: clean(cell.objetivoClase || cell.objetivo), preguntaActivacion: clean(cell.preguntaActivacion),
+    habilidadesTexto: clean(cell.habilidadesTexto) || "Analizar, representar, argumentar",
+    recursosTexto: clean(cell.recursosTexto) || "IA, YouTube, GeoGebra, Desmos, PDF, simulador, GincanaNexus",
+    evaluacion: clean(cell.evaluacion) || "Ticket de salida y evaluación gamificada con GincanaNexus.",
+    gincana: cell.gincana ?? true,
+  };
+}
+
+function completeForSave(plan) {
+  const auto = construirClaseMagistral(plan);
+  const finalPlan = { ...plan, ...Object.fromEntries(Object.entries(auto).map(([k, v]) => [k, clean(plan[k]) || v])) };
+  const habilidades = fromTextList(finalPlan.habilidadesTexto);
+  const recursos = fromTextList(finalPlan.recursosTexto);
+  return {
+    asignatura: clean(finalPlan.asignatura), nivel: clean(finalPlan.nivel), seccion: clean(finalPlan.seccion), curso: clean(finalPlan.curso),
+    dia: clean(finalPlan.dia), bloque: clean(finalPlan.bloque), horario: clean(finalPlan.horario),
+    bloqueInicio: clean(finalPlan.bloqueInicio), bloqueFin: clean(finalPlan.bloqueFin),
+    unidad: clean(finalPlan.unidad), oa: clean(finalPlan.oa), objetivoCurricular: clean(finalPlan.oa),
+    objetivoSemana: clean(finalPlan.objetivoSemana), objetivoGeneral: clean(finalPlan.objetivoSemana),
+    objetivo: clean(finalPlan.objetivoClase), objetivoClase: clean(finalPlan.objetivoClase),
+    contenido: clean(finalPlan.contenidoBloque), contenidoBloque: clean(finalPlan.contenidoBloque),
+    actividadPrincipal: clean(finalPlan.actividadPrincipal), observaciones: clean(finalPlan.observaciones), notasDocente: clean(finalPlan.observaciones),
+    preguntaActivacion: clean(finalPlan.preguntaActivacion),
+    habilidades, habilidadesTexto: habilidades.join(", "), recursos, recursosTexto: recursos.join(", "),
+    evaluacion: clean(finalPlan.evaluacion), gincana: Boolean(finalPlan.gincana),
+    introduccionFormal: clean(finalPlan.introduccionFormal), explicacionBasica: clean(finalPlan.explicacionBasica),
+    explicacionNormal: clean(finalPlan.explicacionNormal), explicacionAvanzada: clean(finalPlan.explicacionAvanzada),
+    ejemploGuiado: clean(finalPlan.ejemploGuiado), actividadPrincipalGenerada: clean(finalPlan.actividadPrincipal),
+    recursosIA: clean(finalPlan.recursosIA), ticketSalida: clean(finalPlan.ticketSalida), gincanaPrompt: clean(finalPlan.gincanaPrompt),
+    fase: "planificacion-semanal-simple", preparadoPara: ["InicioClase", "DesarrolloClase", "CierreClase", "GincanaNexus"],
+  };
+}
+
+function Pill({ children, color = "#e0f2fe" }) {
+  return <span style={{ display: "inline-flex", padding: "6px 10px", borderRadius: 999, background: color, color: COLORS.navy, fontWeight: 900, fontSize: 12 }}>{children}</span>;
+}
+function Field({ title, children }) { return <div><label style={label}>{title}</label>{children}</div>; }
+
+function PreviewBox({ plan }) {
+  const auto = construirClaseMagistral(plan);
+  const unidad = clean(plan.unidad) || auto.unidad;
+  const oa = clean(plan.oa) || auto.oa;
+  const objetivoClase = clean(plan.objetivoClase) || auto.objetivoClase;
+  return (
+    <div style={{ ...miniCard, background: "#f0f9ff", borderColor: "#bae6fd" }}>
+      <div style={{ fontWeight: 950, color: COLORS.navy, marginBottom: 8 }}>Vista automática que usará PragmaProfe</div>
+      <div style={{ display: "grid", gap: 6, fontSize: 13, color: COLORS.navy }}>
+        <div><b>Unidad detectada:</b> {unidad}</div>
+        <div><b>OA sugerido:</b> {oa}</div>
+        <div><b>Objetivo de clase:</b> {objetivoClase}</div>
+        <div><b>Gincana:</b> {plan.gincana ? "Sí, evaluar en el cierre" : "No"}</div>
+      </div>
+    </div>
+  );
+}
+
+function SimplePlanCard({ cell, value, onChange, onSave, saving }) {
+  const slotId = slotFromCell(cell);
+  const listo = clean(value.objetivoSemana) && clean(value.contenidoBloque);
+  function update(field, val) { onChange(slotId, { ...value, [field]: val }); }
+  return (
+    <div style={{ ...card, borderColor: listo ? "#86efac" : COLORS.border }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+        <div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <Pill>{value.dia}</Pill><Pill>{value.bloque}</Pill>{value.horario && <Pill>{value.horario}</Pill>}
+          </div>
+          <div style={{ fontSize: 25, fontWeight: 950, color: COLORS.navy }}>{value.curso || "Curso"} · {value.asignatura || "Asignatura"}</div>
+          <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 4 }}>Slot {slotId} · El profesor escribe lo esencial, PragmaProfe arma la clase.</div>
+        </div>
+        <Pill color={listo ? "#dcfce7" : "#fef9c3"}>{listo ? "✓ Lista para ejecutar" : "Falta objetivo/contenido"}</Pill>
+      </div>
+      <div style={{ display: "grid", gap: 14 }}>
+        <Field title="1. Objetivo de esta semana">
+          <textarea style={textarea} value={value.objetivoSemana} onChange={(e) => update("objetivoSemana", e.target.value)} placeholder="Ej: Analizar datos estadísticos para tomar decisiones fundamentadas." />
+        </Field>
+        <Field title="2. Contenido que pasaré en este bloque">
+          <textarea style={textarea} value={value.contenidoBloque} onChange={(e) => update("contenidoBloque", e.target.value)} placeholder="Ej: Resolver ejercicios PAES de distribución normal usando tabla Z." />
+        </Field>
+        <Field title="3. Actividad principal">
+          <textarea style={{ ...textarea, minHeight: 82 }} value={value.actividadPrincipal} onChange={(e) => update("actividadPrincipal", e.target.value)} placeholder="Ej: Trabajo en parejas con problemas reales y discusión de respuestas." />
+        </Field>
+        <Field title="4. Observaciones del profesor">
+          <textarea style={{ ...textarea, minHeight: 72 }} value={value.observaciones} onChange={(e) => update("observaciones", e.target.value)} placeholder="Ej: Llevar calculadora, apoyar a estudiantes PIE, revisar guía anterior." />
+        </Field>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 900, color: COLORS.navy }}>
+          <input type="checkbox" checked={Boolean(value.gincana)} onChange={(e) => update("gincana", e.target.checked)} />
+          Evaluar esta clase con GincanaNexus en el cierre
+        </label>
+        <PreviewBox plan={value} />
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ color: COLORS.muted, fontSize: 13 }}>Al guardar se generan automáticamente unidad, OA sugerido, introducción, explicación, actividad, ticket de salida y prompt para Gincana.</div>
+          <button style={{ ...btnGreen, minWidth: 190 }} disabled={saving} onClick={() => onSave(slotId)}>{saving ? "Guardando…" : "💾 Guardar clase"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Planificaciones() {
   const navigate = useNavigate();
-
-  const isOnboarding = (() => { try { return localStorage.getItem("onboarding:fromRegistro") === "1"; } catch { return false; } })();
-
   const [user, setUser] = useState(auth.currentUser);
-  const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState([]);
-  const [asigSel, setAsigSel] = useState("");
-  const [nivelSel, setNivelSel] = useState("");
-  const [q, setQ] = useState("");
-  const [seleccionadas, setSeleccionadas] = useState([]);
-  const [agregando, setAgregando] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState("");
+  const [weekKey, setWeekKey] = useState(getWeekKey());
+  const [usuario, setUsuario] = useState(null);
+  const [bloques, setBloques] = useState([]);
+  const [plans, setPlans] = useState({});
+  const [filterDia, setFilterDia] = useState("Todos");
+  const [filterCurso, setFilterCurso] = useState("Todos");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    if (!auth.currentUser) signInAnonymously(auth).catch(console.error);
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid || user?.uid;
-    if (!uid) return;
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, "usuarios", uid));
-        if (snap.exists()) {
-          const lista = Array.isArray(snap.data()?.asignaturasPermitidas)
-            ? snap.data().asignaturasPermitidas.map((s) => String(s).trim()).filter(Boolean)
-            : [];
-          if (lista.length) setSeleccionadas(lista);
-        }
-      } catch (e) { console.warn("[Planificaciones] leer asignaturasPermitidas:", e?.message); }
-    })();
-  }, [user]);
-
-  useEffect(() => {
-    if (!asigSel) return;
-    setSeleccionadas((prev) => Array.from(new Set([...prev, asigSel])));
-  }, [asigSel]);
-
-  useEffect(() => {
-    const load = async () => {
+    const uid = user?.uid;
+    if (!uid) { setLoading(false); return; }
+    async function load() {
       setLoading(true);
       try {
-        const ref = collection(db, "curriculo");
-        let snap;
-        if (asigSel) {
-          snap = await getDocs(query(ref, where("asignaturaId", "==", asigSel)));
-        } else {
-          snap = await getDocs(ref);
+        const usnap = await getDoc(doc(db, "usuarios", uid));
+        const udata = usnap.exists() ? usnap.data() || {} : {};
+        setUsuario(udata);
+        const flat = Array.isArray(udata.horario_flat) ? udata.horario_flat : [];
+        const reales = flat.filter((c) => clean(c.asignatura) && (clean(c.nivel) || clean(c.curso))).sort((a, b) => Number(a.col) - Number(b.col) || Number(a.row) - Number(b.row));
+        setBloques(reales);
+        const nextPlans = {};
+        for (const cell of reales) {
+          const slotId = slotFromCell(cell);
+          const snap = await getDoc(doc(db, "clases_detalle", uid, "slots", slotId));
+          const saved = snap.exists() ? snap.data() || {} : {};
+          const base = emptyPlan(cell);
+          nextPlans[slotId] = {
+            ...base, ...saved,
+            objetivoSemana: clean(saved.objetivoSemana || saved.objetivoGeneral) || base.objetivoSemana,
+            contenidoBloque: clean(saved.contenidoBloque || saved.contenido) || base.contenidoBloque,
+            actividadPrincipal: clean(saved.actividadPrincipal) || base.actividadPrincipal,
+            observaciones: clean(saved.observaciones || saved.notasDocente) || base.observaciones,
+            gincana: saved.gincana ?? base.gincana,
+          };
         }
-        setItems(snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) })));
-      } catch (e) { console.error("Error leyendo curriculo:", e); }
-      finally { setLoading(false); }
-    };
+        setPlans(nextPlans);
+      } catch (e) {
+        console.error("[Planificaciones] load:", e);
+        alert("No se pudo cargar tu horario real. Revisa la consola.");
+      } finally { setLoading(false); }
+    }
     load();
-  }, [asigSel]);
+  }, [user]);
 
-  const asigOptions = useMemo(() => { const s = new Set(); items.forEach((x) => x.asignaturaId && s.add(x.asignaturaId)); return Array.from(s).sort(); }, [items]);
-  const nivelOptions = useMemo(() => { const s = new Set(); items.forEach((x) => x.nivel && s.add(x.nivel)); return Array.from(s).sort(); }, [items]);
+  const cursos = useMemo(() => {
+    const set = new Set();
+    bloques.forEach((c) => { const curso = cursoFromCell(c); if (curso) set.add(curso); });
+    return Array.from(set).sort();
+  }, [bloques]);
 
-  const list = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-    return items.filter((x) => {
-      if (asigSel && x.asignaturaId !== asigSel) return false;
-      if (nivelSel && (x.nivel || "") !== nivelSel) return false;
-      if (!qq) return true;
-      return [x.titulo, x.codUnidad, x.nivel, x.grado, ...(Array.isArray(x.objetivos) ? x.objetivos : []), ...(Array.isArray(x.habilidades) ? x.habilidades : [])].join(" ").toLowerCase().includes(qq);
+  const visibles = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return bloques.filter((c) => {
+      const dia = getDia(c); const curso = cursoFromCell(c); const slotId = slotFromCell(c); const plan = plans[slotId] || {};
+      if (filterDia !== "Todos" && dia !== filterDia) return false;
+      if (filterCurso !== "Todos" && curso !== filterCurso) return false;
+      if (!q) return true;
+      return [dia, curso, c.asignatura, plan.objetivoSemana, plan.contenidoBloque, plan.actividadPrincipal, plan.observaciones].join(" ").toLowerCase().includes(q);
     });
-  }, [items, asigSel, nivelSel, q]);
+  }, [bloques, plans, filterDia, filterCurso, search]);
 
-  async function guardarMateriasParaHorario() {
-    const uid = auth.currentUser?.uid || user?.uid;
-    if (!uid) return alert("No hay usuario autenticado.");
-    const lista = Array.from(new Set(seleccionadas.map((s) => String(s).trim()).filter(Boolean)));
-    if (!lista.length) return alert("Selecciona al menos una asignatura.");
+  const stats = useMemo(() => {
+    const total = bloques.length; let listos = 0; let conGincana = 0;
+    bloques.forEach((cell) => { const p = plans[slotFromCell(cell)] || {}; if (clean(p.objetivoSemana) && clean(p.contenidoBloque)) listos++; if (p.gincana) conGincana++; });
+    return { total, listos, conGincana };
+  }, [bloques, plans]);
+
+  function updatePlan(slotId, value) { setPlans((prev) => ({ ...prev, [slotId]: value })); }
+
+  async function saveOne(slotId) {
+    const uid = user?.uid;
+    if (!uid) return alert("Debes iniciar sesión.");
+    const plan = plans[slotId];
+    if (!plan) return;
+    if (!clean(plan.objetivoSemana) || !clean(plan.contenidoBloque)) return alert("Completa al menos el objetivo de la semana y el contenido de este bloque.");
+    setSaving(slotId);
     try {
-      await setDoc(doc(db, "usuarios", uid), { asignaturasPermitidas: lista, asignaturasUpdatedAt: serverTimestamp() }, { merge: true });
-      alert("✅ Materias guardadas.");
-    } catch (e) { console.error("guardarMateriasParaHorario:", e); alert("No se pudo guardar las materias."); }
+      const payload = {
+        ...completeForSave(plan), semana: weekKey,
+        profesor: clean(usuario?.nombre || user?.displayName || user?.email, "Profesor"),
+        nombreProfesor: clean(usuario?.nombre || user?.displayName || user?.email, "Profesor"),
+        institucion: clean(usuario?.colegio || usuario?.institucion, "Liceo Presidente Balmaceda"),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), payload, { merge: true });
+      setPlans((prev) => ({ ...prev, [slotId]: { ...prev[slotId], ...payload, objetivoSemana: payload.objetivoSemana, contenidoBloque: payload.contenidoBloque, actividadPrincipal: payload.actividadPrincipal, observaciones: payload.observaciones } }));
+      alert("✅ Clase guardada. Inicio, Desarrollo, Cierre y Gincana leerán esta planificación.");
+    } catch (e) { console.error("[Planificaciones] saveOne:", e); alert("No se pudo guardar esta clase."); }
+    finally { setSaving(""); }
   }
 
-  async function continuarAInicioClase() {
-    const uid = auth.currentUser?.uid || user?.uid;
-    const lista = Array.from(new Set(seleccionadas.map((s) => String(s).trim()).filter(Boolean)));
-    if (lista.length && uid) {
-      try { await setDoc(doc(db, "usuarios", uid), { asignaturasPermitidas: lista, asignaturasUpdatedAt: serverTimestamp() }, { merge: true }); }
-      catch (e) { console.warn("[Planificaciones] guardar antes de continuar:", e); }
-    }
-    try { localStorage.removeItem("onboarding:fromRegistro"); } catch {}
-    navigate("/InicioClase", { replace: true, state: { from: "onboarding" } });
-  }
-
-  async function propagarUnidadASlots(uid, row, objetivos, habilidades, nombre) {
+  async function saveAll() {
+    const uid = user?.uid;
+    if (!uid) return alert("Debes iniciar sesión.");
+    const pendientes = bloques.filter((cell) => { const p = plans[slotFromCell(cell)] || {}; return !clean(p.objetivoSemana) || !clean(p.contenidoBloque); });
+    if (pendientes.length) return alert(`Hay ${pendientes.length} bloque(s) sin objetivo/contenido. Guarda primero esos datos.`);
+    setSaving("all");
     try {
-      const usnap = await getDoc(doc(db, "usuarios", uid));
-      if (!usnap.exists()) return 0;
-      const data = usnap.data() || {};
-      const flat = data.horario_flat || [];
-      if (!flat.length) return 0;
-
-      const horarioConfig = data.horarioConfig || {};
-      const bloquesGen = Array.isArray(horarioConfig.bloquesGenerados) ? horarioConfig.bloquesGenerados : [];
-
-      const asigId = (row.asignaturaId || "").toLowerCase();
-      const nivelVariantes = getNivelVariantes(row.nivel || "");
-      const asigDisplays = [
-        ASIG_DISPLAY[asigId] || asigId,
-        asigId,
-        asigId.charAt(0).toUpperCase() + asigId.slice(1),
-      ];
-
-      const primerObjetivo = objetivos.length ? objetivos[0] : "";
-      const habilidadesArr = Array.isArray(habilidades) ? habilidades : [];
-      const habilidadesTexto = habilidadesArr.join(", ");
-
-      let slotsActualizados = 0;
-
-      for (const cell of flat) {
-        const asigCelda = (cell.asignatura || "").trim();
-        const nivelCelda = (cell.nivel || "").trim();
-
-        const asigMatch = asigDisplays.some((a) => a.toLowerCase() === asigCelda.toLowerCase());
-        const nivelMatch = nivelVariantes.some((n) => n.toLowerCase() === nivelCelda.toLowerCase());
-
-        if (!asigMatch || !nivelMatch) continue;
-
-        const slotId = `${cell.row}-${cell.col}`;
-        const seccion = cell.seccion || "";
-        const nivel = cell.nivel || "";
-        const curso = nivel && seccion ? `${nivel} ${seccion}` : nivel || seccion || "";
-        const dia = DIAS[cell.col] || "";
-
-        let bloqueNombre = `Bloque ${cell.row + 1}`;
-        let bloqueInicio = "";
-        if (bloquesGen.length) {
-          const soloClases = bloquesGen.filter((b) => !/(recreo|almuerzo)/i.test(b));
-          const bStr = soloClases[cell.row] || bloquesGen[cell.row] || "";
-          if (bStr) {
-            bloqueInicio = bStr.split(" - ")[0] || "";
-            bloqueNombre = `Bloque ${cell.row + 1}`;
-          }
-        }
-
-        const payload = {
-          unidad: nombre,
-          objetivo: primerObjetivo,
-          habilidades: habilidadesArr,
-          habilidadesTexto,
-          codUnidad: row.codUnidad || row.id || "",
-          asignatura: cell.asignatura || "",
-          nivel, seccion, curso, dia,
-          bloque: bloqueNombre,
-          bloqueInicio,
+      for (const cell of bloques) {
+        const slotId = slotFromCell(cell); const plan = plans[slotId]; if (!plan) continue;
+        await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), {
+          ...completeForSave(plan), semana: weekKey,
+          profesor: clean(usuario?.nombre || user?.displayName || user?.email, "Profesor"),
+          nombreProfesor: clean(usuario?.nombre || user?.displayName || user?.email, "Profesor"),
+          institucion: clean(usuario?.colegio || usuario?.institucion, "Liceo Presidente Balmaceda"),
           updatedAt: serverTimestamp(),
-        };
-
-        await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), payload, { merge: true });
-        slotsActualizados++;
+        }, { merge: true });
       }
-
-      return slotsActualizados;
-    } catch (e) {
-      console.warn("[propagarUnidadASlots]", e?.message);
-      return 0;
-    }
+      alert("✅ Semana completa guardada.");
+    } catch (e) { console.error("[Planificaciones] saveAll:", e); alert("No se pudo guardar toda la semana."); }
+    finally { setSaving(""); }
   }
 
-  const addToMyUnits = async (row) => {
-    const uid = auth.currentUser?.uid || user?.uid;
-    if (!uid) { alert("No hay usuario (auth anónima falló)."); return; }
-
-    const rowId = row.id || row.codUnidad || "x";
-    setAgregando(rowId);
-
-    try {
-      const asigId = (row.asignaturaId || "").toString().toLowerCase();
-      const nivelId = toNivelId(row.nivel || "");
-      const unidadId = (row.codUnidad || row.id || "SINID").toString();
-      const objetivos = Array.isArray(row.objetivos) ? row.objetivos : Array.isArray(row.oas) ? row.oas : [];
-      const habilidades = Array.isArray(row.habilidades) ? row.habilidades : [];
-      const nombre = row.titulo || row.codUnidad || unidadId;
-
-      if (asigId) setSeleccionadas((prev) => Array.from(new Set([...prev, asigId])));
-
-      await setDoc(
-        doc(db, "usuarios", uid, "planificacion_usuario", `${asigId}_${nivelId}`),
-        { updatedAt: serverTimestamp(), unidades: { [unidadId]: "seleccionada" } },
-        { merge: true }
-      );
-
-      await setDoc(
-        doc(db, "catalogo_curricular", asigId, "niveles", nivelId, "unidades", unidadId),
-        { nombre, objetivos, habilidades, horasSugeridas: row.horasSugeridas || null, grado: row.grado || "", oaClaves: row.oaClaves || row.oaCodigos || null, createdFrom: "curriculo", updatedAt: serverTimestamp() },
-        { merge: true }
-      );
-
-      const slotsActualizados = await propagarUnidadASlots(uid, row, objetivos, habilidades, nombre);
-
-      if (slotsActualizados > 0) {
-        alert(`✅ "${nombre}" guardada y propagada a ${slotsActualizados} bloque${slotsActualizados !== 1 ? "s" : ""} de tu horario.`);
-      } else {
-        alert(`✅ Unidad "${nombre}" guardada.\n\nNo se encontraron bloques de ${ASIG_DISPLAY[asigId] || asigId} ${row.nivel} en tu horario.`);
-      }
-    } catch (e) {
-      console.error("addToMyUnits error:", e);
-      alert("No se pudo agregar. Revisa consola.");
-    } finally {
-      setAgregando(null);
-    }
-  };
+  if (!user) return (
+    <div style={page}><div style={{ ...card, maxWidth: 680, margin: "80px auto" }}><h1 style={{ marginTop: 0 }}>Debes iniciar sesión</h1><p style={{ color: COLORS.muted }}>Para planificar tu semana, primero entra con tu cuenta de profesor.</p><button style={btnPrimary} onClick={() => navigate("/login")}>Ir al login</button></div></div>
+  );
 
   return (
-    <div style={{ padding: "2rem" }}>
-      {/* ✅ BANNER TRIAL - bloquea si expiró, avisa si queda 1 día */}
+    <div style={page}>
       <BannerTrial />
-
-      {isOnboarding && (
-        <div style={{ background: "linear-gradient(135deg, #ecfdf5, #eff6ff)", border: "1px solid #a7f3d0", borderRadius: 12, padding: "16px 20px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 15, color: "#065f46" }}>🎉 ¡Ya tienes 7 días de prueba gratis activos!</div>
-            <div style={{ fontSize: 13, color: "#047857", marginTop: 4 }}>Selecciona tus asignaturas y luego continúa a tu primera clase.</div>
-          </div>
-          <button onClick={continuarAInicioClase} style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "#10b981", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap" }}>
-            Continuar a InicioClase →
-          </button>
-        </div>
-      )}
-
-      <div style={{ position: "sticky", top: 0, zIndex: 10, display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", background: "#ffffff", borderBottom: "1px solid #e5e7eb", borderRadius: 8, marginBottom: 12 }}>
-        <button onClick={() => navigate("/horario")} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontWeight: 700 }}>
-          ← Volver a Horario
-        </button>
-        <button onClick={guardarMateriasParaHorario} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontWeight: 700, color: "#0ea5e9" }}>
-          💾 Guardar materias para Horario
-        </button>
-        {isOnboarding && (
-          <button onClick={continuarAInicioClase} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "#10b981", color: "#fff", cursor: "pointer", fontWeight: 800, marginLeft: "auto" }}>
-            Continuar a InicioClase →
-          </button>
-        )}
-        {!isOnboarding && (
-          <div style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>
-            {seleccionadas.length ? `Materias seleccionadas: ${seleccionadas.join(", ")}` : "Sin materias seleccionadas"}
-          </div>
-        )}
-      </div>
-
-      <h1 style={{ marginTop: 0 }}>📚 Planificaciones</h1>
-      <p style={{ color: "#64748b", fontSize: 14 }}>
-        Selecciona la unidad que vas a trabajar. Se guardará automáticamente en todos los bloques de tu horario para esa asignatura y nivel.
-      </p>
-
-      <div style={{ ...niceCard, marginBottom: "1rem" }}>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 12, color: "#475569" }}>Asignatura</div>
-            <select value={asigSel} onChange={(e) => setAsigSel(e.target.value)} style={input}>
-              <option value="">(todas)</option>
-              {asigOptions.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: "#475569" }}>Nivel</div>
-            <select value={nivelSel} onChange={(e) => setNivelSel(e.target.value)} style={input}>
-              <option value="">(todos)</option>
-              {nivelOptions.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={{ fontSize: 12, color: "#475569" }}>Buscar</div>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Unidad, objetivo u habilidad…" style={{ ...input, width: "100%" }} />
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gap: 12 }}>
-        {loading && <div style={{ color: "#64748b" }}>Cargando planificaciones…</div>}
-        {!loading && list.length === 0 && <div style={{ color: "#64748b" }}>No hay resultados con esos filtros.</div>}
-
-        {list.map((row) => {
-          const objetivos = Array.isArray(row.objetivos) ? row.objetivos : Array.isArray(row.oas) ? row.oas : [];
-          const habilidades = Array.isArray(row.habilidades) ? row.habilidades : [];
-          const nombre = row.titulo || row.codUnidad || row.id;
-          const isLoading = agregando === (row.id || row.codUnidad);
-          return (
-            <div key={row.id} style={{ ...niceCard }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 800 }}>{nombre}</div>
-                  <div style={{ color: "#64748b", fontSize: 13 }}>
-                    <b>Unidad:</b> {row.codUnidad || row.id} • <b>Asignatura:</b> {row.asignaturaId} • <b>Nivel:</b> {row.nivel} • <b>Grado:</b> {row.grado}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => addToMyUnits(row)}
-                  disabled={!!agregando}
-                  style={{ ...btn(isLoading ? "#94a3b8" : "#2563eb"), whiteSpace: "nowrap", minWidth: 160 }}
-                >
-                  {isLoading ? "Guardando…" : "Agregar a Mis Unidades"}
-                </button>
-              </div>
-
-              {objetivos.length > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>Objetivos</div>
-                  <ul style={{ margin: "6px 0 0 1rem" }}>
-                    {objetivos.slice(0, 6).map((o, i) => <li key={i} style={{ fontSize: 13 }}>{o}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              {habilidades.length > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>Habilidades</div>
-                  <ul style={{ margin: "6px 0 0 1rem" }}>
-                    {habilidades.slice(0, 6).map((h, i) => <li key={i} style={{ fontSize: 13 }}>{h}</li>)}
-                  </ul>
-                </div>
-              )}
+      <div style={shell}>
+        <section style={hero}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ maxWidth: 780 }}>
+              <div style={{ display: "inline-block", padding: "7px 12px", borderRadius: 999, background: "rgba(255,255,255,.12)", fontWeight: 950, marginBottom: 12 }}>📚 Planificación semanal simple · PragmaProfe v1.0</div>
+              <h1 style={{ margin: 0, fontSize: 42, lineHeight: 1.06 }}>Escribe poco. PragmaProfe arma la clase.</h1>
+              <p style={{ margin: "12px 0 0", fontSize: 17, opacity: .92, lineHeight: 1.55 }}>Para cada bloque solo completas cuatro cosas: objetivo semanal, contenido del bloque, actividad y observaciones. El sistema genera unidad, OA sugerido, explicación, ticket de salida y Gincana.</p>
             </div>
-          );
-        })}
-      </div>
+            <div style={{ display: "grid", gap: 8, minWidth: 230 }}>
+              <button style={btn} onClick={() => navigate("/horario")}>← Volver al horario</button>
+              <button style={btnPrimary} onClick={() => navigate("/InicioClase")}>Ir a InicioClase →</button>
+              <button style={btnGreen} onClick={saveAll} disabled={saving === "all"}>{saving === "all" ? "Guardando…" : "💾 Guardar toda la semana"}</button>
+            </div>
+          </div>
+        </section>
 
-      {isOnboarding && (
-        <div style={{ marginTop: 24, textAlign: "center" }}>
-          <button onClick={continuarAInicioClase} style={{ padding: "14px 32px", borderRadius: 12, border: "none", background: "#10b981", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 15, boxShadow: "0 4px 14px rgba(16,185,129,.4)" }}>
-            ✅ Listo — Ir a mi primera clase →
-          </button>
-        </div>
-      )}
+        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
+          <div style={miniCard}><b>Total de bloques</b><div style={{ fontSize: 30, fontWeight: 950 }}>{stats.total}</div></div>
+          <div style={miniCard}><b>Listos</b><div style={{ fontSize: 30, fontWeight: 950 }}>{stats.listos}</div></div>
+          <div style={miniCard}><b>Con Gincana</b><div style={{ fontSize: 30, fontWeight: 950 }}>{stats.conGincana}</div></div>
+          <div style={miniCard}><b>Semana</b><div style={{ fontSize: 20, fontWeight: 950 }}>{weekKey}</div></div>
+        </section>
+
+        <section style={card}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <div><div style={{ fontWeight: 950, fontSize: 20, color: COLORS.navy }}>Tus clases reales de la semana</div><div style={{ color: COLORS.muted, fontSize: 13 }}>Salen de tu horario guardado. Aquí no hay unidades mezcladas ni datos inventados.</div></div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <select style={{ ...input, width: 180 }} value={weekKey} onChange={(e) => setWeekKey(e.target.value)}><option value={previousWeekKey()}>Semana anterior · {previousWeekKey()}</option><option value={getWeekKey()}>Esta semana · {getWeekKey()}</option><option value={nextWeekKey()}>Próxima semana · {nextWeekKey()}</option></select>
+              <select style={{ ...input, width: 150 }} value={filterDia} onChange={(e) => setFilterDia(e.target.value)}><option>Todos</option>{DIAS.map((d) => <option key={d}>{d}</option>)}</select>
+              <select style={{ ...input, width: 170 }} value={filterCurso} onChange={(e) => setFilterCurso(e.target.value)}><option>Todos</option>{cursos.map((c) => <option key={c}>{c}</option>)}</select>
+              <input style={{ ...input, width: 220 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar curso o contenido..." />
+            </div>
+          </div>
+        </section>
+
+        {loading && <div style={card}>Cargando tu horario real…</div>}
+        {!loading && bloques.length === 0 && <div style={card}><h2 style={{ marginTop: 0 }}>Aún no tienes horario real guardado</h2><p style={{ color: COLORS.muted }}>Primero completa tu horario: día, bloque, curso y asignatura. Luego vuelves aquí y planificas cada bloque.</p><button style={btnPrimary} onClick={() => navigate("/horario")}>Completar horario</button></div>}
+        {!loading && visibles.length === 0 && bloques.length > 0 && <div style={card}>No hay bloques con esos filtros.</div>}
+        {!loading && visibles.length > 0 && <div style={{ display: "grid", gap: 16 }}>{visibles.map((cell) => { const slotId = slotFromCell(cell); return <SimplePlanCard key={slotId} cell={cell} value={plans[slotId] || emptyPlan(cell)} onChange={updatePlan} onSave={saveOne} saving={saving === slotId} />; })}</div>}
+      </div>
     </div>
   );
 }

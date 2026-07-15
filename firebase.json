@@ -8,35 +8,104 @@
       "source": "gincana",
       "codebase": "gincana",
       "disallowLegacyRuntimeConfig": true,
-      "ignore": ["node_modules",".git","firebase-debug.log","firebase-debug.*.log","*.local"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
     }
   ],
   "hosting": {
     "public": "dist",
-    "ignore": ["firebase.json","**/..*","**/node_modules/**"],
-    "cleanUrls": false,
-    "headers": [
-      {"source":"/juego/Build/**.js","headers":[{"key":"Content-Type","value":"application/javascript"}]},
-      {"source":"/juego/Build/**.framework.js.gz","headers":[{"key":"Content-Type","value":"application/javascript"},{"key":"Content-Encoding","value":"gzip"}]},
-      {"source":"/juego/Build/**.wasm.gz","headers":[{"key":"Content-Type","value":"application/wasm"},{"key":"Content-Encoding","value":"gzip"}]},
-      {"source":"/juego/Build/**.data.gz","headers":[{"key":"Content-Encoding","value":"gzip"}]}
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
     ],
-    "redirects": [
-      {"source":"/","destination":"/juego/index.html","type":302}
+    "headers": [
+      {
+        "source": "gincana/Build/*.framework.js.gz",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/javascript"
+          },
+          {
+            "key": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "gincana/Build/*.wasm.gz",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/wasm"
+          },
+          {
+            "key": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "gincana/Build/*.data.gz",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/octet-stream"
+          },
+          {
+            "key": "Content-Encoding",
+            "value": "gzip"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "gincana/Build/*.loader.js",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/javascript"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
     ],
     "rewrites": [
-      {"source":"/api/**","function":"app"},
-      {"source":"/juego","destination":"/juego/index.html"},
-      {"source":"/juego/**","destination":"/juego/index.html"},
-      {"source":"/planes.html","destination":"/planes.html"},
-      {"source":"/pago-exitoso.html","destination":"/pago-exitoso.html"},
-      {"source":"/profe.html","destination":"/profe.html"},
-      {"source":"**","destination":"/index.html","type":200}
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   },
   "emulators": {
-    "functions": {"port": 5001},
-    "hosting": {"port": 5174},
-    "ui": {"enabled": true}
+    "functions": {
+      "port": 5001
+    },
+    "hosting": {
+      "port": 5174
+    },
+    "ui": {
+      "enabled": true
+    }
   }
 }

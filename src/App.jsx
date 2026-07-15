@@ -335,13 +335,7 @@ function GuardedLayout() {
 }
 
 function DesarrolloRouteWrapper() {
-  const navigate = useNavigate();
-  return (
-    <DesarrolloClase
-      duracion={30}
-      onIrACierre={() => navigate("/cierre")}
-    />
-  );
+  return <DesarrolloClase duracion={30} />;
 }
 
 function SalaWrapper() {

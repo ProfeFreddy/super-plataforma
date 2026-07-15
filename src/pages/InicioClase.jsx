@@ -14,7 +14,14 @@ import {
   collection, doc, getDoc, onSnapshot, query, orderBy, setDoc, serverTimestamp,
 } from "firebase/firestore";
 
-import { getClaseVigente, getYearWeek } from "../services/PlanificadorService";
+import { getYearWeek } from "../services/PlanificadorService";
+import {
+  claseEsValida,
+  crearClaseDemo,
+  guardarSesionClase,
+  obtenerClaseActiva,
+  obtenerProximasClases,
+} from "../services/ClaseActivaService";
 import { PlanContext } from "../context/PlanContext";
 import { PLAN_CAPS } from "../lib/planCaps";
 import { nivelDesdeCurso } from "../lib/niveles";
@@ -371,6 +378,88 @@ function buildCloud(items = []) {
   return Array.from(map, ([text, value]) => ({ text, value })).sort((a, b) => b.value - a.value).slice(0, 120);
 }
 
+
+function SinClaseProgramada({ profesor, proximas, loading, error, onDemo, onHorario, onPlanificar }) {
+  const dias = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const nombreCorto = String(profesor || "Profesor").trim().split(/\s+/)[0] || "Profesor";
+
+  return (
+    <div style={page}>
+      <BannerTrial />
+      <div style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gap: "1rem" }}>
+        <section style={{ ...card, background: "linear-gradient(135deg, rgba(15,23,42,.97), rgba(14,116,144,.97))", color: "white", borderRadius: 28, padding: "1.5rem" }}>
+          <div style={{ color: "#a5f3fc", fontWeight: 900 }}>InicioClase · Estado real del horario</div>
+          <h1 style={{ margin: "12px 0 8px", fontSize: "clamp(2.2rem,5vw,4.4rem)", lineHeight: .98 }}>
+            Hola, {nombreCorto} 👋
+          </h1>
+          <p style={{ margin: 0, color: "#dbeafe", fontSize: 19 }}>
+            Ahora no tienes una clase programada.
+          </p>
+          <p style={{ margin: "8px 0 0", color: "#bae6fd" }}>
+            PragmaProfe no seleccionará un bloque antiguo ni inventará una clase.
+          </p>
+        </section>
+
+        {error ? (
+          <div style={{ ...card, borderLeft: "4px solid #dc2626", color: "#991b1b" }}>{error}</div>
+        ) : null}
+
+        <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1.3fr) minmax(290px,.7fr)", gap: "1rem" }}>
+          <div style={card}>
+            <h2 style={{ marginTop: 0 }}>🗓️ Próximas clases</h2>
+            <p style={{ color: COLORS.textMuted }}>
+              Estas tarjetas provienen de tu horario. Editarlas modifica únicamente la planificación futura.
+            </p>
+            {loading ? <p>Cargando próximas clases…</p> : null}
+            {!loading && proximas.length === 0 ? (
+              <div style={{ padding: 18, borderRadius: 16, background: "#f0f9ff", color: "#475569" }}>
+                No hay próximas clases preparadas.
+              </div>
+            ) : null}
+            <div style={{ display: "grid", gap: 12 }}>
+              {proximas.map((c) => (
+                <article key={`${c.slotId}-${c.deltaDias ?? 0}`} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 16, background: "#f8fafc" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: COLORS.textMuted, fontWeight: 900 }}>
+                        {dias[(new Date().getDay() + Number(c.deltaDias || 0)) % 7]} · {c.bloque || `slot ${c.slotId}`}
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 900, marginTop: 4 }}>
+                        {c.curso || "Curso"} · {c.asignatura || "Asignatura"}
+                      </div>
+                      <div style={{ marginTop: 6, color: COLORS.textMuted }}>{c.unidad || "Tarjeta pendiente de completar"}</div>
+                    </div>
+                    <button type="button" onClick={() => onPlanificar(c)} style={{ ...btnTiny, background: "#0ea5e9", color: "white", border: 0, padding: "10px 14px" }}>
+                      Editar tarjeta
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <aside style={{ display: "grid", gap: "1rem", alignContent: "start" }}>
+            <div style={card}>
+              <div style={{ color: "#7c3aed", fontWeight: 900 }}>🧪 SOLO DEMO</div>
+              <h2>Mostrar el flujo completo</h2>
+              <p style={{ color: COLORS.textMuted }}>
+                Usa datos independientes y no modifica horario, planificación, evidencias, progreso ni una sesión real.
+              </p>
+              <button type="button" onClick={onDemo} style={{ ...btnWhite, width: "100%", background: "#7c3aed", color: "white" }}>
+                Entrar a SOLO DEMO
+              </button>
+            </div>
+            <div style={card}>
+              <button type="button" onClick={onHorario} style={{ ...btnTiny, width: "100%", padding: 12, marginBottom: 10 }}>🗓️ Ver horario</button>
+              <button type="button" onClick={() => onPlanificar(null)} style={{ ...btnTiny, width: "100%", padding: 12 }}>📝 Ver planificaciones</button>
+            </div>
+          </aside>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function InicioClaseInner() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -420,6 +509,11 @@ function InicioClaseInner() {
   const [savingSlot, setSavingSlot] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [paidOk, setPaidOk] = useState(false);
+  const [flujoListo, setFlujoListo] = useState(false);
+  const [cargandoFlujo, setCargandoFlujo] = useState(true);
+  const [errorFlujo, setErrorFlujo] = useState("");
+  const [proximasClases, setProximasClases] = useState([]);
+  const [soloDemo, setSoloDemo] = useState(false);
 
   const DISABLE_CLOUD = search.get("nocloud") === "1";
   const DEBUG_ON = search.get("debug") === "1";
@@ -483,16 +577,56 @@ function InicioClaseInner() {
   }, [isEspecial, tituloEspecial, objetivoEspecial, notasEspeciales, lang]);
 
   useEffect(() => {
-    if (isEspecial) return;
+    if (isEspecial) {
+      setFlujoListo(true);
+      setCargandoFlujo(false);
+      return;
+    }
+
+    let alive = true;
     (async () => {
+      setCargandoFlujo(true);
+      setErrorFlujo("");
       try {
-        const res = await getClaseVigente(new Date()); setClaseVigente(res);
-        if (res && (res.unidad || res.objetivo || res.habilidades)) {
-          setClaseActual((prev) => ({ ...(prev || {}), unidad: res.unidad ?? prev?.unidad ?? "(sin unidad)", objetivo: res.objetivo ?? prev?.objetivo ?? "(sin objetivo)", habilidades: res.habilidades ?? prev?.habilidades ?? "(sin habilidades)", asignatura: res.asignatura ?? prev?.asignatura ?? asignaturaProfe ?? "(sin asignatura)" }));
+        const activa = await obtenerClaseActiva(new Date());
+        if (!alive) return;
+
+        if (!activa) {
+          setClaseVigente(null);
+          setClaseActual(null);
+          setSoloDemo(false);
+          const cards = await obtenerProximasClases(4, new Date());
+          if (alive) setProximasClases(Array.isArray(cards) ? cards : []);
+          return;
         }
-      } catch (e) { console.error("[Inicio] getClaseVigente:", e); }
+
+        const sesion = await guardarSesionClase(activa);
+        if (!alive) return;
+
+        const claseSesion = sesion || activa;
+        setClaseVigente(claseSesion);
+        setClaseActual(claseSesion);
+        setCurrentSlotId(claseSesion.slotId || activa.slotId || "0-0");
+        setSoloDemo(Boolean(claseSesion.soloDemo));
+        setProximasClases([]);
+
+        try {
+          localStorage.setItem("__lastSlotId", claseSesion.slotId || activa.slotId || "0-0");
+          localStorage.setItem("__pragmaClaseActual", JSON.stringify(claseSesion));
+        } catch {}
+      } catch (e) {
+        console.error("[InicioClase flujo]", e);
+        if (alive) setErrorFlujo("No se pudo consultar la clase actual. Revisa tu conexión y vuelve a intentar.");
+      } finally {
+        if (alive) {
+          setCargandoFlujo(false);
+          setFlujoListo(true);
+        }
+      }
     })();
-  }, [asignaturaProfe, isEspecial, lang]);
+
+    return () => { alive = false; };
+  }, [isEspecial]);
 
   useEffect(() => {
     if (isEspecial) { setCargandoCurriculo(false); return; }
@@ -521,7 +655,7 @@ function InicioClaseInner() {
   }, [authed, DEFAULT_SLOGAN, slogan]);
 
   useEffect(() => {
-    if (!authed || isEspecial) return;
+    if (!authed || isEspecial || !claseEsValida(claseActual)) return;
     const pick = (...vals) => { for (const v of vals) { const s = (v ?? "").toString().trim(); if (s && !/^\(sin/i.test(s) && !/^\(no /i.test(s)) return s; } return vals.find(Boolean) || ""; };
     const normHabs = (x) => Array.isArray(x) ? x.join(", ") : x ?? "";
     (async () => {
@@ -534,7 +668,7 @@ function InicioClaseInner() {
   }, [authed, asignaturaProfe, isEspecial, lang]);
 
   useEffect(() => {
-    if (!authed || isEspecial) return;
+    if (!authed || isEspecial || !claseEsValida(claseActual)) return;
     (async () => {
       try {
         const uid = auth.currentUser?.uid || localStorage.getItem("uid"); if (!uid) return;
@@ -576,7 +710,7 @@ const slot =
 
     const clase = await leerClaseFallback(slot);
 
-    if (clase) {
+    if (clase && claseEsValida(claseActual)) {
     setFallbackClase((prev) => ({
         ...prev,
         ...Object.fromEntries(
@@ -697,7 +831,7 @@ const slot =
       const nombreProfesorFinal =
         profesorSeguro && profesorSeguro !== "Profesor"
           ? profesorSeguro
-          : fallbackProfesor?.nombre || fallbackClase?.profesor || "Profesor";
+          : claseActual?.nombreProfesor || claseActual?.profesor || fallbackProfesor?.nombre || "Profesor";
 
       const claseParaFlujo = {
         profesor: nombreProfesorFinal,
@@ -728,10 +862,11 @@ const slot =
           tituloEspecial,
           objetivoEspecial,
           notasEspeciales,
+          soloDemo,
         },
       });
     }
-  }, [remaining, navigate, currentSlotId, claseActual, chronoDone, BYPASS_NAV, isEspecial, lang, tituloEspecial, objetivoEspecial, notasEspeciales, nombre]);
+  }, [remaining, navigate, currentSlotId, claseActual, chronoDone, BYPASS_NAV, isEspecial, lang, tituloEspecial, objetivoEspecial, notasEspeciales, nombre, soloDemo]);
 
   useEffect(() => {
     if (DISABLE_CLOUD) { setCloudMode("disabled"); return; }
@@ -748,47 +883,52 @@ const slot =
   const debugData = { lang, isEspecial, tituloEspecial, objetivoEspecial, currentSlotId, salaCode, plan, authed, isAnon, claseActual, curriculoLoaded: !!curriculo };
   const asistentesCount = presentes?.length || 0;
 
-  // ✅ Clase segura: primero usa datos reales; si fallan, usa el JSON fallback.
-  const claseSegura = fallbackClase || claseActual || {};
-  const profesorSeguro =
-    nombre && nombre !== "Profesor" ? nombre : fallbackClase?.profesor || "Profesor";
-  const colegioSeguro = fallbackClase?.colegio || "Institución educativa";
-  const sloganSeguro = slogan || fallbackClase?.slogan || DEFAULT_SLOGAN;
-  const asignaturaSegura =
-  claseSegura?.asignatura ||
-  "(sin asignatura)";
-  const cursoDesdeNivelSeccion =
-  [claseSegura?.nivel, claseSegura?.seccion].filter(Boolean).join(" ").trim();
+  // ✅ Clase segura: modo producto.
+  // Primero usa SIEMPRE la clase real que viene de Firebase / clases_detalle.
+  // El fallback ya no puede imponerse sobre curso, asignatura, unidad, OA ni objetivo.
+  const claseSegura = claseActual || {};
 
-const cursoSeguro =
-  claseSegura?.curso ||
-  cursoDesdeNivelSeccion ||
-  "(sin curso)";
-  const unidadSegura =
-  fallbackClase?.unidad ||
-  claseSegura?.unidad ||
-  "(sin unidad)";
+  const profesorSeguro =
+    nombre && nombre !== "Profesor"
+      ? nombre
+      : claseSegura?.nombreProfesor || claseSegura?.profesor || fallbackProfesor?.nombre || "Profesor";
+
+  const colegioSeguro =
+    claseSegura?.institucion || claseSegura?.colegio || fallbackProfesor?.colegio || "Institución educativa";
+
+  const sloganSeguro = slogan || DEFAULT_SLOGAN;
+
+  const asignaturaSegura = claseSegura?.asignatura || "";
+
+  const cursoSeguro = claseSegura?.curso || "";
+
+  const unidadSegura = claseSegura?.unidad || "";
+
   const objetivoCurricularSeguro =
-    claseSegura?.objetivoCurricular ||
     claseSegura?.oa ||
-    claseVigente?.oa ||
-    fallbackClase?.objetivoCurricular ||
+    claseSegura?.objetivoCurricular ||
     "";
+
   const objetivoClaseSeguro =
-  fallbackClase?.objetivoClase ||
-  fallbackClase?.objetivo ||
-  claseSegura?.objetivoClase ||
-  claseSegura?.objetivo ||
-  "(sin objetivo)";
-  const habilidadesSeguras = Array.isArray(fallbackClase?.habilidades)
-  ? fallbackClase.habilidades
-  : Array.isArray(claseSegura?.habilidades)
+    claseSegura?.objetivoClase ||
+    claseSegura?.objetivo ||
+    "";
+
+  const habilidadesSeguras = Array.isArray(claseSegura?.habilidades)
     ? claseSegura.habilidades
-    : [];
+    : String(claseSegura?.habilidadesTexto || claseSegura?.habilidades || "")
+        .split(/,|;/)
+        .map((h) => h.trim())
+        .filter(Boolean);
+
   const preguntaSegura =
-    preguntaClase || fallbackClase?.preguntaClase || "¿Qué palabra representa mejor la clase de hoy?";
-  const recursosSeguros = Array.isArray(fallbackClase?.recursos)
-    ? fallbackClase.recursos
+    claseSegura?.preguntaClase ||
+    claseSegura?.preguntaActivacion ||
+    preguntaClase ||
+    "";
+
+  const recursosSeguros = Array.isArray(claseSegura?.recursos)
+    ? claseSegura.recursos
     : ["QR activo", "Nube de palabras", "Evidencias", "Gincana Nexus"];
   const fechaClase = new Date().toLocaleDateString("es-CL", {
     weekday: "long",
@@ -810,35 +950,35 @@ const cursoSeguro =
       : profesorSeguro.split(" ")[0] || "profesor";
 
   const handleModoDemo = () => {
-    const demoSlot = window.prompt(
-      "Escribe el bloque demo. Ejemplo: 9-3 para jueves bloque 9, o 10-3 para jueves bloque 10.",
-      currentSlotId && currentSlotId !== "0-0" ? currentSlotId : "9-3"
-    );
+    const demo = crearClaseDemo();
+    const demoCompleta = {
+      ...demo,
+      soloDemo: true,
+      slotId: demo?.slotId || `demo-${Date.now()}`,
+      salaCode: demo?.salaCode || `DEMO-${String(Date.now()).slice(-5)}`,
+    };
 
-    if (!demoSlot) return;
-
-    const slotLimpio = demoSlot.trim();
-    if (!/^\d+-\d+$/.test(slotLimpio)) {
-      alert("Formato inválido. Usa algo como 9-3 o 10-3.");
-      return;
-    }
+    setClaseActual(demoCompleta);
+    setClaseVigente(demoCompleta);
+    setCurrentSlotId(demoCompleta.slotId);
+    setSoloDemo(true);
+    setProximasClases([]);
 
     try {
-      localStorage.setItem("__lastSlotId", slotLimpio);
+      localStorage.setItem("__pragmaClaseDemo", JSON.stringify(demoCompleta));
     } catch {}
-
-    window.location.assign(`/#/InicioClase?slot=${encodeURIComponent(slotLimpio)}`);
   };
   const handleIrADesarrollo = () => {
     const nombreProfesorFinal =
       profesorSeguro && profesorSeguro !== "Profesor"
         ? profesorSeguro
-        : fallbackProfesor?.nombre || fallbackClase?.profesor || "Profesor";
+        : claseActual?.nombreProfesor || claseActual?.profesor || fallbackProfesor?.nombre || "Profesor";
 
     const ficha = makeFicha();
     saveCurrentSlot();
 
     const claseParaFlujo = {
+      ...(claseActual || {}),
       profesor: nombreProfesorFinal,
       nombreProfesor: nombreProfesorFinal,
       asignatura: asignaturaSegura,
@@ -848,6 +988,9 @@ const cursoSeguro =
       objetivo: objetivoClaseSeguro,
       objetivoClase: objetivoClaseSeguro,
       habilidades: habilidadesSeguras,
+      slotId: currentSlotId || claseActual?.slotId || "0-0",
+      salaCode: claseActual?.salaCode || salaCode,
+      soloDemo,
     };
 
     try {
@@ -867,6 +1010,7 @@ const cursoSeguro =
         tituloEspecial,
         objetivoEspecial,
         notasEspeciales,
+        soloDemo,
       },
     });
   };
@@ -882,10 +1026,41 @@ const cursoSeguro =
     );
   }
 
+  if (!flujoListo || cargandoFlujo) {
+    return (
+      <div style={{ ...page, display: "grid", placeItems: "center" }}>
+        <div style={{ ...card, maxWidth: 460, textAlign: "center" }}>
+          <div style={{ fontWeight: 900, fontSize: "1.15rem" }}>Preparando tu jornada docente…</div>
+          <div style={{ color: COLORS.textMuted, marginTop: 8 }}>Consultando la clase vigente y su sesión.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isEspecial && !claseEsValida(claseActual)) {
+    return (
+      <SinClaseProgramada
+        profesor={nombre || fallbackProfesor?.nombre || "Profesor"}
+        proximas={proximasClases}
+        loading={cargandoFlujo}
+        error={errorFlujo}
+        onDemo={handleModoDemo}
+        onHorario={() => navigate("/horario")}
+        onPlanificar={(c) => navigate("/planificaciones", { state: c ? { clase: c, slotId: c.slotId } : undefined })}
+      />
+    );
+  }
+
   return (
     <div style={page}>
       {/* ✅ BANNER TRIAL - bloquea si expiró, avisa si queda 1 día */}
       <BannerTrial />
+
+      {soloDemo && (
+        <div style={{ ...card, maxWidth:1320, margin:"0 auto 1rem", background:"#7c3aed", color:"white", textAlign:"center", fontWeight:900 }}>
+          🧪 SOLO DEMO · Datos independientes · No modifica horario, planificación, evidencias ni progreso real
+        </div>
+      )}
 
       {DEBUG_ON && <ICDebugBadge show={true} data={debugData} />}
 
