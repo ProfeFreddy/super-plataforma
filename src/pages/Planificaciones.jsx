@@ -184,7 +184,7 @@ function emptyPlan(cell = {}) {
 
 function completeForSave(plan) {
   const auto = construirClaseMagistral(plan);
-  const finalPlan = { ...plan, ...Object.fromEntries(Object.entries(auto).map(([k, v]) => [k, clean(plan[k]) || v])) };
+  const finalPlan = { ...plan, ...auto };
   const habilidades = fromTextList(finalPlan.habilidadesTexto);
   const recursos = fromTextList(finalPlan.recursosTexto);
   return {
@@ -214,9 +214,9 @@ function Field({ title, children }) { return <div><label style={label}>{title}</
 
 function PreviewBox({ plan }) {
   const auto = construirClaseMagistral(plan);
-  const unidad = clean(plan.unidad) || auto.unidad;
-  const oa = clean(plan.oa) || auto.oa;
-  const objetivoClase = clean(plan.objetivoClase) || auto.objetivoClase;
+  const unidad = auto.unidad;
+  const oa = auto.oa;
+  const objetivoClase = auto.objetivoClase;
   return (
     <div style={{ ...miniCard, background: "#f0f9ff", borderColor: "#bae6fd" }}>
       <div style={{ fontWeight: 950, color: COLORS.navy, marginBottom: 8 }}>Vista automática que usará PragmaProfe</div>
