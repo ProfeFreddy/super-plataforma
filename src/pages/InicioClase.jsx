@@ -842,31 +842,6 @@ function InicioClaseInner() {
     })();
   }, [authed, asignaturaProfe, isEspecial, lang]);
 
-  useEffect(() => {
-    if (!authed || isEspecial || !claseEsValida(claseActual)) return;
-    (async () => {
-      try {
-        const uid = auth.currentUser?.uid || localStorage.getItem("uid"); if (!uid) return;
-        const sQ = slotFromQuery();
-        if (sQ) {
-          setCurrentSlotId(sQ); try { localStorage.setItem("__lastSlotId", sQ); } catch {}
-          const dsQ = await getDoc(doc(db, "clases_detalle", uid, "slots", sQ));
-          if (dsQ.exists()) { const det = dsQ.data(); setClaseActual((prev) => ({ ...(prev || {}), unidad: det.unidad ?? prev?.unidad ?? "(sin unidad)", objetivo: det.objetivo ?? prev?.objetivo ?? "(sin objetivo)", habilidades: det.habilidades ?? prev?.habilidades ?? "(sin habilidades)", asignatura: det.asignatura ?? prev?.asignatura ?? asignaturaProfe ?? "(sin asignatura)", nivel: det.nivel ?? prev?.nivel ?? "", seccion: det.seccion ?? prev?.seccion ?? "", curso: det.curso ?? prev?.curso ?? "" })); }
-          return;
-        }
-        const usnap = await getDoc(doc(db, "usuarios", uid));
-        const cfg = usnap.exists() ? usnap.data().horarioConfig || {} : {};
-        const marcasArr = getMarcasFromConfig(cfg);
-        if (marcasArr.length > 1) {
-          const fila = filaDesdeMarcas(marcasArr), col = colDeHoy(), slotId = `${fila}-${col}`;
-          setCurrentSlotId(slotId); try { localStorage.setItem("__lastSlotId", slotId); } catch {}
-          const dsnap = await getDoc(doc(db, "clases_detalle", uid, "slots", slotId));
-          if (dsnap.exists()) { const det = dsnap.data(); setClaseActual((prev) => ({ ...(prev || {}), unidad: det.unidad ?? prev?.unidad ?? "(sin unidad)", objetivo: det.objetivo ?? prev?.objetivo ?? "(sin objetivo)", habilidades: det.habilidades ?? prev?.habilidades ?? "(sin habilidades)", asignatura: det.asignatura ?? prev?.asignatura ?? asignaturaProfe ?? "(sin asignatura)", nivel: det.nivel ?? prev?.nivel ?? "", seccion: det.seccion ?? prev?.seccion ?? "", curso: det.curso ?? prev?.curso ?? "" })); }
-        }
-      } catch (e) { console.warn("[horarioConfig.marcas → clases_detalle]", e?.code || e?.message); }
-    })();
-  }, [authed, asignaturaProfe, isEspecial, lang]);
-
 useEffect(() => {
   fetch("/data/inicio_clase_fallback.json")
     .then((res) => res.json())

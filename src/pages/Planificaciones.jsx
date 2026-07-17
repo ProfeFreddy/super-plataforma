@@ -286,6 +286,7 @@ export default function Planificaciones() {
   const [filterDia, setFilterDia] = useState("Todos");
   const [filterCurso, setFilterCurso] = useState("Todos");
   const [search, setSearch] = useState("");
+  const slotSolicitado = clean(location.state?.slotId);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
@@ -338,12 +339,16 @@ export default function Planificaciones() {
     const q = search.trim().toLowerCase();
     return bloques.filter((c) => {
       const dia = getDia(c); const curso = cursoFromCell(c); const slotId = slotFromCell(c); const plan = plans[slotId] || {};
+      // Si el profesor llegó desde "Editar tarjeta" en InicioClase,
+      // se muestra únicamente el slot activo. Así no puede editar por error
+      // otra tarjeta del mismo viernes.
+      if (slotSolicitado && slotId !== slotSolicitado) return false;
       if (filterDia !== "Todos" && dia !== filterDia) return false;
       if (filterCurso !== "Todos" && curso !== filterCurso) return false;
       if (!q) return true;
       return [dia, curso, c.asignatura, plan.objetivoSemana, plan.contenidoBloque, plan.actividadPrincipal, plan.observaciones].join(" ").toLowerCase().includes(q);
     });
-  }, [bloques, plans, filterDia, filterCurso, search]);
+  }, [bloques, plans, filterDia, filterCurso, search, slotSolicitado]);
 
   const stats = useMemo(() => {
     const total = bloques.length; let listos = 0; let conGincana = 0;
