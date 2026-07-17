@@ -531,7 +531,10 @@ function InicioClaseInner() {
   const [claseActual, setClaseActual] = useState(null);
 
   useEffect(() => {
-    if (!authed || !auth.currentUser?.uid || auth.currentUser?.isAnonymous) {
+    // Una sesión anónima de Firebase también es una sesión válida. En modo
+    // incógnito es la identidad que utiliza la aplicación; bloquearla aquí
+    // dejaba cargando InicioClase para siempre.
+    if (!authed || !auth.currentUser?.uid) {
       return undefined;
     }
 
@@ -651,7 +654,7 @@ function InicioClaseInner() {
       return undefined;
     }
 
-    if (!authed || !auth.currentUser?.uid || auth.currentUser?.isAnonymous) {
+    if (!authed || !auth.currentUser?.uid) {
       return undefined;
     }
 
