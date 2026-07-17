@@ -1617,6 +1617,7 @@ const slot =
               <button style={btnWhite} onClick={handleIrADesarrollo}>🚀 {labels.irDesarrollo}</button>
               <button style={btnTiny} onClick={handleModoDemo}>🎬 Modo demo</button>
               <button style={btnTiny} onClick={() => navigate(getInicioClasePath())}>{labels.volverInicio}</button>
+              <button style={btnTiny} onClick={editarTarjetaActual}>✏️ Editar tarjeta</button>
               <button style={btnTiny} onClick={() => navigate("/horario")}>🗓️ {labels.editarHorario}</button>
               <button style={{ ...btnTiny, color:"#ef4444" }} onClick={nuevaSala}>🔄 Nueva sala</button>
             </div>
