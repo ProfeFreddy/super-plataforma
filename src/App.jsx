@@ -595,7 +595,10 @@ export default function App() {
           />
 
           <Route path="/plan-clase" element={<PlanClaseEditor />} />
-          <Route path="/planes" element={<Planes />} />
+          <Route
+  path="/planes"
+  element={<Navigate to="/home" replace />}
+/>
           <Route path="/gincana" element={<Gincana />} />
           <Route path="/pago" element={<Pago />} />
           <Route path="/confirmacion-pago" element={<ConfirmacionPago />} />
