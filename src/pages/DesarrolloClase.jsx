@@ -19,6 +19,7 @@ import {
   leerSesionClase,
   normalizeClase as normalizeClaseSesion,
 } from "../services/ClaseActivaService";
+import { escucharClaseActiva, leerClaseActivaLocal } from "../services/ClaseActivaStore";
 
 const COLORS = {
   bg1: "#0891b2",
@@ -108,7 +109,7 @@ function normalizeHabilidades(value, fallback = "Representar, Analizar, Argument
 
 function getClaseSources(location) {
   const state = location?.state || {};
-  const sesion = leerSesionClase();
+  const sesion = leerClaseActivaLocal();
 
   // Fuente única del flujo:
   // 1) clase recibida desde InicioClase
@@ -312,12 +313,19 @@ function InvalidClass({ onInicio }) {
 }
 
 export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
+  const [claseCentral, setClaseCentral] = React.useState(() => leerClaseActivaLocal());
+
+  React.useEffect(() => {
+    if (!auth.currentUser?.uid || auth.currentUser?.isAnonymous) return undefined;
+    return escucharClaseActiva(setClaseCentral, auth.currentUser.uid);
+  }, [auth.currentUser?.uid]);
+
   const navigate = useNavigate();
   const location = useLocation();
   const { ready, user } = useAuthSafe();
 
   const fuenteInicial = useMemo(
-    () => location.state?.clase || leerSesionClase() || null,
+    () => claseCentral || location.state?.clase || leerClaseActivaLocal() || null,
     [location.key, location.state]
   );
 
@@ -339,7 +347,7 @@ export default function DesarrolloClase({ duracion = 30, onIrACierre }) {
   }, [claseValida, clase.salaCode]);
 
   useEffect(() => {
-    const fuente = location.state?.clase || leerSesionClase() || null;
+    const fuente = claseCentral || location.state?.clase || leerClaseActivaLocal() || null;
     const valida = claseEsValida(normalizeClaseSesion(fuente || {}));
 
     setClaseValida(valida);

@@ -1,5 +1,6 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
+import { leerClaseActivaLocal } from "../services/ClaseActivaStore";
 
 const DOWNLOAD_URL =
   "https://drive.google.com/uc?export=download&id=1xmjGtEXFNJU3D88LKIKEAPYcCqRSJmYT";
@@ -8,6 +9,7 @@ const DOWNLOAD_URL =
 const MODO_EVALUACION = true;
 
 export default function Gincana() {
+  const claseActiva = leerClaseActivaLocal();
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   const asignatura = params.get("asignatura") || "";

@@ -191,6 +191,7 @@ async function writeSlots(uid, matriz, bloqueClases, profesorNombre) {
         ? `¿Qué recuerdas o sabes sobre ${cell.unidadTitulo}?`
         : "¿Qué idea importante recuerdas de la clase anterior?");
       const payload = {
+        slotId,
         asignatura: cell.asignatura,
         nivel: cell.nivel || "",
         seccion: cell.seccion || "",
@@ -472,7 +473,7 @@ export default function HorarioEditable() {
       await writeSlots(uid, matriz, bloqueClases, profesorNombre);
       const isOnboarding = localStorage.getItem("onboarding:fromRegistro") === "1" || localStorage.getItem("forceHorarioOnce") === "1";
       try { localStorage.removeItem("forceHorarioOnce"); } catch {}
-      navigate(isOnboarding ? "/planificaciones" : "/InicioClase");
+      navigate("/planificaciones", { replace: true });
     } catch (e) { console.error("Guardar horario:", e); alert("No se pudo guardar el horario."); }
     finally { setSaving(false); }
   }

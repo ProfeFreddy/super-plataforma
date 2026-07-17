@@ -1,6 +1,6 @@
 // src/pages/Planificaciones.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
@@ -269,6 +269,7 @@ function SimplePlanCard({ cell, value, onChange, onSave, saving }) {
 
 export default function Planificaciones() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(auth.currentUser);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
@@ -363,7 +364,19 @@ export default function Planificaciones() {
       };
       await setDoc(doc(db, "clases_detalle", uid, "slots", slotId), payload, { merge: true });
       setPlans((prev) => ({ ...prev, [slotId]: { ...prev[slotId], ...payload, objetivoSemana: payload.objetivoSemana, contenidoBloque: payload.contenidoBloque, actividadPrincipal: payload.actividadPrincipal, observaciones: payload.observaciones } }));
+      try {
+        const fecha = new Date().toISOString().slice(0, 10);
+        localStorage.removeItem(`pragma:tarjetaConfirmada:${fecha}:${slotId}`);
+        localStorage.setItem("__lastSlotId", slotId);
+      } catch {}
+
       alert("✅ Clase guardada. Inicio, Desarrollo, Cierre y Gincana leerán esta planificación.");
+
+      const volverA = location.state?.volverA;
+      const slotSolicitado = location.state?.slotId;
+      if (volverA && (!slotSolicitado || slotSolicitado === slotId)) {
+        navigate(volverA, { replace: true });
+      }
     } catch (e) { console.error("[Planificaciones] saveOne:", e); alert("No se pudo guardar esta clase."); }
     finally { setSaving(""); }
   }

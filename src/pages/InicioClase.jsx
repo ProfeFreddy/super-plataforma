@@ -19,7 +19,6 @@ import {
   claseEsValida,
   crearClaseDemo,
   guardarSesionClase,
-  obtenerClaseActiva,
   obtenerProximasClases,
 } from "../services/ClaseActivaService";
 import { PlanContext } from "../context/PlanContext";
@@ -33,6 +32,7 @@ import { SHOWTIME_PRESET } from "../lib/cloudPresets";
 import EpicStarters from "../components/EpicStarters";
 import { usePeriodoEval } from "../hooks/usePeriodoEval";
 import BannerTrial from "../components/BannerTrial"; // ✅ AGREGADO
+import { escucharClaseActiva, leerClaseActiva } from "../services/ClaseActivaStore";
 import {
   leerProfesorFallback,
   leerClaseFallback
@@ -269,6 +269,45 @@ function getMarcasFromConfig(cfg = {}) {
 
 const randCode = () => String(Math.floor(10000 + Math.random() * 90000));
 
+function obtenerNombreProfesorLocal(user = auth.currentUser) {
+  const candidatos = [];
+
+  try {
+    candidatos.push(
+      localStorage.getItem("nombreProfesor"),
+      localStorage.getItem("profesorNombre"),
+      localStorage.getItem("nombre"),
+      localStorage.getItem("displayName"),
+      localStorage.getItem("usuarioNombre")
+    );
+  } catch {}
+
+  candidatos.push(user?.displayName);
+
+  const email = String(user?.email || "").trim();
+  if (email) {
+    const base = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+    if (base) {
+      candidatos.push(
+        base.replace(/\b\w/g, (letra) => letra.toUpperCase())
+      );
+    }
+  }
+
+  for (const candidato of candidatos) {
+    const nombre = String(candidato || "").trim();
+    if (
+      nombre &&
+      nombre.toLowerCase() !== "profesor" &&
+      nombre.toLowerCase() !== "usuario"
+    ) {
+      return nombre;
+    }
+  }
+
+  return "Profesor";
+}
+
 function supportsSvgTextBBox() {
   try {
     const NS = "http://www.w3.org/2000/svg";
@@ -484,12 +523,31 @@ function InicioClaseInner() {
   const [currentSlotId, setCurrentSlotId] = useState("0-0");
   const [authed, setAuthed] = useState(false);
   const [isAnon, setIsAnon] = useState(false);
-  const [nombre, setNombre] = useState("Profesor");
+  const [nombre, setNombre] = useState(() => obtenerNombreProfesorLocal());
   const DEFAULT_SLOGAN = lang === "en" ? "From one teacher to another" : "De un profe para los profes";
   const [slogan, setSlogan] = useState(DEFAULT_SLOGAN);
   const [asignaturaProfe, setAsignaturaProfe] = useState("");
   const [horaActual, setHoraActual] = useState("");
   const [claseActual, setClaseActual] = useState(null);
+
+  useEffect(() => {
+    if (!authed || !auth.currentUser?.uid || auth.currentUser?.isAnonymous) {
+      return undefined;
+    }
+
+    return escucharClaseActiva(
+      (clase) => {
+        setClaseActual(clase || null);
+        if (clase?.slotId) {
+          setClaseVigente(clase);
+          setCurrentSlotId(clase.slotId);
+          setProximasClases([]);
+        }
+      },
+      auth.currentUser.uid
+    );
+  }, [authed]);
+
   const [fallbackClase, setFallbackClase] = useState(null);
   const [fallbackProfesor, setFallbackProfesor] = useState(null);
   const [planSug, setPlanSug] = useState(null);
@@ -514,6 +572,7 @@ function InicioClaseInner() {
   const [errorFlujo, setErrorFlujo] = useState("");
   const [proximasClases, setProximasClases] = useState([]);
   const [soloDemo, setSoloDemo] = useState(false);
+  const [tarjetaConfirmada, setTarjetaConfirmada] = useState(false);
 
   const DISABLE_CLOUD = search.get("nocloud") === "1";
   const DEBUG_ON = search.get("debug") === "1";
@@ -541,8 +600,17 @@ function InicioClaseInner() {
     let didTryAnon = false;
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
-        setAuthed(true); setIsAnon(!!u.isAnonymous);
-        const stored = localStorage.getItem("uid"); if (stored !== u.uid) localStorage.setItem("uid", u.uid); return;
+        setAuthed(true);
+        setIsAnon(!!u.isAnonymous);
+
+        const nombreAuth = obtenerNombreProfesorLocal(u);
+        if (nombreAuth !== "Profesor") {
+          setNombre(nombreAuth);
+        }
+
+        const stored = localStorage.getItem("uid");
+        if (stored !== u.uid) localStorage.setItem("uid", u.uid);
+        return;
       }
       if (ALLOW_ANON && !didTryAnon) {
         didTryAnon = true;
@@ -580,43 +648,68 @@ function InicioClaseInner() {
     if (isEspecial) {
       setFlujoListo(true);
       setCargandoFlujo(false);
-      return;
+      return undefined;
+    }
+
+    if (!authed || !auth.currentUser?.uid || auth.currentUser?.isAnonymous) {
+      return undefined;
     }
 
     let alive = true;
+
     (async () => {
       setCargandoFlujo(true);
       setErrorFlujo("");
+
       try {
-        const activa = await obtenerClaseActiva(new Date());
+        /*
+         * FUENTE ÚNICA:
+         * ClaseActivaStore detecta el slot horario actual, lo activa y
+         * devuelve exactamente el documento de clases_detalle correspondiente.
+         */
+        const activa = await leerClaseActiva(
+          auth.currentUser.uid,
+          new Date()
+        );
+
         if (!alive) return;
 
         if (!activa) {
           setClaseVigente(null);
           setClaseActual(null);
           setSoloDemo(false);
+
           const cards = await obtenerProximasClases(4, new Date());
-          if (alive) setProximasClases(Array.isArray(cards) ? cards : []);
+          if (alive) {
+            setProximasClases(Array.isArray(cards) ? cards : []);
+          }
           return;
         }
 
-        const sesion = await guardarSesionClase(activa);
-        if (!alive) return;
-
-        const claseSesion = sesion || activa;
-        setClaseVigente(claseSesion);
-        setClaseActual(claseSesion);
-        setCurrentSlotId(claseSesion.slotId || activa.slotId || "0-0");
-        setSoloDemo(Boolean(claseSesion.soloDemo));
+        setClaseVigente(activa);
+        setClaseActual(activa);
+        setCurrentSlotId(activa.slotId || "0-0");
+        setSoloDemo(Boolean(activa.soloDemo));
         setProximasClases([]);
 
         try {
-          localStorage.setItem("__lastSlotId", claseSesion.slotId || activa.slotId || "0-0");
-          localStorage.setItem("__pragmaClaseActual", JSON.stringify(claseSesion));
+          localStorage.setItem(
+            "__lastSlotId",
+            activa.slotId || "0-0"
+          );
+          localStorage.setItem(
+            "__pragmaClaseActual",
+            JSON.stringify(activa)
+          );
         } catch {}
-      } catch (e) {
-        console.error("[InicioClase flujo]", e);
-        if (alive) setErrorFlujo("No se pudo consultar la clase actual. Revisa tu conexión y vuelve a intentar.");
+      } catch (error) {
+        console.error("[InicioClase fuente única]", error);
+
+        if (alive) {
+          setErrorFlujo(
+            "No se pudo consultar la clase actual. Revisa tu conexión y vuelve a intentar."
+          );
+        }
       } finally {
         if (alive) {
           setCargandoFlujo(false);
@@ -625,8 +718,10 @@ function InicioClaseInner() {
       }
     })();
 
-    return () => { alive = false; };
-  }, [isEspecial]);
+    return () => {
+      alive = false;
+    };
+  }, [isEspecial, authed]);
 
   useEffect(() => {
     if (isEspecial) { setCargandoCurriculo(false); return; }
@@ -643,15 +738,95 @@ function InicioClaseInner() {
   }, [claseVigente, isEspecial]);
 
   useEffect(() => {
-    if (!authed) return;
+    if (!authed) return undefined;
+
+    let alive = true;
+
     (async () => {
-      const uid = auth.currentUser?.uid || localStorage.getItem("uid");
-      if (uid) {
-        try { const usnap = await getDoc(doc(db, "usuarios", uid)); if (usnap.exists()) { const u = usnap.data(); if (u?.nombre) setNombre(u.nombre); if (u?.asignatura) setAsignaturaProfe(u.asignatura); if (u?.slogan) setSlogan(String(u.slogan).trim() || DEFAULT_SLOGAN); } } catch (e) { console.warn("[usuarios] read:", e?.code); }
-        try { const psnap = await getDoc(doc(db, "profesores", uid)); if (psnap.exists()) { const p = psnap.data() || {}; if (p?.slogan && (!slogan || slogan === DEFAULT_SLOGAN)) setSlogan(String(p.slogan).trim() || DEFAULT_SLOGAN); } } catch (e) { console.warn("[profesores] read slogan:", e?.code); }
+      const currentUser = auth.currentUser;
+      const uid = currentUser?.uid || localStorage.getItem("uid");
+
+      const nombreAuth = obtenerNombreProfesorLocal(currentUser);
+      if (alive && nombreAuth !== "Profesor") {
+        setNombre(nombreAuth);
       }
-      try { const psnap = await getDoc(doc(db, "preguntaClase", "actual")); if (psnap.exists() && psnap.data()?.texto) setPreguntaClase(psnap.data().texto); } catch (e) { console.warn("[preguntaClase] read:", e?.code); }
+
+      if (uid && !currentUser?.isAnonymous) {
+        try {
+          const usnap = await getDoc(doc(db, "usuarios", uid));
+          if (usnap.exists()) {
+            const u = usnap.data() || {};
+            const nombreUsuario =
+              u.nombreCompleto ||
+              u.nombre ||
+              u.displayName ||
+              u.profesor ||
+              "";
+
+            if (alive && String(nombreUsuario).trim()) {
+              const limpio = String(nombreUsuario).trim();
+              setNombre(limpio);
+              try {
+                localStorage.setItem("nombreProfesor", limpio);
+              } catch {}
+            }
+
+            if (alive && u.asignatura) {
+              setAsignaturaProfe(u.asignatura);
+            }
+
+            if (alive && u.slogan) {
+              setSlogan(String(u.slogan).trim() || DEFAULT_SLOGAN);
+            }
+          }
+        } catch (e) {
+          console.warn("[usuarios] read:", e?.code || e);
+        }
+
+        try {
+          const psnap = await getDoc(doc(db, "profesores", uid));
+          if (psnap.exists()) {
+            const p = psnap.data() || {};
+            const nombreProfesor =
+              p.nombreCompleto ||
+              p.nombre ||
+              p.displayName ||
+              "";
+
+            if (alive && String(nombreProfesor).trim()) {
+              const limpio = String(nombreProfesor).trim();
+              setNombre(limpio);
+              try {
+                localStorage.setItem("nombreProfesor", limpio);
+              } catch {}
+            }
+
+            if (
+              alive &&
+              p.slogan &&
+              (!slogan || slogan === DEFAULT_SLOGAN)
+            ) {
+              setSlogan(String(p.slogan).trim() || DEFAULT_SLOGAN);
+            }
+          }
+        } catch (e) {
+          console.warn("[profesores] read:", e?.code || e);
+        }
+      }
+
+      try {
+        const psnap = await getDoc(doc(db, "preguntaClase", "actual"));
+        if (alive && psnap.exists() && psnap.data()?.texto) {
+          setPreguntaClase(psnap.data().texto);
+        }
+      } catch (e) {
+        console.warn("[preguntaClase] read:", e?.code || e);
+      }
     })();
+
+    return () => {
+      alive = false;
+    };
   }, [authed, DEFAULT_SLOGAN, slogan]);
 
   useEffect(() => {
@@ -730,12 +905,47 @@ const slot =
 }, []);
 
   useEffect(() => {
+    if (!flujoListo || !claseActual) return;
+
     (async () => {
-      let code = salaCode; if (!code) { code = randCode(); localStorage.setItem("salaCode", code); setSalaCode(code); }
-      try { await setDoc(doc(db, "salas", code), { activa: true, createdAt: serverTimestamp() }, { merge: true }); } catch (e) { console.warn("[sala] setDoc:", e?.code || e?.message); }
+      const fechaKey = new Date().toISOString().slice(0, 10);
+      const slotKey = claseActual?.slotId || currentSlotId || "0-0";
+      const sessionKey = `${fechaKey}:${slotKey}`;
+      const previousSessionKey = localStorage.getItem("inicioClase_session_key");
+
+      let code = localStorage.getItem("salaCode") || "";
+
+      // Cada clase real comienza con una sala nueva. Así la nube, asistencia
+      // y últimos envíos nunca se mezclan con una clase anterior.
+      if (!code || previousSessionKey !== sessionKey) {
+        code = randCode();
+        localStorage.setItem("salaCode", code);
+        localStorage.setItem("inicioClase_session_key", sessionKey);
+        setSalaCode(code);
+        setPalabrasAgg([]);
+        setUltimos([]);
+        setPresentes([]);
+        window.__salaInitDone = false;
+      }
+
+      try {
+        await setDoc(
+          doc(db, "salas", code),
+          {
+            activa: true,
+            createdAt: serverTimestamp(),
+            slotId: slotKey,
+            fecha: fechaKey,
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        console.warn("[sala] setDoc:", e?.code || e?.message);
+      }
+
       setParticipaURL(code ? makeUrl(`/sala/${code}`) : makeUrl("/participa"));
     })();
-  }, []);
+  }, [flujoListo, claseActual?.slotId, currentSlotId]);
 
   useEffect(() => {
     if (!authed || window.__salaInitDone) return;
@@ -893,8 +1103,21 @@ const slot =
       ? nombre
       : claseSegura?.nombreProfesor || claseSegura?.profesor || fallbackProfesor?.nombre || "Profesor";
 
+  const institucionLocal =
+    localStorage.getItem("institucion") ||
+    localStorage.getItem("colegio") ||
+    localStorage.getItem("establecimiento") ||
+    localStorage.getItem("nombreInstitucion") ||
+    "";
+
   const colegioSeguro =
-    claseSegura?.institucion || claseSegura?.colegio || fallbackProfesor?.colegio || "Institución educativa";
+    claseSegura?.institucion ||
+    claseSegura?.colegio ||
+    claseSegura?.establecimiento ||
+    fallbackProfesor?.institucion ||
+    fallbackProfesor?.colegio ||
+    institucionLocal ||
+    "Institución educativa";
 
   const sloganSeguro = slogan || DEFAULT_SLOGAN;
 
@@ -1015,6 +1238,38 @@ const slot =
     });
   };
 
+  const tarjetaKey = useMemo(() => {
+    const fecha = new Date().toISOString().slice(0, 10);
+    return `pragma:tarjetaConfirmada:${fecha}:${currentSlotId || claseActual?.slotId || "0-0"}`;
+  }, [currentSlotId, claseActual?.slotId]);
+
+  useEffect(() => {
+    if (!claseActual || isEspecial || soloDemo) {
+      setTarjetaConfirmada(true);
+      return;
+    }
+    try {
+      setTarjetaConfirmada(localStorage.getItem(tarjetaKey) === "1");
+    } catch {
+      setTarjetaConfirmada(false);
+    }
+  }, [tarjetaKey, claseActual, isEspecial, soloDemo]);
+
+  const confirmarTarjetaActual = () => {
+    try { localStorage.setItem(tarjetaKey, "1"); } catch {}
+    setTarjetaConfirmada(true);
+  };
+
+  const editarTarjetaActual = () => {
+    navigate("/planificaciones", {
+      state: {
+        clase: claseActual,
+        slotId: currentSlotId || claseActual?.slotId || "0-0",
+        volverA: "/InicioClase",
+      },
+    });
+  };
+
   if (!authReady) {
     return (
       <div style={page}>
@@ -1040,7 +1295,13 @@ const slot =
   if (!isEspecial && !claseEsValida(claseActual)) {
     return (
       <SinClaseProgramada
-        profesor={nombre || fallbackProfesor?.nombre || "Profesor"}
+        profesor={
+          nombre && nombre !== "Profesor"
+            ? nombre
+            : obtenerNombreProfesorLocal(auth.currentUser) ||
+              fallbackProfesor?.nombre ||
+              "Profesor"
+        }
         proximas={proximasClases}
         loading={cargandoFlujo}
         error={errorFlujo}
@@ -1048,6 +1309,46 @@ const slot =
         onHorario={() => navigate("/horario")}
         onPlanificar={(c) => navigate("/planificaciones", { state: c ? { clase: c, slotId: c.slotId } : undefined })}
       />
+    );
+  }
+
+  if (!isEspecial && !soloDemo && claseEsValida(claseActual) && !tarjetaConfirmada) {
+    return (
+      <div style={{ ...page, display: "grid", placeItems: "center" }}>
+        <section style={{ ...card, width: "min(760px, 96vw)", borderRadius: 24, padding: "1.5rem" }}>
+          <div style={{ color: "#0284c7", fontWeight: 900 }}>📝 Tarjeta de la clase actual</div>
+          <h1 style={{ margin: "10px 0 6px", fontSize: "clamp(1.8rem,4vw,3rem)" }}>
+            {claseActual?.curso || "Curso"} · {claseActual?.asignatura || "Asignatura"}
+          </h1>
+          <p style={{ color: COLORS.textMuted, marginTop: 0 }}>
+            Revisa esta tarjeta antes de iniciar. Los cambios que hagas pasarán a Inicio, Desarrollo, Cierre y GincanaNexus.
+          </p>
+
+          <div style={{ display: "grid", gap: 12, margin: "18px 0" }}>
+            <div style={{ padding: 14, borderRadius: 14, background: "#f8fafc", border: `1px solid ${COLORS.border}` }}>
+              <strong>Unidad:</strong> {claseActual?.unidad || "Sin definir"}
+            </div>
+            <div style={{ padding: 14, borderRadius: 14, background: "#f8fafc", border: `1px solid ${COLORS.border}` }}>
+              <strong>OA:</strong> {claseActual?.oa || claseActual?.objetivoCurricular || "Sin definir"}
+            </div>
+            <div style={{ padding: 14, borderRadius: 14, background: "#f8fafc", border: `1px solid ${COLORS.border}` }}>
+              <strong>Objetivo de la clase:</strong> {claseActual?.objetivoClase || claseActual?.objetivo || "Sin definir"}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <button type="button" onClick={editarTarjetaActual} style={{ ...btnWhite, background: "#0ea5e9", color: "white" }}>
+              ✏️ Editar tarjeta
+            </button>
+            <button type="button" onClick={confirmarTarjetaActual} style={{ ...btnWhite, background: "#16a34a", color: "white" }}>
+              ✅ Está correcta · iniciar clase
+            </button>
+            <button type="button" onClick={() => navigate("/horario")} style={btnTiny}>
+              🗓️ Volver al horario
+            </button>
+          </div>
+        </section>
+      </div>
     );
   }
 
