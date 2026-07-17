@@ -454,6 +454,25 @@ function ForceInicioClaseDev({ children }) {
 
 /* ── APP PRINCIPAL ── */
 export default function App() {
+  const esSubdominioJuego =
+    window.location.hostname === "juego.pragmaprofe.com";
+
+  const estaEnRaiz =
+    window.location.pathname === "/" ||
+    window.location.pathname === "";
+
+  if (esSubdominioJuego && estaEnRaiz) {
+    window.location.replace(
+      "https://juego.pragmaprofe.com/gincana/"
+    );
+
+    return (
+      <div style={{ padding: 24, fontFamily: "sans-serif" }}>
+        Abriendo GincanaNexus…
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <Suspense fallback={<div style={{ padding: 16 }}>Cargando…</div>}>

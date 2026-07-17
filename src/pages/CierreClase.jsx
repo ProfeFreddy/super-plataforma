@@ -10,11 +10,11 @@ import CronometroGlobal from "../components/CronometroGlobal";
 import DesarrolloHeader from "../components/desarrollo/DesarrolloHeader";
 import {
   claseEsValida,
-  construirUrlGincana,
   leerSesionClase,
   limpiarSesionClase,
   normalizeClase,
 } from "../services/ClaseActivaService";
+import { escucharClaseActiva, leerClaseActivaLocal } from "../services/ClaseActivaStore";
 
 const COLORS = {
   bg1: "#0e7490",
@@ -161,18 +161,14 @@ function makeResumenDocente(clase, conectados, respuestas) {
   return `Clase cerrada con evidencia real: se trabajó ${clase.unidad}, asociado a ${clase.oa}, con foco en ${clase.habilidades}. Participación registrada: ${n} conectado(s) y ${r} envío(s).`;
 }
 
-function safeGincanaUrl(clase) {
-  const params = new URLSearchParams();
-  if (clase.curso) params.set("curso", clase.curso);
-  if (clase.asignatura) params.set("asignatura", clase.asignatura);
-  if (clase.unidad) params.set("unidad", clase.unidad);
-  if (clase.oa) params.set("oa", clase.oa);
-  if (clase.salaCode) params.set("sala", clase.salaCode);
-  return `https://juego.pragmaprofe.com/#/gincana?${params.toString()}`;
+const GINCANA_WEBGL_URL = "https://juego.pragmaprofe.com/gincana/";
+
+function safeGincanaUrl() {
+  return GINCANA_WEBGL_URL;
 }
 
 function CierreRightPanel({ clase, conectados, respuestas }) {
-  const gincanaUrl = clase?.gincanaUrl || safeGincanaUrl(clase);
+  const gincanaUrl = safeGincanaUrl();
   return (
     <div style={cardStyle()}>
       <div style={{ textAlign: "center" }}>
@@ -266,7 +262,7 @@ function TicketSalida({ clase }) {
 }
 
 function EvaluarConGincana({ clase }) {
-  const gincanaUrl = clase?.gincanaUrl || safeGincanaUrl(clase);
+  const gincanaUrl = safeGincanaUrl();
   return (
     <section style={cardStyle({ background: "linear-gradient(135deg,#111827,#312e81)", color: "white", border: "1px solid rgba(255,255,255,.18)" })}>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 220px", gap: 22, alignItems: "center" }}>
@@ -332,11 +328,18 @@ function MensajeDocente({ clase }) {
 }
 
 export default function CierreClase({ duracion = 10 }) {
+  const [claseCentral, setClaseCentral] = React.useState(() => leerClaseActivaLocal());
+
+  React.useEffect(() => {
+    if (!auth.currentUser?.uid || auth.currentUser?.isAnonymous) return undefined;
+    return escucharClaseActiva(setClaseCentral, auth.currentUser.uid);
+  }, [auth.currentUser?.uid]);
+
   const navigate = useNavigate();
   const location = useLocation();
 
   const initial = useMemo(
-    () => normalizeClase(location.state?.clase || leerSesionClase() || {}),
+    () => normalizeClase(claseCentral || location.state?.clase || leerClaseActivaLocal() || {}),
     [location.state]
   );
 
@@ -347,7 +350,7 @@ export default function CierreClase({ duracion = 10 }) {
   const [cerrando, setCerrando] = useState(false);
 
   useEffect(() => {
-    setClase(normalizeClase(location.state?.clase || leerSesionClase() || {}));
+    setClase(normalizeClase(claseCentral || location.state?.clase || leerClaseActivaLocal() || {}));
   }, [location.key, location.state]);
 
   useEffect(() => {
@@ -376,9 +379,9 @@ export default function CierreClase({ duracion = 10 }) {
   }, [clase.salaCode]);
 
   const gincanaUrl = useMemo(
-    () => (claseEsValida(clase) ? construirUrlGincana(clase) : ""),
-    [clase]
-  );
+  () => (claseEsValida(clase) ? safeGincanaUrl() : ""),
+  [clase]
+);
 
   const cerrarClase = async () => {
     if (!claseEsValida(clase) || clase.soloDemo) return;
