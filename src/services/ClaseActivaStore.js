@@ -346,21 +346,12 @@ export async function leerClaseActiva(uid, fecha = new Date()) {
     ? normalizarClaseActiva(snap.data() || {})
     : null;
 
-  // Si ahora hay una clase programada, ese slot tiene prioridad absoluta.
+  // Si ahora hay una clase programada, se vuelve a leer SIEMPRE la tarjeta.
+  // Así los cambios recién guardados no quedan ocultos por una copia antigua
+  // del mismo slot almacenada en clase_activa.
   if (slotHorario) {
-    if (
-      !guardada ||
-      guardada.slotId !== slotHorario ||
-      guardada.activa === false
-    ) {
-      const activada = await activarClasePorSlot(
-        slotHorario,
-        resolvedUid
-      );
-      return activada || leerClaseActivaLocal();
-    }
-
-    return guardarClaseActivaLocal(guardada);
+    const activada = await activarClasePorSlot(slotHorario, resolvedUid);
+    return activada || leerClaseActivaLocal();
   }
 
   // Fuera de un bloque lectivo no se mantiene como vigente una clase vieja.

@@ -101,6 +101,8 @@ function fromTextList(value) {
 
 function inferirUnidad({ asignatura, curso, objetivoSemana, contenidoBloque }) {
   const texto = `${objetivoSemana} ${contenidoBloque}`.toLowerCase();
+  if (texto.includes("función inversa") || texto.includes("funcion inversa") || texto.includes("inversa de una función") || texto.includes("inversa de una funcion")) return "Función inversa";
+  if (texto.includes("límite") || texto.includes("limite") || texto.includes("derivad") || texto.includes("integral")) return "Límites, derivadas e integrales";
   if (texto.includes("estad")) return "Estadística";
   if (texto.includes("probab")) return "Probabilidad";
   if (texto.includes("normal")) return "Distribución normal";
@@ -117,6 +119,7 @@ function inferirUnidad({ asignatura, curso, objetivoSemana, contenidoBloque }) {
 
 function inferirOA({ curso, unidad, objetivoSemana }) {
   const texto = `${curso} ${unidad} ${objetivoSemana}`.toLowerCase();
+  if ((texto.includes("2° medio") || texto.includes("2º medio") || texto.includes("2 medio")) && texto.includes("inversa")) return "MA2M OA05";
   if (texto.includes("homotec")) return "OA08";
   if (texto.includes("estad") || texto.includes("probab")) {
     if (texto.includes("3")) return "FG-MATE-3M";
@@ -132,10 +135,13 @@ function construirClaseMagistral(plan) {
   const asignatura = clean(plan.asignatura, "la asignatura");
   const objetivoSemana = clean(plan.objetivoSemana, "comprender el contenido central de la semana");
   const contenidoBloque = clean(plan.contenidoBloque, "el contenido de este bloque");
-  const unidad = clean(plan.unidad) || inferirUnidad(plan);
-  const oa = clean(plan.oa) || inferirOA({ ...plan, unidad });
-  const objetivoClase = clean(plan.objetivoClase) || `Aplicar ${contenidoBloque} para avanzar en el objetivo semanal: ${objetivoSemana}.`;
-  const preguntaActivacion = clean(plan.preguntaActivacion) || `¿Qué recuerdas o sabes que podría ayudarte hoy con ${unidad}?`;
+  // La tarjeta es la fuente pedagógica. Unidad, OA, objetivo y pregunta
+  // se regeneran desde lo que el profesor acaba de escribir, sin conservar
+  // valores curriculares antiguos provenientes del horario.
+  const unidad = inferirUnidad({ ...plan, objetivoSemana, contenidoBloque });
+  const oa = inferirOA({ ...plan, unidad, objetivoSemana });
+  const objetivoClase = `Aplicar ${contenidoBloque} para avanzar en el objetivo semanal: ${objetivoSemana}.`;
+  const preguntaActivacion = `¿Qué recuerdas o sabes que podría ayudarte hoy con ${unidad}?`;
 
   return {
     unidad,
